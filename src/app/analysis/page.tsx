@@ -308,12 +308,15 @@ export default function AnalysisPage() {
       {/* ─── Step 3: Result ─── */}
       {step === 3 && result && scoring && (
         <div className="space-y-6">
-          {/* Total score + explanation */}
+          {/* Total score + confidence + explanation */}
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Analysis Result</h2>
-                <p className="text-sm text-[var(--muted)]">Weighted score across 6 dimensions.</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <p className="text-sm text-[var(--muted)]">Weighted score across 6 dimensions</p>
+                  <ConfidenceBadge level={scoring.confidenceLevel} />
+                </div>
               </div>
               <ScoreBadge score={scoring.totalScore} size="lg" />
             </div>
@@ -340,21 +343,34 @@ export default function AnalysisPage() {
             </div>
           </div>
 
-          {/* Key metrics */}
+          {/* Comparison metrics */}
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6">
-            <h3 className="font-semibold mb-3">Key Metrics</h3>
-            <div className="grid sm:grid-cols-3 gap-4 text-sm">
-              <MetricCard label="Gross Yield" value={`${((result.monthlyRent * 12) / result.purchasePrice * 100).toFixed(2)}%`} />
-              <MetricCard label="Price / m\u00B2" value={`\u20AC${Math.round(result.purchasePrice / result.areaSqm).toLocaleString()}`} />
-              <MetricCard label="Rent Multiplier" value={`${(result.purchasePrice / (result.monthlyRent * 12)).toFixed(1)}x`} />
+            <h3 className="font-semibold mb-3">Comparison Metrics</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+              <MetricCard label="Gross Yield" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
+              <MetricCard label="Factor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
+              <MetricCard label="Renovations" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
+              <MetricCard label="Energy Rank" value={`${scoring.comparisonMetrics.energyRank}/100`} />
+              <MetricCard label="Bank Score" value={`${scoring.comparisonMetrics.bankScore}/100`} />
+              <MetricCard label="Risk Level" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
             </div>
           </div>
 
-          {/* Strengths + risks + recommendations */}
-          <div className="grid lg:grid-cols-3 gap-6">
+          {/* Strengths + risks */}
+          <div className="grid lg:grid-cols-2 gap-6">
             <ListCard title="Strengths" items={scoring.strengths} icon="\u2705" />
             <ListCard title="Risks" items={scoring.risks} icon="\u26A0\uFE0F" />
-            <ListCard title="Recommendations" items={scoring.recommendations} icon="\u2192" />
+          </div>
+
+          {/* Categorized recommendations */}
+          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
+            <h3 className="font-semibold">Recommendations</h3>
+            <div className="grid sm:grid-cols-2 gap-5">
+              <RecoSection tag="Financing" items={scoring.recommendations.financing} icon="\uD83C\uDFE6" />
+              <RecoSection tag="Technical" items={scoring.recommendations.technical} icon="\uD83D\uDD27" />
+              <RecoSection tag="Legal" items={scoring.recommendations.legal} icon="\u2696\uFE0F" />
+              <RecoSection tag="Strategy" items={scoring.recommendations.strategy} icon="\uD83C\uDFAF" />
+            </div>
           </div>
 
           {/* Property preview card */}
@@ -472,6 +488,38 @@ function ListCard({ title, items, icon }: { title: string; items: string[]; icon
           <li key={i} className="flex gap-2 text-sm text-[var(--muted)] leading-relaxed">
             <span className="shrink-0 mt-0.5">{icon}</span>
             <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ConfidenceBadge({ level }: { level: import("@/lib/scoring").ConfidenceLevel }) {
+  const styles = {
+    high: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    medium: "bg-amber-50 text-amber-700 ring-amber-200",
+    low: "bg-red-50 text-red-700 ring-red-200",
+  };
+  return (
+    <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ring-1 ${styles[level]}`}>
+      {level} confidence
+    </span>
+  );
+}
+
+function RecoSection({ tag, items, icon }: { tag: string; items: string[]; icon: string }) {
+  if (items.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-1.5">
+        <span className="text-sm">{icon}</span>
+        <h4 className="text-sm font-semibold">{tag}</h4>
+      </div>
+      <ul className="space-y-1.5">
+        {items.map((item, i) => (
+          <li key={i} className="text-sm text-[var(--muted)] leading-relaxed pl-5">
+            {item}
           </li>
         ))}
       </ul>
