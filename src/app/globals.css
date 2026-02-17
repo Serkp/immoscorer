@@ -3,23 +3,29 @@
 @tailwind utilities;
 
 :root {
-  --background: #0b0f19;
-  --foreground: #e2e8f0;
-  --card: #111827;
-  --card-border: #1e293b;
-  --accent: #3b82f6;
-  --accent-hover: #2563eb;
-  --muted: #94a3b8;
-  --input-bg: #1e293b;
-  --input-border: #334155;
+  --bg: #F8FAFC;
+  --fg: #0F172A;
+  --muted: #64748B;
+  --border: #E2E8F0;
+  --card: #FFFFFF;
+  --accent: #2563EB;
+  --accent-hover: #1D4ED8;
+  --accent-light: #EFF6FF;
+  --success: #16A34A;
+  --warning: #F59E0B;
+  --danger: #EF4444;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  color: var(--fg);
+  background: var(--bg);
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* Smooth page transitions */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
 }

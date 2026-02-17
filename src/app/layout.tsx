@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
+import { Navbar } from "@/components/Navbar";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -24,26 +25,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
+        className={`${geistSans.variable} ${geistMono.variable} font-[family-name:var(--font-geist-sans)] antialiased min-h-screen bg-[var(--bg)]`}
       >
-        {/* Top navigation bar */}
-        <nav className="sticky top-0 z-50 flex items-center justify-between border-b border-[var(--card-border)] bg-[var(--card)]/80 backdrop-blur px-6 py-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold tracking-tight text-white">
-              Immo<span className="text-[var(--accent)]">Scorer</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-sm text-[var(--muted)]">
-            <span>Dashboard</span>
-            <span className="h-5 w-5 rounded-full bg-[var(--accent)] inline-flex items-center justify-center text-xs text-white font-medium">
-              S
-            </span>
-          </div>
-        </nav>
-
-        <main>{children}</main>
+        <Navbar />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+          {children}
+        </main>
       </body>
     </html>
   );
