@@ -24,7 +24,8 @@ export interface Property {
   locationGrade: LocationGrade;
   renovations: Renovations;
   exposeImageUrl?: string;
-  score: number;          // 0-100
+  score: number;          // 0-100 (totalScore from engine)
+  scoringResult?: import("./scoring").ScoringResult;
   trend: "up" | "down" | "stable";
   favorite: boolean;
   createdAt: string;      // ISO date

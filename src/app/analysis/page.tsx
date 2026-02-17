@@ -8,6 +8,7 @@ import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { addProperty } from "@/lib/storage";
 import { computeScore, scoreTrend } from "@/lib/scoring";
+import type { ScoringResult } from "@/lib/scoring";
 import type { EnergyClass, LocationGrade, Renovations, Property } from "@/lib/types";
 
 const ENERGY_CLASSES: EnergyClass[] = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"];
@@ -55,6 +56,7 @@ export default function AnalysisPage() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(INITIAL);
   const [result, setResult] = useState<Property | null>(null);
+  const [scoring, setScoring] = useState<ScoringResult | null>(null);
 
   function set(field: keyof FormState, value: string) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -77,7 +79,7 @@ export default function AnalysisPage() {
   function handleNext() {
     if (step === 1) setStep(2);
     else if (step === 2) {
-      const score = computeScore({
+      const sr = computeScore({
         purchasePrice: Number(form.purchasePrice),
         monthlyRent: Number(form.monthlyRent),
         housegeld: Number(form.housegeld),
@@ -101,12 +103,14 @@ export default function AnalysisPage() {
         locationGrade: form.locationGrade as LocationGrade,
         renovations: form.renovations,
         exposeImageUrl: form.exposeImageUrl || undefined,
-        score,
+        score: sr.totalScore,
+        scoringResult: sr,
         trend: scoreTrend(),
         favorite: false,
         createdAt: new Date().toISOString(),
       };
 
+      setScoring(sr);
       setResult(property);
       setStep(3);
     }
@@ -143,7 +147,7 @@ export default function AnalysisPage() {
                   : "bg-slate-100 text-[var(--muted)]"
               }`}
             >
-              {s < step ? "✓" : s}
+              {s < step ? "\u2713" : s}
             </span>
             <span className="hidden sm:inline">
               {s === 1 ? "Basics" : s === 2 ? "Renovations" : "Result"}
@@ -178,7 +182,7 @@ export default function AnalysisPage() {
               onChange={(v) => set("purchasePrice", v)}
               placeholder="250000"
               type="number"
-              prefix="€"
+              prefix="\u20AC"
               help="Total asking price including any listed Nebenkosten."
             />
             <Field
@@ -187,7 +191,7 @@ export default function AnalysisPage() {
               onChange={(v) => set("monthlyRent", v)}
               placeholder="950"
               type="number"
-              prefix="€"
+              prefix="\u20AC"
               help="Net cold rent, excluding utilities."
             />
           </div>
@@ -199,7 +203,7 @@ export default function AnalysisPage() {
               onChange={(v) => set("housegeld", v)}
               placeholder="350"
               type="number"
-              prefix="€"
+              prefix="\u20AC"
               help="Monthly management fee for the property."
             />
             <Field
@@ -208,7 +212,7 @@ export default function AnalysisPage() {
               onChange={(v) => set("areaSqm", v)}
               placeholder="72"
               type="number"
-              suffix="m²"
+              suffix="m\u00B2"
             />
           </div>
 
@@ -238,7 +242,7 @@ export default function AnalysisPage() {
           </div>
 
           <Field
-            label="Exposé Image URL (optional)"
+            label="Expos\u00E9 Image URL (optional)"
             value={form.exposeImageUrl}
             onChange={(v) => set("exposeImageUrl", v)}
             placeholder="https://example.com/photo.jpg"
@@ -249,7 +253,7 @@ export default function AnalysisPage() {
             onClick={handleNext}
             className="w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Continue to Renovations →
+            Continue to Renovations \u2192
           </button>
         </div>
       )}
@@ -289,44 +293,76 @@ export default function AnalysisPage() {
               onClick={() => setStep(1)}
               className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
             >
-              ← Back
+              \u2190 Back
             </button>
             <button
               onClick={handleNext}
               className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)]"
             >
-              Calculate Score →
+              Calculate Score \u2192
             </button>
           </div>
         </div>
       )}
 
       {/* ─── Step 3: Result ─── */}
-      {step === 3 && result && (
+      {step === 3 && result && scoring && (
         <div className="space-y-6">
-          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-6">
+          {/* Total score + explanation */}
+          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div>
                 <h2 className="text-lg font-semibold">Analysis Result</h2>
-                <p className="text-sm text-[var(--muted)]">Score calculated from all provided data.</p>
+                <p className="text-sm text-[var(--muted)]">Weighted score across 6 dimensions.</p>
               </div>
-              <ScoreBadge score={result.score} size="lg" />
+              <ScoreBadge score={scoring.totalScore} size="lg" />
             </div>
 
-            <ProgressBar value={result.score} label="Investment Score" />
+            <ProgressBar value={scoring.totalScore} label="Overall Score" />
 
-            <div className="grid sm:grid-cols-3 gap-4 text-sm">
-              <Stat label="Gross Yield" value={`${((result.monthlyRent * 12) / result.purchasePrice * 100).toFixed(2)}%`} />
-              <Stat label="Price / m²" value={`€${Math.round(result.purchasePrice / result.areaSqm).toLocaleString()}`} />
-              <Stat label="Rent Multiplier" value={`${(result.purchasePrice / (result.monthlyRent * 12)).toFixed(1)}x`} />
+            <p className="text-sm text-[var(--muted)] leading-relaxed">{scoring.explanation}</p>
+          </div>
+
+          {/* Subscores */}
+          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-4">
+            <h3 className="font-semibold">Subscores</h3>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Object.values(scoring.subscores).map((sub) => (
+                <div key={sub.label} className="rounded-xl bg-slate-50 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">{sub.label}</span>
+                    <ScoreBadge score={sub.value} size="sm" />
+                  </div>
+                  <ProgressBar value={sub.value} />
+                  <p className="text-xs text-[var(--muted)]">Weight: {Math.round(sub.weight * 100)}%</p>
+                </div>
+              ))}
             </div>
           </div>
 
+          {/* Key metrics */}
+          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6">
+            <h3 className="font-semibold mb-3">Key Metrics</h3>
+            <div className="grid sm:grid-cols-3 gap-4 text-sm">
+              <MetricCard label="Gross Yield" value={`${((result.monthlyRent * 12) / result.purchasePrice * 100).toFixed(2)}%`} />
+              <MetricCard label="Price / m\u00B2" value={`\u20AC${Math.round(result.purchasePrice / result.areaSqm).toLocaleString()}`} />
+              <MetricCard label="Rent Multiplier" value={`${(result.purchasePrice / (result.monthlyRent * 12)).toFixed(1)}x`} />
+            </div>
+          </div>
+
+          {/* Strengths + risks + recommendations */}
+          <div className="grid lg:grid-cols-3 gap-6">
+            <ListCard title="Strengths" items={scoring.strengths} icon="\u2705" />
+            <ListCard title="Risks" items={scoring.risks} icon="\u26A0\uFE0F" />
+            <ListCard title="Recommendations" items={scoring.recommendations} icon="\u2192" />
+          </div>
+
+          {/* Property preview card */}
           <div className="max-w-xs">
             <PropertyCard
               street={result.street}
               city={result.city}
-              price={`€${result.purchasePrice.toLocaleString()}`}
+              price={`\u20AC${result.purchasePrice.toLocaleString()}`}
               trend={result.trend}
               score={result.score}
               imageUrl={result.exposeImageUrl}
@@ -335,10 +371,10 @@ export default function AnalysisPage() {
 
           <div className="flex gap-3">
             <button
-              onClick={() => { setStep(1); setResult(null); }}
+              onClick={() => { setStep(1); setResult(null); setScoring(null); }}
               className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
             >
-              ← Analyze Another
+              \u2190 Analyze Another
             </button>
             <button
               onClick={handleSave}
@@ -353,7 +389,7 @@ export default function AnalysisPage() {
   );
 }
 
-/* ─── Field helpers ─── */
+/* ─── Small helper components ─── */
 
 function Field({
   label, value, onChange, placeholder, type = "text", prefix, suffix, help,
@@ -418,11 +454,27 @@ function SelectField({
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-xl bg-slate-50 p-3">
       <p className="text-xs text-[var(--muted)]">{label}</p>
       <p className="font-semibold mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function ListCard({ title, items, icon }: { title: string; items: string[]; icon: string }) {
+  return (
+    <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-5 space-y-3">
+      <h3 className="font-semibold text-sm">{title}</h3>
+      <ul className="space-y-2">
+        {items.map((item, i) => (
+          <li key={i} className="flex gap-2 text-sm text-[var(--muted)] leading-relaxed">
+            <span className="shrink-0 mt-0.5">{icon}</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
