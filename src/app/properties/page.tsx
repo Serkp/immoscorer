@@ -29,18 +29,18 @@ export default function PropertiesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Properties</h1>
+        <h1 className="text-2xl font-bold">Meine Immobilien</h1>
         <p className="text-sm text-[var(--muted)]">
-          {properties.length} saved {properties.length === 1 ? "property" : "properties"}
+          {properties.length} gespeicherte {properties.length === 1 ? "Immobilie" : "Immobilien"}
         </p>
       </div>
 
       {properties.length === 0 ? (
         <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-12 text-center">
-          <p className="text-4xl mb-3">🏠</p>
-          <p className="font-semibold">No properties yet</p>
+          <p className="text-4xl mb-3">{"\uD83C\uDFE0"}</p>
+          <p className="font-semibold">Noch keine Immobilien vorhanden</p>
           <p className="text-sm text-[var(--muted)] mt-1">
-            Go to <a href="/analysis" className="text-[var(--accent)] hover:underline">Analysis</a> to add your first property.
+            Starten Sie eine <a href="/analysis" className="text-[var(--accent)] hover:underline">Analyse</a>, um Ihre erste Immobilie hinzuzuf\u00FCgen.
           </p>
         </div>
       ) : (
@@ -50,7 +50,7 @@ export default function PropertiesPage() {
               <PropertyCard
                 street={p.street}
                 city={p.city}
-                price={`€${p.purchasePrice.toLocaleString()}`}
+                price={`\u20AC${p.purchasePrice.toLocaleString()}`}
                 trend={p.trend}
                 score={p.score}
                 imageUrl={p.exposeImageUrl}
@@ -65,23 +65,23 @@ export default function PropertiesPage() {
                       ? "bg-amber-50 border-amber-200 text-amber-500"
                       : "bg-white border-[var(--border)] text-[var(--muted)] hover:text-amber-500"
                   }`}
-                  title={p.favorite ? "Remove from favorites" : "Add to favorites"}
+                  title={p.favorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzuf\u00FCgen"}
                 >
-                  {p.favorite ? "★" : "☆"}
+                  {p.favorite ? "\u2605" : "\u2606"}
                 </button>
                 <button
                   onClick={() => handleDelete(p.id)}
                   className="w-8 h-8 rounded-full bg-white border border-[var(--border)] flex items-center justify-center text-sm text-[var(--muted)] hover:text-red-500 shadow-sm transition-colors"
-                  title="Delete property"
+                  title="Immobilie l\u00F6schen"
                 >
-                  ×
+                  \u00D7
                 </button>
               </div>
 
               {/* Bottom detail row */}
               <div className="mt-0 px-4 pb-3 -translate-y-1 flex items-center justify-between text-xs text-[var(--muted)]">
-                <span>{p.areaSqm} m² · {p.energyClass} · {p.locationGrade}-location</span>
-                <span>€{Math.round(p.monthlyRent).toLocaleString()}/mo</span>
+                <span>{p.areaSqm}\u00A0m\u00B2 \u00B7 {p.energyClass} \u00B7 Lage\u00A0{p.locationGrade}</span>
+                <span>\u20AC{Math.round(p.monthlyRent).toLocaleString()}/Monat</span>
               </div>
             </div>
           ))}

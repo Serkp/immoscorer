@@ -7,10 +7,10 @@ interface DonutChartProps {
 }
 
 const DEFAULT_DATA = [
-  { name: "Excellent", value: 4, color: "#16A34A" },
-  { name: "Good", value: 6, color: "#2563EB" },
-  { name: "Average", value: 3, color: "#F59E0B" },
-  { name: "Poor", value: 1, color: "#EF4444" },
+  { name: "Hervorragend", value: 4, color: "#16A34A" },
+  { name: "Gut", value: 6, color: "#2563EB" },
+  { name: "Durchschnittlich", value: 3, color: "#F59E0B" },
+  { name: "Schwach", value: 1, color: "#EF4444" },
 ];
 
 export function DonutChart({ data = DEFAULT_DATA }: DonutChartProps) {

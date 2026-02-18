@@ -4,13 +4,13 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
-  { href: "/analysis", label: "Analysis" },
-  { href: "/properties", label: "Properties" },
-  { href: "/compare", label: "Compare" },
-  { href: "/strategies", label: "Strategies" },
-  { href: "/guide", label: "Guide" },
-  { href: "/assistant", label: "Assistant" },
-  { href: "/expose", label: "Exposé" },
+  { href: "/analysis", label: "Analyse" },
+  { href: "/properties", label: "Meine Immobilien" },
+  { href: "/compare", label: "Vergleich" },
+  { href: "/strategies", label: "Strategien" },
+  { href: "/guide", label: "Wissensbereich" },
+  { href: "/assistant", label: "KI-Assistent" },
+  { href: "/expose", label: "Expos\u00E9-Analyse" },
 ];
 
 export function Navbar() {

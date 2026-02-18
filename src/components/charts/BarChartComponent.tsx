@@ -16,10 +16,10 @@ interface BarChartProps {
 
 const DEFAULT_DATA = [
   { name: "Berlin", value: 72 },
-  { name: "Munich", value: 65 },
+  { name: "M\u00FCnchen", value: 65 },
   { name: "Hamburg", value: 78 },
   { name: "Frankfurt", value: 81 },
-  { name: "Cologne", value: 69 },
+  { name: "K\u00F6ln", value: 69 },
 ];
 
 export function BarChartComponent({ data = DEFAULT_DATA }: BarChartProps) {

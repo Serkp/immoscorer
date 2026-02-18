@@ -10,7 +10,7 @@ interface PropertyCardProps {
   onClick?: () => void;
 }
 
-const trendLabels = { up: "↑ Rising", down: "↓ Falling", stable: "→ Stable" };
+const trendLabels = { up: "\u2191 Steigend", down: "\u2193 Fallend", stable: "\u2192 Stabil" };
 const trendColors = {
   up: "text-emerald-600",
   down: "text-red-500",

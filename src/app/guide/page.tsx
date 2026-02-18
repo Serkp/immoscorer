@@ -1,28 +1,28 @@
 export default function GuidePage() {
   const sections = [
     {
-      title: "Understanding the Score",
-      body: "The ImmoScorer score (0-100) weighs gross yield, price per m², building age, energy efficiency, location grade, and needed renovations. A score above 75 is excellent, 50-75 is moderate, and below 50 needs careful evaluation.",
+      title: "Den Score verstehen",
+      body: "Der ImmoScorer-Score (0\u2013100) gewichtet Bruttomietrendite, Quadratmeterpreis, Geb\u00E4udealter, Energieeffizienz, Lageklasse und Sanierungsbedarf. Ein Score \u00FCber 75 ist hervorragend, 50\u201375 moderat und unter 50 erfordert eine sorgf\u00E4ltige Pr\u00FCfung.",
     },
     {
-      title: "Key Metrics Explained",
-      body: "Gross yield is annual rent divided by purchase price. The rent multiplier shows how many years of rent equal the price. Hausgeld covers management fees — keep it below 30% of rent for healthy cash-flow.",
+      title: "Wichtige Kennzahlen erkl\u00E4rt",
+      body: "Die Bruttomietrendite ergibt sich aus der Jahresmiete geteilt durch den Kaufpreis. Der Kaufpreisfaktor zeigt, wie viele Jahreskaltmieten dem Kaufpreis entsprechen. Das Hausgeld umfasst Verwaltungskosten und R\u00FCcklagen \u2013 halten Sie es unter 30\u00A0% der Miete f\u00FCr einen gesunden Cashflow.",
     },
     {
-      title: "Renovation Impact",
-      body: "Each needed renovation reduces the score by 3 points. Prioritize roof, facade, and heating — they have the highest cost impact. Windows and electrical are often required for older buildings (pre-1990).",
+      title: "Einfluss von Sanierungen",
+      body: "Jedes sanierungsbed\u00FCrftige Gewerk reduziert den Score. Priorisieren Sie Dach, Fassade und Heizung \u2013 diese haben den h\u00F6chsten Kosteneinfluss. Fenster und Elektrik sind bei \u00E4lteren Geb\u00E4uden (vor 1990) h\u00E4ufig erneuerungsbed\u00FCrftig.",
     },
     {
-      title: "Location Grades",
-      body: "Grade A locations are prime urban areas with high demand and low vacancy. Grade D locations are developing — higher yield potential but more risk. B and C offer a balance of growth and stability.",
+      title: "Lageklassen im \u00DCberblick",
+      body: "Lageklasse A bezeichnet urbane Top-Lagen mit hoher Nachfrage und geringem Leerstand. Lageklasse D steht f\u00FCr Entwicklungslagen \u2013 h\u00F6heres Renditepotenzial, aber mehr Risiko. B und C bieten eine ausgewogene Mischung aus Wachstum und Stabilit\u00E4t.",
     },
   ];
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Guide</h1>
-        <p className="text-sm text-[var(--muted)]">How to read and use ImmoScorer results.</p>
+        <h1 className="text-2xl font-bold">Wissensbereich</h1>
+        <p className="text-sm text-[var(--muted)]">So lesen und nutzen Sie die ImmoScorer-Ergebnisse.</p>
       </div>
 
       <div className="space-y-4">

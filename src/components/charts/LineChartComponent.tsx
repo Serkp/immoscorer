@@ -17,9 +17,9 @@ interface LineChartProps {
 const DEFAULT_DATA = [
   { name: "Jan", value: 62 },
   { name: "Feb", value: 65 },
-  { name: "Mar", value: 63 },
+  { name: "M\u00E4r", value: 63 },
   { name: "Apr", value: 68 },
-  { name: "May", value: 72 },
+  { name: "Mai", value: 72 },
   { name: "Jun", value: 71 },
   { name: "Jul", value: 75 },
 ];

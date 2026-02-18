@@ -15,8 +15,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "ImmoScorer – Real Estate Analysis",
-  description: "Analyze and score real estate investments",
+  title: "ImmoScorer \u2013 Immobilien-Investmentanalyse",
+  description: "Immobilien-Investments professionell bewerten und vergleichen",
 };
 
 export default function RootLayout({
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="de">
       <body
         className={`${geistSans.variable} ${geistMono.variable} font-[family-name:var(--font-geist-sans)] antialiased min-h-screen bg-[var(--bg)]`}
       >

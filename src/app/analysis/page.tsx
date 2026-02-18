@@ -15,12 +15,12 @@ const ENERGY_CLASSES: EnergyClass[] = ["A+", "A", "B", "C", "D", "E", "F", "G", 
 const LOCATION_GRADES: LocationGrade[] = ["A", "B", "C", "D"];
 
 const RENOVATION_ITEMS: { key: keyof Renovations; label: string; help: string }[] = [
-  { key: "roof", label: "Roof", help: "Does the roof need replacement or major repairs?" },
-  { key: "facade", label: "Facade", help: "Is the facade insulation outdated or damaged?" },
-  { key: "windows", label: "Windows", help: "Are windows single-glazed or older than 20 years?" },
-  { key: "bathroom", label: "Bathroom", help: "Does the bathroom need a full renovation?" },
-  { key: "electrical", label: "Electrical", help: "Is the electrical system outdated (pre-1990)?" },
-  { key: "heating", label: "Heating", help: "Does the heating system need replacement?" },
+  { key: "roof", label: "Dach", help: "Muss das Dach erneuert oder grundlegend saniert werden?" },
+  { key: "facade", label: "Fassade", help: "Ist die Fassadend\u00E4mmung veraltet oder besch\u00E4digt?" },
+  { key: "windows", label: "Fenster", help: "Sind die Fenster einfach verglast oder \u00E4lter als 20 Jahre?" },
+  { key: "bathroom", label: "Bad", help: "Muss das Badezimmer komplett saniert werden?" },
+  { key: "electrical", label: "Elektrik", help: "Ist die Elektroinstallation veraltet (vor 1990)?" },
+  { key: "heating", label: "Heizung", help: "Muss die Heizungsanlage erneuert werden?" },
 ];
 
 interface FormState {
@@ -92,8 +92,8 @@ export default function AnalysisPage() {
 
       const property: Property = {
         id: crypto.randomUUID(),
-        street: form.street || "Unknown Street",
-        city: form.city || "Unknown City",
+        street: form.street || "Unbekannte Stra\u00DFe",
+        city: form.city || "Unbekannte Stadt",
         purchasePrice: Number(form.purchasePrice),
         monthlyRent: Number(form.monthlyRent),
         housegeld: Number(form.housegeld),
@@ -150,14 +150,14 @@ export default function AnalysisPage() {
               {s < step ? "\u2713" : s}
             </span>
             <span className="hidden sm:inline">
-              {s === 1 ? "Basics" : s === 2 ? "Renovations" : "Result"}
+              {s === 1 ? "Basisdaten" : s === 2 ? "Sanierung" : "Ergebnis"}
             </span>
           </button>
         ))}
         <div className="flex-1" />
         {gross && step === 1 && (
           <span className="text-xs text-[var(--muted)]">
-            Gross yield: <strong className="text-[var(--fg)]">{gross}%</strong>
+            Bruttorendite: <strong className="text-[var(--fg)]">{gross}%</strong>
           </span>
         )}
       </div>
@@ -166,33 +166,33 @@ export default function AnalysisPage() {
       {step === 1 && (
         <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold">Property Basics</h2>
-            <p className="text-sm text-[var(--muted)]">Core financial and location details.</p>
+            <h2 className="text-lg font-semibold">Objektdaten</h2>
+            <p className="text-sm text-[var(--muted)]">Finanzielle Eckdaten und Lageangaben.</p>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Street" value={form.street} onChange={(v) => set("street", v)} placeholder="Berliner Str. 42" />
-            <Field label="City" value={form.city} onChange={(v) => set("city", v)} placeholder="Berlin" />
+            <Field label="Stra\u00DFe" value={form.street} onChange={(v) => set("street", v)} placeholder="Berliner Str. 42" />
+            <Field label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Berlin" />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <Field
-              label="Purchase Price"
+              label="Kaufpreis"
               value={form.purchasePrice}
               onChange={(v) => set("purchasePrice", v)}
               placeholder="250000"
               type="number"
               prefix="\u20AC"
-              help="Total asking price including any listed Nebenkosten."
+              help="Gesamtangebotspreis inkl. ggf. ausgewiesener Nebenkosten."
             />
             <Field
-              label="Monthly Rent (Kaltmiete)"
+              label="Monatliche Kaltmiete"
               value={form.monthlyRent}
               onChange={(v) => set("monthlyRent", v)}
               placeholder="950"
               type="number"
               prefix="\u20AC"
-              help="Net cold rent, excluding utilities."
+              help="Nettokaltmiete ohne Nebenkosten."
             />
           </div>
 
@@ -204,10 +204,10 @@ export default function AnalysisPage() {
               placeholder="350"
               type="number"
               prefix="\u20AC"
-              help="Monthly management fee for the property."
+              help="Monatliches Hausgeld (Verwaltung + Instandhaltungsr\u00FCcklage)."
             />
             <Field
-              label="Living Area"
+              label="Wohnfl\u00E4che"
               value={form.areaSqm}
               onChange={(v) => set("areaSqm", v)}
               placeholder="72"
@@ -218,31 +218,31 @@ export default function AnalysisPage() {
 
           <div className="grid sm:grid-cols-3 gap-4">
             <Field
-              label="Baujahr (Year Built)"
+              label="Baujahr"
               value={form.baujahr}
               onChange={(v) => set("baujahr", v)}
               placeholder="1985"
               type="number"
             />
             <SelectField
-              label="Energy Class"
+              label="Energieeffizienzklasse"
               value={form.energyClass}
               onChange={(v) => set("energyClass", v)}
               options={ENERGY_CLASSES}
-              placeholder="Select"
+              placeholder="Ausw\u00E4hlen"
             />
             <SelectField
-              label="Location Grade"
+              label="Lageklasse"
               value={form.locationGrade}
               onChange={(v) => set("locationGrade", v)}
               options={LOCATION_GRADES}
-              placeholder="Select"
-              help="A = prime, D = developing area."
+              placeholder="Ausw\u00E4hlen"
+              help="A = Top-Lage, D = Entwicklungslage."
             />
           </div>
 
           <Field
-            label="Expos\u00E9 Image URL (optional)"
+            label="Expos\u00E9-Bild-URL (optional)"
             value={form.exposeImageUrl}
             onChange={(v) => set("exposeImageUrl", v)}
             placeholder="https://example.com/photo.jpg"
@@ -253,7 +253,7 @@ export default function AnalysisPage() {
             onClick={handleNext}
             className="w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            Continue to Renovations \u2192
+            Weiter zu Sanierung \u2192
           </button>
         </div>
       )}
@@ -262,8 +262,8 @@ export default function AnalysisPage() {
       {step === 2 && (
         <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
           <div>
-            <h2 className="text-lg font-semibold">Renovation Needs</h2>
-            <p className="text-sm text-[var(--muted)]">Toggle items that need renovation. Each reduces the score.</p>
+            <h2 className="text-lg font-semibold">Sanierungsbedarf</h2>
+            <p className="text-sm text-[var(--muted)]">Markieren Sie Gewerke mit Sanierungsbedarf. Jedes reduziert den Score.</p>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
@@ -293,13 +293,13 @@ export default function AnalysisPage() {
               onClick={() => setStep(1)}
               className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
             >
-              \u2190 Back
+              \u2190 Zur\u00FCck
             </button>
             <button
               onClick={handleNext}
               className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)]"
             >
-              Calculate Score \u2192
+              Score berechnen \u2192
             </button>
           </div>
         </div>
@@ -312,23 +312,23 @@ export default function AnalysisPage() {
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Analysis Result</h2>
+                <h2 className="text-lg font-semibold">Analyseergebnis</h2>
                 <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-[var(--muted)]">Weighted score across 6 dimensions</p>
+                  <p className="text-sm text-[var(--muted)]">Gewichteter Score \u00FCber 6 Dimensionen</p>
                   <ConfidenceBadge level={scoring.confidenceLevel} />
                 </div>
               </div>
               <ScoreBadge score={scoring.totalScore} size="lg" />
             </div>
 
-            <ProgressBar value={scoring.totalScore} label="Overall Score" />
+            <ProgressBar value={scoring.totalScore} label="Gesamtscore" />
 
             <p className="text-sm text-[var(--muted)] leading-relaxed">{scoring.explanation}</p>
           </div>
 
           {/* Subscores */}
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-4">
-            <h3 className="font-semibold">Subscores</h3>
+            <h3 className="font-semibold">Teilscores</h3>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.values(scoring.subscores).map((sub) => (
                 <div key={sub.label} className="rounded-xl bg-slate-50 p-4 space-y-2">
@@ -337,7 +337,7 @@ export default function AnalysisPage() {
                     <ScoreBadge score={sub.value} size="sm" />
                   </div>
                   <ProgressBar value={sub.value} />
-                  <p className="text-xs text-[var(--muted)]">Weight: {Math.round(sub.weight * 100)}%</p>
+                  <p className="text-xs text-[var(--muted)]">Gewichtung: {Math.round(sub.weight * 100)}%</p>
                 </div>
               ))}
             </div>
@@ -345,31 +345,31 @@ export default function AnalysisPage() {
 
           {/* Comparison metrics */}
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6">
-            <h3 className="font-semibold mb-3">Comparison Metrics</h3>
+            <h3 className="font-semibold mb-3">Vergleichskennzahlen</h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-              <MetricCard label="Gross Yield" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
-              <MetricCard label="Factor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
-              <MetricCard label="Renovations" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
-              <MetricCard label="Energy Rank" value={`${scoring.comparisonMetrics.energyRank}/100`} />
-              <MetricCard label="Bank Score" value={`${scoring.comparisonMetrics.bankScore}/100`} />
-              <MetricCard label="Risk Level" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
+              <MetricCard label="Bruttorendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
+              <MetricCard label="Kaufpreisfaktor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
+              <MetricCard label="Sanierungen" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
+              <MetricCard label="Energie-Rang" value={`${scoring.comparisonMetrics.energyRank}/100`} />
+              <MetricCard label="Bank-Score" value={`${scoring.comparisonMetrics.bankScore}/100`} />
+              <MetricCard label="Risiko-Stufe" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
             </div>
           </div>
 
           {/* Strengths + risks */}
           <div className="grid lg:grid-cols-2 gap-6">
-            <ListCard title="Strengths" items={scoring.strengths} icon="\u2705" />
-            <ListCard title="Risks" items={scoring.risks} icon="\u26A0\uFE0F" />
+            <ListCard title="St\u00E4rken" items={scoring.strengths} icon="\u2705" />
+            <ListCard title="Risiken" items={scoring.risks} icon="\u26A0\uFE0F" />
           </div>
 
           {/* Categorized recommendations */}
           <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
-            <h3 className="font-semibold">Recommendations</h3>
+            <h3 className="font-semibold">Handlungsempfehlungen</h3>
             <div className="grid sm:grid-cols-2 gap-5">
-              <RecoSection tag="Financing" items={scoring.recommendations.financing} icon="\uD83C\uDFE6" />
-              <RecoSection tag="Technical" items={scoring.recommendations.technical} icon="\uD83D\uDD27" />
-              <RecoSection tag="Legal" items={scoring.recommendations.legal} icon="\u2696\uFE0F" />
-              <RecoSection tag="Strategy" items={scoring.recommendations.strategy} icon="\uD83C\uDFAF" />
+              <RecoSection tag="Finanzierung" items={scoring.recommendations.financing} icon="\uD83C\uDFE6" />
+              <RecoSection tag="Technik" items={scoring.recommendations.technical} icon="\uD83D\uDD27" />
+              <RecoSection tag="Recht" items={scoring.recommendations.legal} icon="\u2696\uFE0F" />
+              <RecoSection tag="Strategie" items={scoring.recommendations.strategy} icon="\uD83C\uDFAF" />
             </div>
           </div>
 
@@ -390,13 +390,13 @@ export default function AnalysisPage() {
               onClick={() => { setStep(1); setResult(null); setScoring(null); }}
               className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
             >
-              \u2190 Analyze Another
+              \u2190 Neue Analyse
             </button>
             <button
               onClick={handleSave}
               className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)]"
             >
-              Save to Portfolio
+              Im Portfolio speichern
             </button>
           </div>
         </div>
@@ -461,7 +461,7 @@ function SelectField({
         onChange={(e) => onChange(e.target.value)}
         className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 appearance-none"
       >
-        <option value="">{placeholder || "Select..."}</option>
+        <option value="">{placeholder || "Ausw\u00E4hlen\u2026"}</option>
         {options.map((o) => (
           <option key={o} value={o}>{o}</option>
         ))}
@@ -501,9 +501,10 @@ function ConfidenceBadge({ level }: { level: import("@/lib/scoring").ConfidenceL
     medium: "bg-amber-50 text-amber-700 ring-amber-200",
     low: "bg-red-50 text-red-700 ring-red-200",
   };
+  const labels = { high: "Hohe Bewertungssicherheit", medium: "Mittlere Bewertungssicherheit", low: "Geringe Bewertungssicherheit" };
   return (
     <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ring-1 ${styles[level]}`}>
-      {level} confidence
+      {labels[level]}
     </span>
   );
 }
