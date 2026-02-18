@@ -1,31 +1,17 @@
-export type EnergyClass = "A+" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
-export type LocationGrade = "A" | "B" | "C" | "D";
+import type { PropertyInput, ScoringResult } from "./scoring";
 
-export interface Renovations {
-  roof: boolean;
-  facade: boolean;
-  windows: boolean;
-  bathroom: boolean;
-  electrical: boolean;
-  heating: boolean;
+export interface SavedProperty {
+  id: string;
+  input: PropertyInput;
+  result: ScoringResult;
+  favorite: boolean;
+  createdAt: string;
 }
 
-export interface Property {
+export interface SavedAnalysis {
   id: string;
-  street: string;
-  city: string;
-  purchasePrice: number;
-  monthlyRent: number;
-  housegeld: number;
-  baujahr: number;
-  energyClass: EnergyClass;
-  areaSqm: number;
-  locationGrade: LocationGrade;
-  renovations: Renovations;
-  exposeImageUrl?: string;
-  score: number;
-  scoringResult?: import("./scoring").ScoringResult;
-  trend: "up" | "down" | "stable";
-  favorite: boolean;
+  propertyId: string;
+  input: PropertyInput;
+  result: ScoringResult;
   createdAt: string;
 }

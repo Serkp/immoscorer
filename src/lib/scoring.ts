@@ -1,597 +1,392 @@
-import { EnergyClass, LocationGrade, Renovations } from "./types";
+/* ═══════════════════════════════════════════════════════════
+   ImmoScorer — Deterministische Scoring-Engine
+   Keine KI, keine Randomness. Pure Berechnungen.
+   ═══════════════════════════════════════════════════════════ */
 
-/* ═══════════════════════════════════════════════════
-   Public types
-   ═══════════════════════════════════════════════════ */
+export interface PropertyInput {
+  street: string;
+  city: string;
+  price: number;
+  rent: number;
+  hausgeld: number;
+  area: number;
+  year: number;
+  energyClass: string;
+  locationGrade: string;
+  renovations: string[];
+}
 
-export interface Subscore {
+export interface SubscoreEntry {
+  key: string;
   label: string;
-  value: number;  // 0-100
-  weight: number; // fraction, all weights sum to 1
-}
-
-export type ConfidenceLevel = "high" | "medium" | "low";
-
-export interface CategorizedRecommendations {
-  financing: string[];
-  technical: string[];
-  legal: string[];
-  strategy: string[];
-}
-
-export interface ComparisonMetrics {
-  yield: number;            // gross yield as decimal, e.g. 0.056
-  factor: number;           // rent multiplier, e.g. 22.1
-  renovationCount: number;  // 0-6
-  energyRank: number;       // 0-100 from energy class
-  bankScore: number;        // 0-100 bankability subscore
-  riskLevel: number;        // 0-100 risk subscore (higher = safer)
+  value: number;
+  weight: number;
+  oneLiner: string;
+  reasons: string[];
+  actions: string[];
 }
 
 export interface ScoringResult {
   totalScore: number;
-  confidenceLevel: ConfidenceLevel;
-  subscores: {
-    investmentScore: Subscore;
-    rentabilityScore: Subscore;
-    riskScore: Subscore;
-    energyScore: Subscore;
-    bankabilityScore: Subscore;
-    projectionScore: Subscore;
+  confidence: "Hohe Bewertungssicherheit" | "Mittlere Bewertungssicherheit" | "Geringe Bewertungssicherheit";
+  subscores: SubscoreEntry[];
+  kpis: {
+    netYield: number;
+    grossYield: number;
+    factor: number;
+    sqmPrice: number;
+    hausgeldRatio: number;
+    netCashflow: number;
   };
-  explanation: string;
   strengths: string[];
   risks: string[];
-  recommendations: CategorizedRecommendations;
-  comparisonMetrics: ComparisonMetrics;
 }
 
-export interface ScoringInput {
-  purchasePrice: number;
-  monthlyRent: number;
-  housegeld: number;
-  baujahr: number;
-  energyClass: EnergyClass;
-  areaSqm: number;
-  locationGrade: LocationGrade;
-  renovations: Renovations;
-}
+/* ─── Lookup-Tabellen ─── */
 
-/* ─── Weights (sum = 1.00) ─── */
-
-const WEIGHTS = {
-  investment:   0.30,
-  rentability:  0.15,
-  risk:         0.15,
-  bankability:  0.15,
-  energy:       0.10,
-  projection:   0.15,
-} as const;
-
-/* ─── Lookup tables ─── */
-
-const ENERGY_RANK: Record<EnergyClass, number> = {
+const ENERGY_RANK: Record<string, number> = {
   "A+": 100, A: 88, B: 76, C: 62, D: 48, E: 35, F: 22, G: 12, H: 5,
 };
 
-const ENERGY_LABEL: Record<EnergyClass, string> = {
-  "A+": "hervorragend", A: "sehr gut", B: "gut", C: "akzeptabel",
-  D: "unterdurchschnittlich", E: "schwach", F: "sehr schwach", G: "kritisch", H: "ungen\u00FCgend",
-};
+const LOCATION_RANK: Record<string, number> = { A: 100, B: 72, C: 45, D: 20 };
 
-const LOCATION_RANK: Record<LocationGrade, number> = { A: 100, B: 72, C: 45, D: 20 };
-const LOCATION_LABEL: Record<LocationGrade, string> = {
+const LOCATION_LABEL: Record<string, string> = {
   A: "Top-Lage", B: "gute Lage", C: "durchschnittliche Lage", D: "Entwicklungslage",
 };
 
-/* ─── Renovation labels ─── */
-
-const RENO_LABEL: Record<keyof Renovations, string> = {
-  roof: "Dach", facade: "Fassade", windows: "Fenster",
-  bathroom: "Bad", electrical: "Elektrik", heating: "Heizung",
+const RENO_LABEL: Record<string, string> = {
+  dach: "Dach", fassade: "Fassade", fenster: "Fenster",
+  bad: "Bad", elektrik: "Elektrik", heizung: "Heizung",
 };
 
-/* ─── Helpers ─── */
+const RENO_COST: Record<string, string> = {
+  dach: "15.000–40.000 €", fassade: "20.000–50.000 €", fenster: "8.000–20.000 €",
+  bad: "10.000–25.000 €", elektrik: "8.000–18.000 €", heizung: "12.000–35.000 €",
+};
+
+/* ─── Hilfsfunktionen ─── */
 
 function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-type Metrics = ReturnType<typeof deriveMetrics>;
-
-function deriveMetrics(p: ScoringInput) {
-  const annualRent = p.monthlyRent * 12;
-  const grossYield = annualRent / p.purchasePrice;
-  const netRent = p.monthlyRent - p.housegeld;
-  const netYield = (netRent * 12) / p.purchasePrice;
-  const rentMultiplier = p.purchasePrice / annualRent;
-  const pricePerSqm = p.purchasePrice / p.areaSqm;
-  const hausgeldRatio = p.housegeld / p.monthlyRent;
-  const age = new Date().getFullYear() - p.baujahr;
-  const renoCount = Object.values(p.renovations).filter(Boolean).length;
-  const renoKeys = (Object.entries(p.renovations) as [keyof Renovations, boolean][])
-    .filter(([, v]) => v)
-    .map(([k]) => k);
-
-  return {
-    annualRent, grossYield, netRent, netYield,
-    rentMultiplier, pricePerSqm, hausgeldRatio,
-    age, renoCount, renoKeys,
-  };
+function deriveKPIs(p: PropertyInput) {
+  const annualRent = p.rent * 12;
+  const grossYield = annualRent / p.price;
+  const netCashflow = p.rent - p.hausgeld;
+  const netYield = (netCashflow * 12) / p.price;
+  const factor = p.price / annualRent;
+  const sqmPrice = p.price / p.area;
+  const hausgeldRatio = p.hausgeld / p.rent;
+  const age = new Date().getFullYear() - p.year;
+  return { annualRent, grossYield, netCashflow, netYield, factor, sqmPrice, hausgeldRatio, age };
 }
 
-/* ═══════════════════════════════════════════════════
-   1. Investment Score (30%)
-   ═══════════════════════════════════════════════════ */
+type KPIs = ReturnType<typeof deriveKPIs>;
 
-function calcInvestmentScore(_p: ScoringInput, m: Metrics): number {
+/* ═══════════════════════════════════════════════════════════
+   1. Investitions-Score (30%)
+   ═══════════════════════════════════════════════════════════ */
+
+function calcInvestment(_p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
   let s = 0;
+  const reasons: string[] = [];
+  const actions: string[] = [];
+  const yieldPct = (k.grossYield * 100).toFixed(1);
 
-  if (m.grossYield >= 0.08) s += 40;
-  else if (m.grossYield >= 0.06) s += 32;
-  else if (m.grossYield >= 0.05) s += 24;
-  else if (m.grossYield >= 0.04) s += 16;
-  else if (m.grossYield >= 0.03) s += 8;
-  else s += 2;
+  if (k.grossYield >= 0.08) { s += 40; reasons.push(`Bruttorendite ${yieldPct} % liegt weit über dem Marktdurchschnitt von 4 % — exzellentes Ertragsprofil.`); }
+  else if (k.grossYield >= 0.06) { s += 32; reasons.push(`Bruttorendite ${yieldPct} % deutlich über dem Bundesdurchschnitt — guter Einkommenspuffer gegen steigende Zinsen.`); }
+  else if (k.grossYield >= 0.05) { s += 24; reasons.push(`Bruttorendite ${yieldPct} % übertrifft den Marktdurchschnitt und ermöglicht positiven Leverage.`); }
+  else if (k.grossYield >= 0.04) { s += 16; reasons.push(`Bruttorendite ${yieldPct} % ist marktüblich, lässt jedoch wenig Spielraum bei steigenden Zinsen.`); }
+  else if (k.grossYield >= 0.03) { s += 8; reasons.push(`Bruttorendite ${yieldPct} % liegt unter der Rentabilitätsschwelle für fremdfinanzierte Akquisitionen (3,5–4,5 %).`); }
+  else { s += 2; reasons.push(`Bruttorendite ${yieldPct} % ist für ein Kapitalanlage-Investment kritisch niedrig.`); }
 
-  if (m.rentMultiplier <= 15) s += 30;
-  else if (m.rentMultiplier <= 20) s += 24;
-  else if (m.rentMultiplier <= 25) s += 16;
-  else if (m.rentMultiplier <= 30) s += 8;
-  else s += 2;
+  const f = k.factor.toFixed(1);
+  if (k.factor <= 15) { s += 30; reasons.push(`Kaufpreisfaktor ${f}x ist außergewöhnlich attraktiv — schnelle Amortisation.`); }
+  else if (k.factor <= 20) { s += 24; reasons.push(`Kaufpreisfaktor ${f}x liegt deutlich unter dem Metropol-Korridor von 22–28x.`); }
+  else if (k.factor <= 25) { s += 16; reasons.push(`Kaufpreisfaktor ${f}x ist marktüblich für deutsche B-/C-Standorte.`); }
+  else if (k.factor <= 30) { s += 8; reasons.push(`Kaufpreisfaktor ${f}x impliziert eine Amortisation von über 25 Jahren.`); }
+  else { s += 2; reasons.push(`Kaufpreisfaktor ${f}x — die Investmentthese muss primär auf Wertsteigerung basieren.`); }
 
-  if (m.pricePerSqm <= 1500) s += 30;
-  else if (m.pricePerSqm <= 2500) s += 24;
-  else if (m.pricePerSqm <= 3500) s += 18;
-  else if (m.pricePerSqm <= 5000) s += 10;
-  else s += 3;
+  const sqm = Math.round(k.sqmPrice).toLocaleString("de-DE");
+  if (k.sqmPrice <= 1500) { s += 30; reasons.push(`Einstiegspreis ${sqm} €/m² weit unter dem Marktmedian — organisches Upside durch Preiskonvergenz.`); }
+  else if (k.sqmPrice <= 2500) { s += 24; reasons.push(`${sqm} €/m² bietet ein attraktives Preisniveau mit Wertsteigerungspotenzial.`); }
+  else if (k.sqmPrice <= 3500) { s += 18; reasons.push(`${sqm} €/m² entspricht dem Marktdurchschnitt für solide Standorte.`); }
+  else if (k.sqmPrice <= 5000) { s += 10; reasons.push(`${sqm} €/m² liegt im gehobenen Segment — limitiertes Preis-Upside.`); }
+  else { s += 3; reasons.push(`${sqm} €/m² im Premium-Segment — weiteres Upside nur bei absoluter Spitzenmikrolage.`); }
 
-  return clamp(s);
+  if (k.grossYield >= 0.05) actions.push("Rendite trägt positiven Leverage — modellieren Sie 80 % LTV bei 4 % Annuität zur Cashflow-Validierung.");
+  else if (k.grossYield >= 0.04) actions.push("Grenzwertige Rendite — zielen Sie auf 70–75 % LTV oder verhandeln Sie 5–10 % Preisnachlass.");
+  else actions.push("Rendite unter 4 % macht fremdfinanzierte Akquisition riskant — höheren Eigenkapitaleinsatz einkalkulieren.");
+
+  if (k.factor >= 25) actions.push("Verhandeln Sie 10–15 % unter Angebotspreis, um den Faktor in den Zielkorridor von 20–22x zu senken.");
+
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   2. Rentability Score (15%)
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   2. Vermietbarkeits-Score (15%)
+   ═══════════════════════════════════════════════════════════ */
 
-function calcRentabilityScore(_p: ScoringInput, m: Metrics): number {
+function calcRentability(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
   let s = 0;
+  const reasons: string[] = [];
+  const actions: string[] = [];
+  const locRank = LOCATION_RANK[p.locationGrade] || 45;
 
-  if (m.netYield >= 0.05) s += 40;
-  else if (m.netYield >= 0.04) s += 32;
-  else if (m.netYield >= 0.03) s += 24;
-  else if (m.netYield >= 0.02) s += 14;
-  else if (m.netYield >= 0.01) s += 6;
-  else s += 0;
+  s += Math.round((locRank / 100) * 40);
+  reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — ${
+    locRank >= 72 ? "geringe Leerstandsquote und planbare Mietnachfrage gemäß §558 BGB Mietspiegel." :
+    locRank >= 45 ? "durchschnittliches Vermietungspotenzial, Mietspiegel als Orientierung für §558 BGB Mieterhöhungen." :
+    "erhöhtes Leerstandsrisiko, eingeschränkte Mietpreisbremse nach §556d BGB."
+  }`);
 
-  if (m.hausgeldRatio <= 0.15) s += 30;
-  else if (m.hausgeldRatio <= 0.25) s += 24;
-  else if (m.hausgeldRatio <= 0.35) s += 16;
-  else if (m.hausgeldRatio <= 0.50) s += 8;
-  else s += 0;
+  if (p.area >= 50 && p.area <= 85) { s += 30; reasons.push(`${p.area} m² Wohnfläche im nachfragestärksten Segment — ideal für Singles und Paare.`); }
+  else if (p.area >= 35 && p.area <= 100) { s += 22; reasons.push(`${p.area} m² ist gut vermietbar und deckt breite Zielgruppen ab.`); }
+  else if (p.area > 100) { s += 12; reasons.push(`${p.area} m² — große Einheiten sind schwieriger vermietbar mit höherem m²-Leerstandsverlust.`); }
+  else { s += 8; reasons.push(`${p.area} m² ist eine sehr kleine Einheit — eingeschränkter Mieterkreis.`); }
 
-  if (m.netRent >= 600) s += 30;
-  else if (m.netRent >= 400) s += 24;
-  else if (m.netRent >= 200) s += 16;
-  else if (m.netRent >= 0) s += 8;
-  else s += 0;
+  if (k.age <= 10) { s += 30; reasons.push(`Neubau (${p.year}) — moderne Ausstattung, hohe Mieterakzeptanz.`); }
+  else if (k.age <= 25) { s += 24; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — zeitgemäße Bausubstanz.`); }
+  else if (k.age <= 40) { s += 16; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — solide Substanz, mittelfristiger Modernisierungsbedarf möglich.`); }
+  else if (k.age <= 60) { s += 8; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — ältere Bausubstanz, Mieter erwarten ggf. Modernisierungsstandard.`); }
+  else { s += 3; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — vor modernen Baustandards, Vollgutachten empfohlen.`); }
 
-  return clamp(s);
+  if (locRank >= 72) actions.push("Mietpreisbremse prüfen (§556d BGB) — Höchstmiete 10 % über Mietspiegel bei Neuvermietung.");
+  if (p.area >= 50 && p.area <= 85) actions.push("Zielgruppe Singles/Paare — hohe Nachfrage, kurze Wiedervermietungszeiten.");
+  if (k.age >= 40) actions.push("Modernisierungskosten nach §559 BGB zu 8 % p.a. auf Mieter umlegbar (gedeckelt §559 Abs. 3a BGB).");
+
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   3. Risk Score (15%)
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   3. Risiko-Score (15%)
+   ═══════════════════════════════════════════════════════════ */
 
-function calcRiskScore(p: ScoringInput, m: Metrics): number {
+function calcRisk(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
   let s = 100;
+  const reasons: string[] = [];
+  const actions: string[] = [];
+  const renoCount = p.renovations.length;
 
-  s -= m.renoCount * 12;
+  s -= renoCount * 12;
+  if (renoCount === 0) {
+    reasons.push("Kein Sanierungsbedarf — das Objekt ist stabilisiert und ab Tag 1 cashflow-fähig.");
+  } else {
+    const items = p.renovations.map(r => RENO_LABEL[r] || r).join(", ");
+    const costs = p.renovations.map(r => RENO_COST[r]).filter(Boolean).join("; ");
+    reasons.push(`${renoCount} von 6 Gewerken sanierungsbedürftig (${items}). Geschätzte Bandbreiten: ${costs}.`);
+    actions.push("Verbindliche Handwerkerangebote vor Kaufvertrag einholen. Kostenpuffer 15–20 % einkalkulieren.");
+  }
 
-  if (m.age >= 80) s -= 20;
-  else if (m.age >= 60) s -= 14;
-  else if (m.age >= 40) s -= 8;
-  else if (m.age >= 20) s -= 3;
+  if (k.hausgeldRatio >= 0.6) {
+    s -= 10;
+    reasons.push(`Hausgeld absorbiert ${(k.hausgeldRatio * 100).toFixed(0)} % der Bruttomiete — deutet auf hohe WEG-Kosten oder aufgestaute Rücklagen hin.`);
+    actions.push("WEG-Wirtschaftsplan und Hausgeldabrechnung der letzten 3 Jahre anfordern (§28 WEG).");
+  } else if (k.hausgeldRatio >= 0.45) {
+    s -= 5;
+    reasons.push(`Hausgeld-Quote bei ${(k.hausgeldRatio * 100).toFixed(0)} % — überschreitet die empfohlene 30 %-Obergrenze.`);
+  } else if (k.hausgeldRatio <= 0.25) {
+    reasons.push(`Hausgeld-Quote nur ${(k.hausgeldRatio * 100).toFixed(0)} % der Miete — gesunder Cashflow-Puffer.`);
+  }
 
-  if (p.locationGrade === "D") s -= 15;
-  else if (p.locationGrade === "C") s -= 7;
+  if (k.age >= 80) { s -= 20; reasons.push(`${k.age} Jahre Gebäudealter — erhöhtes Risiko für verdeckte Mängel.`); actions.push("Unabhängiges Baugutachten beauftragen. Schadstoffprüfung (Asbest, PCB) empfohlen."); }
+  else if (k.age >= 60) { s -= 14; reasons.push(`${k.age} Jahre — vor modernen Baustandards, latente Mängel möglich.`); actions.push("Bautechnisches Gutachten empfohlen — Fokus Abdichtung, Elektrik, tragende Wände."); }
+  else if (k.age >= 40) { s -= 8; reasons.push(`${k.age} Jahre — mittelalte Substanz, planmäßige Instandhaltung prüfen.`); }
+  else if (k.age >= 20) { s -= 3; reasons.push(`${k.age} Jahre — relativ junge Bausubstanz mit moderatem Risikoprofil.`); }
+  else { reasons.push(`Nur ${k.age} Jahre alt — niedriges Substanzrisiko.`); }
 
-  if (m.hausgeldRatio >= 0.6) s -= 10;
-  else if (m.hausgeldRatio >= 0.45) s -= 5;
+  if (p.renovations.includes("dach")) actions.push("Dacherneuerung höchstes Capex-Risiko (15.000–40.000 € Anteil) — WEG-Beschluss und Sonderumlage prüfen.");
+  if (p.renovations.includes("heizung") && (ENERGY_RANK[p.energyClass] || 50) < 50) actions.push("Heizungstausch bei schlechter Energieklasse kann gemäß GEG §§71–72 gebäudeweite Sanierung auslösen.");
 
-  return clamp(s);
+  if (k.netCashflow < 0) { s -= 5; reasons.push(`Negativer Netto-Cashflow von ${Math.round(k.netCashflow)} €/Monat vor Finanzierung.`); }
+
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   4. Energy Score (10%)
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   4. Finanzierungs-Score (15%)
+   ═══════════════════════════════════════════════════════════ */
 
-function calcEnergyScore(p: ScoringInput, m: Metrics): number {
-  let s = ENERGY_RANK[p.energyClass];
-
-  if (m.age <= 10) s += 10;
-  else if (m.age <= 25) s += 5;
-
-  if (p.renovations.heating && ENERGY_RANK[p.energyClass] < 50) s -= 10;
-
-  if (!p.renovations.facade && !p.renovations.windows) s += 5;
-
-  return clamp(s);
-}
-
-/* ═══════════════════════════════════════════════════
-   5. Bankability Score (15%)
-   ═══════════════════════════════════════════════════ */
-
-function calcBankabilityScore(p: ScoringInput, m: Metrics): number {
+function calcFinancing(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
   let s = 0;
+  const reasons: string[] = [];
+  const actions: string[] = [];
+  const locRank = LOCATION_RANK[p.locationGrade] || 45;
+  const energyRank = ENERGY_RANK[p.energyClass] || 50;
 
-  s += (LOCATION_RANK[p.locationGrade] / 100) * 30;
+  s += Math.round((locRank / 100) * 30);
+  reasons.push(`Lageklasse ${p.locationGrade} — ${locRank >= 72 ? "günstige Bankkonditionen und höhere Beleihungsausläufe." : locRank >= 45 ? "Standard-Beleihungswerte." : "Banken kalkulieren Risikoabschläge."}`);
 
-  if (m.grossYield >= 0.05) s += 25;
-  else if (m.grossYield >= 0.04) s += 18;
-  else if (m.grossYield >= 0.03) s += 10;
-  else s += 3;
+  if (k.grossYield >= 0.05) { s += 25; reasons.push("Rendite über 5 % — positiver Leverage bei aktuellen Zinsen sicher darstellbar."); }
+  else if (k.grossYield >= 0.04) { s += 18; reasons.push("Rendite um 4 % — Kapitaldienstdeckung knapp, Stresstest empfohlen."); }
+  else if (k.grossYield >= 0.03) { s += 10; reasons.push("Rendite unter 4 % — negativer Leverage bei marktüblichen Zinsen wahrscheinlich."); }
+  else { s += 3; reasons.push("Rendite unter 3 % — Fremdfinanzierung wirtschaftlich kaum darstellbar."); }
 
-  s += Math.max(0, 25 - m.renoCount * 5);
+  s += Math.max(0, 25 - p.renovations.length * 5);
+  if (p.renovations.length === 0) reasons.push("Kein Sanierungsbedarf — einfacheres Underwriting, keine Nachfinanzierung.");
+  else reasons.push(`${p.renovations.length} Sanierungen — Banken können zusätzliches Eigenkapital (30 %+) verlangen.`);
 
-  s += (ENERGY_RANK[p.energyClass] / 100) * 20;
+  s += Math.round((energyRank / 100) * 20);
+  if (energyRank >= 76) { reasons.push(`Energieklasse ${p.energyClass} — KfW-Förderung möglich.`); actions.push("KfW-Programm 261/262 prüfen — bis zu 150.000 € zinsgünstiges Darlehen."); }
+  else if (energyRank < 35) { reasons.push(`Energieklasse ${p.energyClass} — GEG-Konformitätsrisiko, möglicher Beleihungswert-Abschlag.`); actions.push("Energieausweis anfordern. GEG-Erfüllungsfristen prüfen."); }
 
-  return clamp(Math.round(s));
+  if (k.grossYield >= 0.04) actions.push("Stresstest bei 5,5 % Zinssatz durchführen.");
+  actions.push("Mindestens 3 Finanzierungsangebote einholen (Interhyp, Direktbanken, Hausbank).");
+
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   6. Projection Score (15%)
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   5. Zukunfts-Score (15%)
+   ═══════════════════════════════════════════════════════════ */
 
-function calcProjectionScore(p: ScoringInput, m: Metrics): number {
+function calcProjection(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
   let s = 0;
+  const reasons: string[] = [];
+  const actions: string[] = [];
+  const locRank = LOCATION_RANK[p.locationGrade] || 45;
+  const energyRank = ENERGY_RANK[p.energyClass] || 50;
 
-  const locGrowth: Record<LocationGrade, number> = { A: 20, B: 25, C: 30, D: 35 };
-  s += locGrowth[p.locationGrade];
+  const locGrowth: Record<string, number> = { A: 20, B: 25, C: 30, D: 35 };
+  s += locGrowth[p.locationGrade] || 20;
+  if (locRank >= 72) reasons.push(`Lageklasse ${p.locationGrade} — stabiles Wertwachstum, hohe Wiederverkaufsliquidität.`);
+  else if (locRank >= 45) reasons.push(`Lageklasse ${p.locationGrade} — gutes Mietwachstumspotenzial durch Infrastrukturentwicklung.`);
+  else { reasons.push(`Lageklasse ${p.locationGrade} — hohes Aufholpotenzial, abhängig von Infrastrukturkatalysatoren.`); actions.push("ÖPNV-Ausbau und Gewerbeansiedlung in der Region beobachten."); }
 
-  if (ENERGY_RANK[p.energyClass] >= 76) s += 30;
-  else if (ENERGY_RANK[p.energyClass] >= 48) s += 18;
+  if (energyRank >= 76) { s += 30; reasons.push(`Energieklasse ${p.energyClass} — zukunftssicher gegenüber GEG-Verschärfungen.`); }
+  else if (energyRank >= 48) { s += 18; reasons.push(`Energieklasse ${p.energyClass} — mittelfristig regulatorisch vertretbar.`); }
+  else { s += 5; reasons.push(`Energieklasse ${p.energyClass} — Sanierungspflicht innerhalb der nächsten Dekade möglich.`); }
+
+  if (locRank >= 72 && k.grossYield < 0.04) { s += 20; reasons.push("Mietwachstum gemäß §558 BGB bis Mietspiegel-Obergrenze realisierbar."); actions.push("Mietsteigerungspotenzial nach §558 BGB prüfen — 15–20 % in 3 Jahren möglich."); }
+  else if (locRank >= 72) { s += 12; reasons.push("Premiumlage sichert Mietwachstum über Inflation."); }
+  else { s += 6; reasons.push("Mietwachstum an wirtschaftliche Entwicklung der Region gekoppelt."); }
+
+  if (k.age >= 10 && k.age <= 35) s += 15;
+  else if (k.age < 10) s += 8;
   else s += 5;
 
-  if (p.locationGrade <= "B" && m.grossYield < 0.04) s += 20;
-  else if (p.locationGrade <= "B" && m.grossYield < 0.05) s += 12;
-  else s += 6;
+  if (k.grossYield >= 0.06 && locRank < 72) actions.push("Cashflow-first-Strategie — Einnahmen akkumulieren, Katalysatoren beobachten.");
+  if (k.grossYield < 0.04 && locRank >= 72) actions.push("Wertsteigerungswette — 10-Jahres-Preistrends validieren.");
+  if (energyRank < 48) actions.push("Proaktive energetische Sanierung kann Energieklasse um 1–2 Stufen verbessern.");
 
-  if (m.age >= 10 && m.age <= 35) s += 15;
-  else if (m.age < 10) s += 8;
-  else s += 5;
-
-  return clamp(s);
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   Bewertungssicherheit
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   6. Energie-Score (10%)
+   ═══════════════════════════════════════════════════════════ */
 
-function calcConfidence(p: ScoringInput, m: Metrics, riskScore: number): ConfidenceLevel {
-  let deductions = 0;
+function calcEnergy(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
+  const energyRank = ENERGY_RANK[p.energyClass] || 50;
+  let s = energyRank;
+  const reasons: string[] = [];
+  const actions: string[] = [];
 
-  if (m.renoCount >= 4) deductions += 2;
-  else if (m.renoCount >= 2) deductions += 1;
+  if (energyRank >= 76) reasons.push(`Energieklasse ${p.energyClass} — hervorragend. Keine regulatorischen Risiken.`);
+  else if (energyRank >= 48) reasons.push(`Energieklasse ${p.energyClass} — akzeptabel, mittelfristig Modernisierung sinnvoll.`);
+  else reasons.push(`Energieklasse ${p.energyClass} — schwach. GEG §72 kann Heizungstauschpflicht auslösen.`);
 
-  if (m.age >= 60) deductions += 2;
-  else if (m.age >= 40) deductions += 1;
+  if (k.age <= 10) { s += 10; reasons.push("Jüngere Bausubstanz — aktuelle GEG-Standards bei Errichtung eingehalten."); }
+  else if (k.age <= 25) s += 5;
 
-  if (p.locationGrade === "D") deductions += 1;
+  if (p.renovations.includes("heizung") && energyRank < 50) {
+    s -= 10;
+    reasons.push("Sanierungsbedürftige Heizung bei schlechter Energieklasse — 65 %-EE-Vorgabe gemäß GEG §71 beachten.");
+    actions.push("Wärmepumpe, Pellets oder Fernwärmeanschluss prüfen (GEG §71).");
+  }
 
-  if (riskScore < 40) deductions += 1;
-
-  if (m.netRent < 0) deductions += 1;
-
-  if (deductions <= 1) return "high";
-  if (deductions <= 3) return "medium";
-  return "low";
-}
-
-/* ─── Confidence label mapping ─── */
-
-const CONFIDENCE_LABEL: Record<ConfidenceLevel, string> = {
-  high: "hoch",
-  medium: "mittel",
-  low: "gering",
-};
-
-/* ═══════════════════════════════════════════════════
-   Erkl\u00E4rung (professionell, investorenorientiert)
-   ═══════════════════════════════════════════════════ */
-
-function generateExplanation(p: ScoringInput, m: Metrics, total: number, confidence: ConfidenceLevel): string {
-  const yieldPct = (m.grossYield * 100).toFixed(2);
-  const netPct = (m.netYield * 100).toFixed(2);
-  const ppsm = Math.round(m.pricePerSqm).toLocaleString("de-DE");
-  const factor = m.rentMultiplier.toFixed(1);
-
-  let verdict: string;
-  if (total >= 80) verdict = "stellt einen aussichtsreichen Akquisitionskandidaten mit attraktivem risikoadjustiertem Renditeprofil dar";
-  else if (total >= 65) verdict = "bietet eine solide Investmentgrundlage mit tragf\u00E4higen Fundamentaldaten, geeignet f\u00FCr eine Buy-and-Hold-Strategie";
-  else if (total >= 50) verdict = "zeigt moderates Potenzial, erfordert jedoch eine sorgf\u00E4ltige Due Diligence vor der Kaufentscheidung";
-  else if (total >= 35) verdict = "weist wesentliche Schw\u00E4chen auf, die durch Preisverhandlung oder eine klar definierte Value-Add-Strategie adressiert werden m\u00FCssen";
-  else verdict = "erf\u00FCllt die Mindestanforderungen an ein tragf\u00E4higes Investment unter Standardannahmen nicht";
-
-  const parts: string[] = [];
-
-  // Einordnungssatz
-  parts.push(
-    `Investmentzusammenfassung: Dieses Objekt erreicht einen gewichteten Gesamtscore von ${total}/100 (Bewertungssicherheit: ${CONFIDENCE_LABEL[confidence]}) und ${verdict}.`
-  );
-
-  // Begr\u00FCndungssatz
-  parts.push(
-    `Das Objekt ist mit \u20AC${p.purchasePrice.toLocaleString("de-DE")} (\u20AC${ppsm}/m\u00B2 bei ${p.areaSqm}\u00A0m\u00B2 Wohnfl\u00E4che) angesetzt und generiert \u20AC${p.monthlyRent.toLocaleString("de-DE")} monatliche Kaltmiete bei \u20AC${p.housegeld} Hausgeld. Daraus ergibt sich eine Bruttomietrendite von ${yieldPct}\u00A0% und eine Nettorendite von ${netPct}\u00A0% bei einem Kaufpreisfaktor von ${factor}x Jahresnettokaltmiete.`
-  );
-
-  // Risikohinweis
-  if (m.netRent > 0) {
-    parts.push(
-      `Nach Abzug des Hausgeldes erwirtschaftet das Objekt einen monatlichen Netto-Cashflow von \u20AC${Math.round(m.netRent).toLocaleString("de-DE")} vor Kapitaldienst \u2013 ein Puffer f\u00FCr Finanzierungskosten und Leerstandsreserven.`
-    );
+  if (!p.renovations.includes("fenster") && !p.renovations.includes("fassade")) {
+    s += 5;
+    reasons.push("Fenster und Fassade intakt — Gebäudehülle energetisch stabil.");
   } else {
-    parts.push(
-      `Nach Abzug des Hausgeldes entsteht ein monatlicher Netto-Fehlbetrag von \u20AC${Math.abs(Math.round(m.netRent)).toLocaleString("de-DE")} vor Finanzierung \u2013 dieser negative Carry muss durch Wertsteigerung oder Mietwachstum kompensiert werden, um die Investition zu rechtfertigen.`
-    );
+    if (p.renovations.includes("fenster")) { reasons.push("Fenster sanierungsbedürftig — Dreifachverglasung verbessert U-Wert um 50–70 %."); actions.push("Fenstertausch zu Dreifachverglasung — KfW-förderfähig."); }
+    if (p.renovations.includes("fassade")) { reasons.push("Fassade sanierungsbedürftig — WDVS hebt Energieklasse um 1–2 Stufen."); actions.push("Fassadendämmung (WDVS) — förderfähig über BEG-EM."); }
   }
 
-  if (m.renoCount > 0) {
-    const items = m.renoKeys.map(k => RENO_LABEL[k]).join(", ");
-    parts.push(
-      `Sanierungsbedarf: Bei ${m.renoCount} von 6 bewerteten Gewerken besteht Handlungsbedarf (${items}). Dies birgt Capex-Risiken und m\u00F6gliche Verz\u00F6gerungen im Bauzeitenplan.`
-    );
-  } else {
-    parts.push(
-      "Das Objekt weist bei keinem der sechs bewerteten Gewerke unmittelbaren Investitionsbedarf auf \u2013 die kurzfristige Cashflow-Prognose ist damit stabil unterlegt."
-    );
-  }
-
-  parts.push(
-    `Baujahr ${p.baujahr} (${m.age} Jahre), Energieeffizienzklasse ${p.energyClass} (${ENERGY_LABEL[p.energyClass]}), ${LOCATION_LABEL[p.locationGrade]} (Lageklasse ${p.locationGrade}). ${p.locationGrade <= "B" ? "Dies sichert eine starke Mietnachfrage und hohe Wiederverkaufsliquidit\u00E4t." : "Dies kann die Exit-Optionen einschr\u00E4nken und l\u00E4ngere Haltezeitr\u00E4ume erfordern."}`
-  );
-
-  return parts.join(" ");
+  return { value: clamp(s), reasons, actions };
 }
 
-/* ═══════════════════════════════════════════════════
-   St\u00E4rken
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   Confidence-Berechnung
+   ═══════════════════════════════════════════════════════════ */
 
-function generateStrengths(p: ScoringInput, m: Metrics): string[] {
-  const list: string[] = [];
-
-  if (m.grossYield >= 0.06)
-    list.push(`Eine Bruttomietrendite von ${(m.grossYield * 100).toFixed(1)}\u00A0% liegt deutlich \u00FCber dem deutschen Marktdurchschnitt von ca.\u00A04\u00A0% und bietet einen robusten Einkommenspuffer gegen steigende Zinsen.`);
-  else if (m.grossYield >= 0.05)
-    list.push(`Die Bruttomietrendite von ${(m.grossYield * 100).toFixed(1)}\u00A0% \u00FCbertrifft den Bundesdurchschnitt und erm\u00F6glicht positiven Leverage bei aktuellen Finanzierungskonditionen.`);
-
-  if (m.hausgeldRatio <= 0.25)
-    list.push(`Das Hausgeld beansprucht lediglich ${(m.hausgeldRatio * 100).toFixed(0)}\u00A0% der Bruttomiete \u2013 deutlich innerhalb der \u226430\u00A0%-Schwelle institutioneller Bewertungsstandards.`);
-
-  if (m.renoCount === 0)
-    list.push("Kein Sanierungsbedarf bei s\u00E4mtlichen sechs Gewerken \u2013 das Objekt ist stabilisiert und ab dem ersten Tag cashflow-f\u00E4hig.");
-
-  if (ENERGY_RANK[p.energyClass] >= 76)
-    list.push(`Energieeffizienzklasse ${p.energyClass} positioniert das Objekt vorausschauend gegen\u00FCber k\u00FCnftigen GEG-Versch\u00E4rfungen und vermeidet erzwungene Nachr\u00FCstungsinvestitionen.`);
-
-  if (p.locationGrade <= "B")
-    list.push(`${LOCATION_LABEL[p.locationGrade]} (Lageklasse ${p.locationGrade}) sichert ein geringes Leerstandsrisiko, planbare Mietnachfrage und vorteilhaftere Beleihungsbedingungen der Banken.`);
-
-  if (m.rentMultiplier <= 20)
-    list.push(`Ein Kaufpreisfaktor von ${m.rentMultiplier.toFixed(1)}x ist attraktiv im Vergleich zum Korridor von 20\u201325x, der in deutschen Metropolregionen typisch ist.`);
-
-  if (m.pricePerSqm <= 2500)
-    list.push(`Der Einstiegspreis von \u20AC${Math.round(m.pricePerSqm).toLocaleString("de-DE")}/m\u00B2 liegt unter dem Marktmedian und bietet eingebettetes Upside durch organische Preiskonvergenz.`);
-
-  if (m.netRent >= 400)
-    list.push(`Ein monatlicher Netto\u00FCberschuss von \u20AC${Math.round(m.netRent)} nach Hausgeld gew\u00E4hrleistet eine tragf\u00E4hige Kapitaldienstdeckung.`);
-
-  if (m.age <= 15)
-    list.push(`J\u00FCngere Bausubstanz (${m.age} Jahre) impliziert moderne Baustandards und einen geringeren mittelfristigen Instandhaltungsaufwand.`);
-
-  return list.length > 0 ? list : ["Keine herausragenden St\u00E4rken identifiziert \u2013 das Objekt bewegt sich in allen Dimensionen nahe am Marktdurchschnitt."];
+function calcConfidence(p: PropertyInput, k: KPIs): ScoringResult["confidence"] {
+  let d = 0;
+  if (p.renovations.length >= 4) d += 2; else if (p.renovations.length >= 2) d += 1;
+  if (k.age >= 60) d += 2; else if (k.age >= 40) d += 1;
+  if (p.locationGrade === "D") d += 1;
+  if (k.netCashflow < 0) d += 1;
+  if (p.year < 1960) d += 1;
+  if (d <= 1) return "Hohe Bewertungssicherheit";
+  if (d <= 3) return "Mittlere Bewertungssicherheit";
+  return "Geringe Bewertungssicherheit";
 }
 
-/* ═══════════════════════════════════════════════════
-   Risiken
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   Stärken + Risiken
+   ═══════════════════════════════════════════════════════════ */
 
-function generateRisks(p: ScoringInput, m: Metrics): string[] {
-  const list: string[] = [];
-
-  if (m.grossYield < 0.03)
-    list.push(`Eine Bruttomietrendite von ${(m.grossYield * 100).toFixed(1)}\u00A0% liegt deutlich unter der Break-even-Schwelle f\u00FCr fremdfinanzierte Akquisitionen bei aktuellen Zinss\u00E4tzen (3,5\u20134,5\u00A0%).`);
-  else if (m.grossYield < 0.04)
-    list.push(`Eine Bruttomietrendite von ${(m.grossYield * 100).toFixed(1)}\u00A0% l\u00E4sst nur minimalen Spielraum gegen steigende Zinsen \u2013 ein Zinsanstieg um 50 Basispunkte k\u00F6nnte den Cashflow eliminieren.`);
-
-  if (m.hausgeldRatio >= 0.5)
-    list.push(`Das Hausgeld absorbiert ${(m.hausgeldRatio * 100).toFixed(0)}\u00A0% der Bruttomiete \u2013 dies deutet auf hohe Verwaltungskosten oder aufgestaute Instandhaltungsr\u00FCcklage-Beitr\u00E4ge hin.`);
-  else if (m.hausgeldRatio >= 0.35)
-    list.push(`Das Hausgeld liegt bei ${(m.hausgeldRatio * 100).toFixed(0)}\u00A0% der Miete und \u00FCberschreitet die empfohlene 30\u00A0%-Obergrenze \u2013 die Aufschl\u00FCsselung zwischen Verwaltung und R\u00FCcklagen sollte gepr\u00FCft werden.`);
-
-  if (m.renoCount >= 4)
-    list.push(`${m.renoCount} von 6 Gewerken erfordern Sanierung \u2013 die kumulierte Capex-Belastung kann \u20AC50.000\u2013150.000+ erreichen und die Gesamterwerbskosten wesentlich beeinflussen.`);
-  else if (m.renoCount >= 2) {
-    const items = m.renoKeys.map(k => RENO_LABEL[k]).join(", ");
-    list.push(`${m.renoCount} anstehende Sanierungen (${items}) bergen Ausf\u00FChrungsrisiken und Kapitalbedarf, der in den Angebotspreis eingerechnet werden muss.`);
-  }
-
-  if (p.renovations.roof)
-    list.push("Eine Dacherneuerung stellt eines der h\u00F6chsten Einzelposten-Capex-Risiken dar (\u20AC15.000\u201340.000 typischer Miteigentumsanteil) und l\u00F6st h\u00E4ufig Sonderumlage-Beschl\u00FCsse aus.");
-
-  if (p.renovations.heating && ENERGY_RANK[p.energyClass] < 50)
-    list.push("Ein erforderlicher Heizungstausch bei einer Energieklasse unter D kann gem\u00E4\u00DF GEG \u00A7\u00A7\u00A071\u201372 eine geb\u00E4udeweite energetische Sanierung ausl\u00F6sen.");
-
-  if (ENERGY_RANK[p.energyClass] < 35)
-    list.push(`Energieklasse ${p.energyClass} (${ENERGY_LABEL[p.energyClass]}) steht unter zunehmendem regulatorischem Druck \u2013 die EU-Richtlinie 2024/1275 und GEG-Novellen k\u00F6nnen innerhalb der n\u00E4chsten Dekade eine Sanierungspflicht ausl\u00F6sen.`);
-
-  if (p.locationGrade === "D")
-    list.push("Lageklasse D birgt erh\u00F6htes Leerstands- und Wiedervermietungsrisiko, schw\u00E4chere Bankbewertungen und eingeschr\u00E4nkte Exit-Liquidit\u00E4t.");
-
-  if (m.age >= 60)
-    list.push(`Bei einem Geb\u00E4udealter von ${m.age} Jahren liegt die Bausubstanz vor modernen Baustandards \u2013 ein bautechnisches Gutachten sollte latente M\u00E4ngel identifizieren, die \u00FCber die Renovierungscheckliste hinausgehen.`);
-
-  if (m.netRent < 0)
-    list.push(`Ein negativer Netto-Carry von \u20AC${Math.abs(Math.round(m.netRent))}/Monat vor Finanzierung erzeugt einen sofortigen Liquidit\u00E4tsabfluss, der sich unter Fremdfinanzierung verst\u00E4rkt.`);
-
-  if (m.rentMultiplier >= 30)
-    list.push(`Ein Kaufpreisfaktor von ${m.rentMultiplier.toFixed(1)}x impliziert eine Amortisationsdauer von \u00FCber 30 Jahren \u2013 die Investmentthese muss sich vorrangig auf Wertsteigerung statt auf Einnahmen st\u00FCtzen.`);
-
-  if (m.pricePerSqm >= 6000)
-    list.push(`Bei \u20AC${Math.round(m.pricePerSqm).toLocaleString("de-DE")}/m\u00B2 liegt der Einstiegspreis im Premium-Segment \u2013 weiteres Upside ist begrenzt, sofern das Objekt keine absolute Spitzenmikrolage besetzt.`);
-
-  return list.length > 0 ? list : ["Keine wesentlichen Risiken auf Basis der vorliegenden Daten identifiziert \u2013 standardm\u00E4\u00DFige Due Diligence ist ausreichend."];
+function generateStrengths(p: PropertyInput, k: KPIs): string[] {
+  const l: string[] = [];
+  if (k.grossYield >= 0.06) l.push(`Bruttomietrendite ${(k.grossYield * 100).toFixed(1)} % deutlich über Marktdurchschnitt — robuster Einkommenspuffer.`);
+  else if (k.grossYield >= 0.05) l.push(`Bruttomietrendite ${(k.grossYield * 100).toFixed(1)} % übertrifft den Bundesdurchschnitt.`);
+  if (k.hausgeldRatio <= 0.25) l.push(`Hausgeld nur ${(k.hausgeldRatio * 100).toFixed(0)} % der Bruttomiete — innerhalb der 30 %-Schwelle.`);
+  if (p.renovations.length === 0) l.push("Kein Sanierungsbedarf — stabilisiertes Objekt, ab Tag 1 cashflow-fähig.");
+  if ((ENERGY_RANK[p.energyClass] || 50) >= 76) l.push(`Energieklasse ${p.energyClass} — zukunftssicher gegenüber GEG-Verschärfungen.`);
+  if ((LOCATION_RANK[p.locationGrade] || 45) >= 72) l.push(`${LOCATION_LABEL[p.locationGrade]} — geringe Leerstandsquote, günstige Bankkonditionen.`);
+  if (k.factor <= 20) l.push(`Kaufpreisfaktor ${k.factor.toFixed(1)}x deutlich unter dem Metropol-Korridor von 22–28x.`);
+  if (k.netCashflow >= 400) l.push(`${Math.round(k.netCashflow)} € monatlicher Nettocashflow — tragfähige Kapitaldienstdeckung.`);
+  if (k.age <= 15) l.push(`Jüngere Bausubstanz (${k.age} Jahre) — moderne Standards, geringer Instandhaltungsaufwand.`);
+  return l.length > 0 ? l : ["Objekt bewegt sich in allen Dimensionen nahe am Marktdurchschnitt."];
 }
 
-/* ═══════════════════════════════════════════════════
-   Kategorisierte Handlungsempfehlungen
-   ═══════════════════════════════════════════════════ */
-
-function generateRecommendations(p: ScoringInput, m: Metrics, total: number, bank: number): CategorizedRecommendations {
-  const financing: string[] = [];
-  const technical: string[] = [];
-  const legal: string[] = [];
-  const strategy: string[] = [];
-
-  /* ─── Finanzierung ─── */
-
-  if (m.grossYield >= 0.05 && m.netRent > 0)
-    financing.push("Die Rendite tr\u00E4gt einen positiven Leverage \u2013 modellieren Sie eine Finanzierung mit 80\u00A0% Beleihungsauslauf, um den Cashflow nach Kapitaldienst bei 4\u00A0% Annuit\u00E4t zu validieren.");
-  else if (m.grossYield >= 0.04)
-    financing.push("Grenzwertige Rendite \u2013 zielen Sie auf einen niedrigeren Beleihungsauslauf (70\u201375\u00A0%) oder verhandeln Sie den Kaufpreis um 5\u201310\u00A0% herunter, um Finanzierungsspielraum zu schaffen.");
-  else
-    financing.push("Eine Rendite unter 4\u00A0% macht eine fremdfinanzierte Akquisition bei aktuellen Zinsen riskant \u2013 erw\u00E4gen Sie einen h\u00F6heren Eigenkapitaleinsatz oder verzichten Sie, sofern kein signifikantes Mietwachstum realisierbar ist.");
-
-  if (bank >= 70)
-    financing.push("Starkes Finanzierungsprofil \u2013 rechnen Sie mit wettbewerbsf\u00E4higen Konditionen. Holen Sie Angebote von mindestens 3 Kreditgebern ein, darunter Interhyp und Direktbanken.");
-  else if (bank < 50)
-    financing.push("Unterdurchschnittliche Bankf\u00E4higkeit \u2013 Banken k\u00F6nnen h\u00F6heres Eigenkapital (30\u00A0%+), k\u00FCrzere Laufzeiten oder zus\u00E4tzliche Sicherheiten verlangen. Bereiten Sie die Unterlagen im Vorfeld auf.");
-
-  if (m.hausgeldRatio >= 0.35)
-    financing.push("Das erh\u00F6hte Hausgeld reduziert die Kapitaldienstdeckungsquote \u2013 stellen Sie das vollst\u00E4ndige Hausgeld in der Bankpr\u00E4sentation dar, um \u00DCberraschungen im Underwriting zu vermeiden.");
-
-  if (m.grossYield >= 0.04)
-    financing.push("F\u00FChren Sie einen Stresstest bei 5,5\u00A0% Zinssatz durch, um die Belastbarkeit gegen\u00FCber m\u00F6glichen Zinserh\u00F6hungen zu validieren.");
-
-  /* ─── Technik ─── */
-
-  if (m.renoCount >= 2) {
-    technical.push("Holen Sie verbindliche Handwerkerangebote f\u00FCr alle identifizierten Sanierungsma\u00DFnahmen vor Unterzeichnung des Kaufvertrags ein.");
-    technical.push("Kalkulieren Sie einen Kostenpuffer von 15\u201320\u00A0% \u00FCber den Angebotssummen, um Nachtr\u00E4ge und Umfangserweiterungen bei \u00E4lteren Geb\u00E4uden abzudecken.");
-  }
-
-  if (p.renovations.roof || p.renovations.facade)
-    technical.push("Dach- und Fassadenarbeiten erfordern einen WEG-Beschluss \u2013 pr\u00FCfen Sie den Zeitplan der Eigent\u00FCmerversammlung und bestehende Beschlusslage vor der Budgetierung.");
-
-  if (ENERGY_RANK[p.energyClass] < 50) {
-    technical.push("Fordern Sie den aktuellen Energieausweis an und pr\u00FCfen Sie die Erf\u00FCllungsfristen nach GEG 2024 \u2013 bei Nichtkonformit\u00E4t drohen beh\u00F6rdliche Sanierungsanordnungen.");
-    if (!p.renovations.facade)
-      technical.push("Eine proaktive Fassadend\u00E4mmung (WDVS) kann die Energieeffizienzklasse um 1\u20132 Stufen verbessern und sowohl regulatorische Konformit\u00E4t als auch Mietsteigerungspotenzial erschlie\u00DFen.");
-  }
-
-  if (p.renovations.heating)
-    technical.push("Die Heizungsmodernisierung muss der 65\u00A0%-EE-Vorgabe gem\u00E4\u00DF GEG \u00A7\u00A071 entsprechen \u2013 W\u00E4rmepumpe oder Fernw\u00E4rmeanschluss sollten gepr\u00FCft werden.");
-
-  if (m.age >= 40 && m.renoCount === 0)
-    technical.push("Trotz fehlender Auff\u00E4lligkeiten: Bei einem Geb\u00E4ude dieses Alters empfiehlt sich ein unabh\u00E4ngiges Baugutachten \u2013 verdeckte M\u00E4ngel an Leitungen, tragenden Bauteilen oder Abdichtungen sind h\u00E4ufig.");
-
-  /* ─── Recht ─── */
-
-  if (m.renoCount >= 1)
-    legal.push("Pr\u00FCfen Sie die WEG-Protokolle der letzten 3 Jahre auf geplante Sonderumlagen, anh\u00E4ngige Rechtsstreitigkeiten und den aktuellen Stand der Instandhaltungsr\u00FCcklage.");
-
-  if (m.grossYield < 0.04 && p.locationGrade <= "B")
-    legal.push("Pr\u00FCfen Sie das Mietsteigerungspotenzial nach \u00A7\u00A0559 BGB \u2013 bis zu 8\u00A0% der Modernisierungskosten k\u00F6nnen j\u00E4hrlich auf den Mieter umgelegt werden, gedeckelt bei \u20AC2\u20133/m\u00B2 je nach Vormiete.");
-
-  if (p.locationGrade <= "B")
-    legal.push("Pr\u00FCfen Sie die Anwendbarkeit der Mietpreisbremse \u2013 in regulierten M\u00E4rkten ist die H\u00F6chstmiete bei Neuvermietung auf 10\u00A0% \u00FCber dem \u00F6rtlichen Mietspiegel begrenzt.");
-
-  legal.push("Grundbuch-Pr\u00FCfung (Abt. II & III): Kl\u00E4ren Sie Wegerechte, Nie\u00DFbrauch, Vorkaufsrechte und bestehende Grundschulden des Verk\u00E4ufers.");
-
-  if (ENERGY_RANK[p.energyClass] < 35)
-    legal.push("Die niedrige Energieklasse l\u00F6st Offenlegungspflichten nach \u00A7\u00A080 GEG aus \u2013 stellen Sie sicher, dass der Verk\u00E4ufer einen g\u00FCltigen Energieausweis vorgelegt hat, und kalkulieren Sie Konformit\u00E4tskosten in Ihr Angebot ein.");
-
-  /* ─── Strategie ─── */
-
-  if (total >= 75) {
-    strategy.push("Starke Fundamentaldaten sprechen f\u00FCr eine Core-Buy-and-Hold-Strategie \u2013 planen Sie eine Haltedauer von 10+ Jahren mit organischem Mietwachstum und Tilgung als prim\u00E4ren Renditetreibern.");
-    strategy.push("Leiten Sie die Finanzierungsvoranfrage und den Notartermin ein. Die Standard-Due-Diligence-Checkliste ist anwendbar.");
-  } else if (total >= 55) {
-    strategy.push("Moderater Score \u2013 benchmarken Sie gegen 2\u20133 vergleichbare Angebote, bevor Sie sich festlegen, um den relativen Wert sicherzustellen.");
-    if (m.renoCount >= 2)
-      strategy.push("Value-Add-Ansatz: Verhandeln Sie einen Sanierungsabschlag in den Kaufpreis, f\u00FChren Sie gezielte Aufwertungen durch und repositionieren Sie das Objekt f\u00FCr h\u00F6here Mieten innerhalb von 12\u201318 Monaten.");
-    else
-      strategy.push("Optimieren Sie durch Mietanpassung auf Mietspiegel-Niveau und Hausgeld-Reduktion \u00FCber WEG-Kostenmanagement.");
-  } else {
-    strategy.push("Unterdurchschnittlicher Score \u2013 verfolgen Sie das Objekt nur mit einer konkreten Value-Add-These (Kernsanierung, Nutzungs\u00E4nderung oder Zusammenlegung) und quantifizierten Renditeprognosen.");
-    if (m.rentMultiplier >= 25)
-      strategy.push("Verhandeln Sie 10\u201315\u00A0% unter Angebotspreis, um den Kaufpreisfaktor in den Bereich von 20\u201322x zu bringen, der f\u00FCr eine rentable Fremdfinanzierung erforderlich ist.");
-  }
-
-  if (p.locationGrade >= "C" && m.grossYield >= 0.06)
-    strategy.push("Hohe Rendite in einer Entwicklungslage spricht f\u00FCr eine Cashflow-first-Strategie \u2013 akkumulieren Sie Einnahmen und beobachten Sie Infrastrukturkatalysatoren, die Wertsteigerungen ausl\u00F6sen k\u00F6nnten.");
-
-  if (p.locationGrade <= "B" && m.grossYield < 0.04)
-    strategy.push("Niedrige Rendite in Premiumlage ist eine Wertsteigerungswette \u2013 validieren Sie anhand von 10-Jahres-Preistrends und pr\u00FCfen Sie das Refinanzierungspotenzial nach 5 Jahren.");
-
-  return { financing, technical, legal, strategy };
+function generateRisks(p: PropertyInput, k: KPIs): string[] {
+  const l: string[] = [];
+  if (k.grossYield < 0.03) l.push(`Bruttomietrendite ${(k.grossYield * 100).toFixed(1)} % unter Break-even-Schwelle für fremdfinanzierte Akquisitionen.`);
+  else if (k.grossYield < 0.04) l.push(`Bruttomietrendite ${(k.grossYield * 100).toFixed(1)} % — minimaler Spielraum bei Zinsanstieg.`);
+  if (k.hausgeldRatio >= 0.5) l.push(`Hausgeld absorbiert ${(k.hausgeldRatio * 100).toFixed(0)} % der Miete — hohe WEG-Kosten.`);
+  if (p.renovations.length >= 4) l.push(`${p.renovations.length} Gewerke sanierungsbedürftig — Capex 50.000–150.000 €+.`);
+  else if (p.renovations.length >= 2) l.push(`${p.renovations.length} Sanierungen mit Ausführungsrisiken und Kapitalbedarf.`);
+  if ((ENERGY_RANK[p.energyClass] || 50) < 35) l.push(`Energieklasse ${p.energyClass} — regulatorischer Druck, Sanierungspflicht möglich.`);
+  if (p.locationGrade === "D") l.push("Lageklasse D — erhöhtes Leerstandsrisiko, eingeschränkte Exit-Liquidität.");
+  if (k.age >= 60) l.push(`Gebäudealter ${k.age} Jahre — Gutachten empfohlen, latente Mängel wahrscheinlich.`);
+  if (k.netCashflow < 0) l.push(`Negativer Netto-Cashflow ${Math.round(k.netCashflow)} €/Monat.`);
+  if (k.factor >= 30) l.push(`Kaufpreisfaktor ${k.factor.toFixed(1)}x — primär Wertsteigerungswette.`);
+  return l.length > 0 ? l : ["Keine wesentlichen Risiken — standardmäßige Due Diligence ausreichend."];
 }
 
-/* ═══════════════════════════════════════════════════
-   Main entry point
-   ═══════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════
+   Haupt-Entry-Point
+   ═══════════════════════════════════════════════════════════ */
 
-export function computeScore(params: ScoringInput): ScoringResult {
-  const m = deriveMetrics(params);
+export function computeScore(p: PropertyInput): ScoringResult {
+  const k = deriveKPIs(p);
 
-  const inv    = calcInvestmentScore(params, m);
-  const rent   = calcRentabilityScore(params, m);
-  const risk   = calcRiskScore(params, m);
-  const energy = calcEnergyScore(params, m);
-  const bank   = calcBankabilityScore(params, m);
-  const proj   = calcProjectionScore(params, m);
+  const inv = calcInvestment(p, k);
+  const rent = calcRentability(p, k);
+  const risk = calcRisk(p, k);
+  const fin = calcFinancing(p, k);
+  const proj = calcProjection(p, k);
+  const energy = calcEnergy(p, k);
 
-  const totalScore = clamp(Math.round(
-    inv    * WEIGHTS.investment +
-    rent   * WEIGHTS.rentability +
-    risk   * WEIGHTS.risk +
-    energy * WEIGHTS.energy +
-    bank   * WEIGHTS.bankability +
-    proj   * WEIGHTS.projection
-  ));
+  const subscores: SubscoreEntry[] = [
+    { key: "investment", label: "Investitions-Score", value: inv.value, weight: 30, oneLiner: `Bruttorendite ${(k.grossYield * 100).toFixed(1)} %, Faktor ${k.factor.toFixed(1)}x, ${Math.round(k.sqmPrice).toLocaleString("de-DE")} €/m²`, reasons: inv.reasons, actions: inv.actions },
+    { key: "rentability", label: "Vermietbarkeits-Score", value: rent.value, weight: 15, oneLiner: `Lageklasse ${p.locationGrade}, ${p.area} m², Baujahr ${p.year}`, reasons: rent.reasons, actions: rent.actions },
+    { key: "risk", label: "Risiko-Score", value: risk.value, weight: 15, oneLiner: `${p.renovations.length} Sanierungen, ${(k.hausgeldRatio * 100).toFixed(0)} % HG-Quote, ${k.age} J. alt`, reasons: risk.reasons, actions: risk.actions },
+    { key: "financing", label: "Finanzierungs-Score", value: fin.value, weight: 15, oneLiner: `LTV-Potenzial: Lage ${p.locationGrade}, Rendite ${(k.grossYield * 100).toFixed(1)} %`, reasons: fin.reasons, actions: fin.actions },
+    { key: "projection", label: "Zukunfts-Score", value: proj.value, weight: 15, oneLiner: "Wachstumspotenzial, Energiekonformität, Mietentwicklung", reasons: proj.reasons, actions: proj.actions },
+    { key: "energy", label: "Energie-Score", value: energy.value, weight: 10, oneLiner: `Klasse ${p.energyClass}, Gebäudehülle ${!p.renovations.includes("fenster") && !p.renovations.includes("fassade") ? "intakt" : "sanierungsbedürftig"}`, reasons: energy.reasons, actions: energy.actions },
+  ];
 
-  const confidenceLevel = calcConfidence(params, m, risk);
+  const totalScore = clamp(Math.round(subscores.reduce((sum, s) => sum + s.value * (s.weight / 100), 0)));
 
   return {
     totalScore,
-    confidenceLevel,
-    subscores: {
-      investmentScore:   { label: "Investitions-Score",      value: inv,    weight: WEIGHTS.investment },
-      rentabilityScore:  { label: "Vermietbarkeits-Score",   value: rent,   weight: WEIGHTS.rentability },
-      riskScore:         { label: "Risiko-Score",            value: risk,   weight: WEIGHTS.risk },
-      energyScore:       { label: "Energie-Score",           value: energy, weight: WEIGHTS.energy },
-      bankabilityScore:  { label: "Finanzierungs-Score",     value: bank,   weight: WEIGHTS.bankability },
-      projectionScore:   { label: "Zukunfts-Score",          value: proj,   weight: WEIGHTS.projection },
-    },
-    explanation: generateExplanation(params, m, totalScore, confidenceLevel),
-    strengths: generateStrengths(params, m),
-    risks: generateRisks(params, m),
-    recommendations: generateRecommendations(params, m, totalScore, bank),
-    comparisonMetrics: {
-      yield: m.grossYield,
-      factor: m.rentMultiplier,
-      renovationCount: m.renoCount,
-      energyRank: ENERGY_RANK[params.energyClass],
-      bankScore: bank,
-      riskLevel: risk,
-    },
+    confidence: calcConfidence(p, k),
+    subscores,
+    kpis: { netYield: k.netYield, grossYield: k.grossYield, factor: k.factor, sqmPrice: k.sqmPrice, hausgeldRatio: k.hausgeldRatio, netCashflow: k.netCashflow },
+    strengths: generateStrengths(p, k),
+    risks: generateRisks(p, k),
   };
-}
-
-export function scoreTrend(): "up" | "down" | "stable" {
-  const r = Math.random();
-  if (r < 0.33) return "up";
-  if (r < 0.66) return "stable";
-  return "down";
 }

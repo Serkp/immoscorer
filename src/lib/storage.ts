@@ -1,37 +1,50 @@
-import type { Property } from "./types";
+import type { SavedProperty, SavedAnalysis } from "./types";
+import type { PropertyInput, ScoringResult } from "./scoring";
 
-const KEY = "immoscorer_properties";
+const PROP_KEY = "immoscorer_properties";
+const ANALYSIS_KEY = "immoscorer_analyses";
 
-function read(): Property[] {
+function readJSON<T>(key: string): T[] {
   if (typeof window === "undefined") return [];
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]");
-  } catch {
-    return [];
-  }
+  try { return JSON.parse(localStorage.getItem(key) || "[]"); }
+  catch { return []; }
 }
 
-function write(data: Property[]) {
-  localStorage.setItem(KEY, JSON.stringify(data));
+function writeJSON<T>(key: string, data: T[]) {
+  localStorage.setItem(key, JSON.stringify(data));
 }
 
-export function getProperties(): Property[] {
-  return read();
+export function saveProperty(input: PropertyInput, result: ScoringResult): SavedProperty {
+  const list = readJSON<SavedProperty>(PROP_KEY);
+  const item: SavedProperty = { id: crypto.randomUUID(), input, result, favorite: false, createdAt: new Date().toISOString() };
+  list.unshift(item);
+  writeJSON(PROP_KEY, list);
+  return item;
 }
 
-export function addProperty(p: Property) {
-  const list = read();
-  list.unshift(p);
-  write(list);
+export function getProperties(): SavedProperty[] {
+  return readJSON<SavedProperty>(PROP_KEY);
 }
 
-export function removeProperty(id: string) {
-  write(read().filter((p) => p.id !== id));
+export function deleteProperty(id: string) {
+  writeJSON(PROP_KEY, readJSON<SavedProperty>(PROP_KEY).filter((p) => p.id !== id));
 }
 
 export function toggleFavorite(id: string) {
-  const list = read();
+  const list = readJSON<SavedProperty>(PROP_KEY);
   const item = list.find((p) => p.id === id);
   if (item) item.favorite = !item.favorite;
-  write(list);
+  writeJSON(PROP_KEY, list);
+}
+
+export function saveAnalysis(propertyId: string, input: PropertyInput, result: ScoringResult): SavedAnalysis {
+  const list = readJSON<SavedAnalysis>(ANALYSIS_KEY);
+  const item: SavedAnalysis = { id: crypto.randomUUID(), propertyId, input, result, createdAt: new Date().toISOString() };
+  list.unshift(item);
+  writeJSON(ANALYSIS_KEY, list);
+  return item;
+}
+
+export function getAnalyses(): SavedAnalysis[] {
+  return readJSON<SavedAnalysis>(ANALYSIS_KEY);
 }
