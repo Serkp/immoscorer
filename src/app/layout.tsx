@@ -1,39 +1,19 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
-import "./globals.css";
 import { Navbar } from "@/components/Navbar";
-
-const geistSans = localFont({
-  src: "./fonts/GeistVF.woff",
-  variable: "--font-geist-sans",
-  weight: "100 900",
-});
-const geistMono = localFont({
-  src: "./fonts/GeistMonoVF.woff",
-  variable: "--font-geist-mono",
-  weight: "100 900",
-});
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ImmoScorer \u2013 Immobilien-Investmentanalyse",
-  description: "Immobilien-Investments professionell bewerten und vergleichen",
+  title: "ImmoScorer — KI-gestützte Immobilienanalyse",
+  description:
+    "Professionelle Bewertung von Anlageimmobilien mit KI-gestütztem Scoring, Risikoanalyse und Handlungsempfehlungen für den deutschen Markt.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} font-[family-name:var(--font-geist-sans)] antialiased min-h-screen`}
-        style={{ background: "var(--bg)" }}
-      >
+      <body className="bg-[#08090E] text-[#EDEEF2] antialiased">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-8">
-          {children}
-        </main>
+        <main className="mx-auto max-w-6xl px-5 pb-16 pt-6">{children}</main>
       </body>
     </html>
   );

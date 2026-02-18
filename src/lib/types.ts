@@ -1,5 +1,4 @@
 export type EnergyClass = "A+" | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H";
-
 export type LocationGrade = "A" | "B" | "C" | "D";
 
 export interface Renovations {
@@ -24,14 +23,9 @@ export interface Property {
   locationGrade: LocationGrade;
   renovations: Renovations;
   exposeImageUrl?: string;
-  score: number;          // 0-100 (totalScore from engine)
+  score: number;
   scoringResult?: import("./scoring").ScoringResult;
   trend: "up" | "down" | "stable";
   favorite: boolean;
-  createdAt: string;      // ISO date
-}
-
-export interface PropertyStore {
-  version: 1;
-  properties: Property[];
+  createdAt: string;
 }
