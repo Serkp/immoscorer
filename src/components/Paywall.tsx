@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { C } from "@/lib/theme";
 
 const FEATURES = [
@@ -11,6 +13,31 @@ const FEATURES = [
 ] as const;
 
 export function Paywall() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCheckout() {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      if (data.url) window.location.href = data.url;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-[480px] py-16 space-y-8">
       <div className="flex flex-col items-center gap-4">
@@ -35,15 +62,31 @@ export function Paywall() {
           </p>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div
+            className="rounded-xl px-4 py-3 text-xs"
+            style={{
+              background: C.redDim,
+              color: C.red,
+              border: "1px solid rgba(248,113,113,0.2)",
+            }}
+          >
+            {error}
+          </div>
+        )}
+
         {/* CTA */}
         <button
-          className="w-full rounded-xl py-3 text-sm font-bold transition-all hover:opacity-90"
+          onClick={handleCheckout}
+          disabled={loading}
+          className="w-full rounded-xl py-3 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-50"
           style={{
             background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
             color: "#fff",
           }}
         >
-          Jetzt freischalten
+          {loading ? "Wird geladen..." : "Jetzt freischalten"}
         </button>
 
         {/* Feature bullets */}

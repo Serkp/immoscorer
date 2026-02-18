@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
@@ -11,9 +11,10 @@ import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
 import { Paywall } from "@/components/Paywall";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { savePropertyDB, saveAnalysisDB, countAnalyses, getSubscriptionStatus } from "@/lib/db";
+import { savePropertyDB, saveAnalysisDB, countAnalyses } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -58,7 +59,9 @@ const INIT: FormData = {
 
 export default function AnalysisPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
+  const { isPro, loading: subLoading, refresh: refreshSub } = useSubscription();
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -71,20 +74,38 @@ export default function AnalysisPage() {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; type: "success" | "neutral" } | null>(null);
 
   /* ── Paywall state ── */
   const [paywallCheck, setPaywallCheck] = useState(true);
   const [showPaywall, setShowPaywall] = useState(false);
 
+  /* ── Checkout success/cancel handling ── */
   useEffect(() => {
-    if (!user) return;
+    const checkout = searchParams.get("checkout");
+    if (checkout === "success") {
+      setToast({ text: "Willkommen bei ImmoScorer Pro! Alle Funktionen sind freigeschaltet.", type: "success" });
+      refreshSub();
+      setTimeout(() => setToast(null), 5000);
+      window.history.replaceState({}, "", "/analysis");
+    } else if (checkout === "cancel") {
+      setToast({ text: "Bezahlung abgebrochen.", type: "neutral" });
+      setTimeout(() => setToast(null), 4000);
+      window.history.replaceState({}, "", "/analysis");
+    }
+  }, [searchParams, refreshSub]);
+
+  useEffect(() => {
+    if (!user || subLoading) return;
+    if (isPro) {
+      setPaywallCheck(false);
+      setShowPaywall(false);
+      return;
+    }
     async function check() {
       try {
-        const [count, sub] = await Promise.all([
-          countAnalyses(user!.id),
-          getSubscriptionStatus(user!.id),
-        ]);
-        if (count >= 1 && !sub) {
+        const count = await countAnalyses(user!.id);
+        if (count >= 1) {
           setShowPaywall(true);
         }
       } catch {
@@ -94,7 +115,7 @@ export default function AnalysisPage() {
       }
     }
     check();
-  }, [user]);
+  }, [user, isPro, subLoading]);
 
   const set = useCallback((key: keyof FormData, val: string) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -237,7 +258,7 @@ export default function AnalysisPage() {
   }
 
   /* ── Paywall check loading ── */
-  if (paywallCheck) {
+  if (paywallCheck || subLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <AIOrb size={48} active />
@@ -250,12 +271,27 @@ export default function AnalysisPage() {
     return <Paywall />;
   }
 
+  /* ── Global checkout toast ── */
+  const checkoutToast = toast ? (
+    <div
+      className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg animate-fade-up"
+      style={{
+        background: toast.type === "success" ? C.greenDim : C.surface3,
+        color: toast.type === "success" ? C.green : C.sub,
+        border: `1px solid ${toast.type === "success" ? C.greenBorder : C.border}`,
+      }}
+    >
+      {toast.text}
+    </div>
+  ) : null;
+
   /* ══════════════════════════════════
      INPUT VIEW
      ══════════════════════════════════ */
   if (view === "input") {
     return (
       <div className="mx-auto max-w-[640px] space-y-6">
+        {checkoutToast}
         {/* Progress bars */}
         <div className="flex gap-2">
           {[0, 1, 2].map((i) => (
