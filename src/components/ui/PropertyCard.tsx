@@ -52,7 +52,7 @@ export function PropertyCard({
             <p className="font-semibold text-sm truncate">{street}</p>
             <p className="text-xs text-[var(--muted)]">{city}</p>
           </div>
-          <ScoreBadge score={score} size="md" />
+          <ScoreBadge score={score} size="lg" />
         </div>
 
         {/* Price + trend */}

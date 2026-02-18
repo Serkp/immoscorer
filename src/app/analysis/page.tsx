@@ -4,9 +4,8 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { InlineHelp } from "@/components/ui";
 import { PropertyCard } from "@/components/ui/PropertyCard";
-import { ScoreBadge } from "@/components/ui/ScoreBadge";
-import { ProgressBar } from "@/components/ui/ProgressBar";
-import { LineChartComponent } from "@/components/charts/LineChartComponent";
+import { DonutChart } from "@/components/charts/DonutChart";
+import { BarChartComponent } from "@/components/charts/BarChartComponent";
 import { addProperty } from "@/lib/storage";
 import { computeScore, scoreTrend } from "@/lib/scoring";
 import type { ScoringResult } from "@/lib/scoring";
@@ -29,6 +28,8 @@ const STEPS = [
   { num: 2, label: "Sanierung" },
   { num: 3, label: "Ergebnis" },
 ];
+
+const SUBSCORE_COLORS = ["#4F46E5", "#6366F1", "#7C3AED", "#8B5CF6", "#A78BFA", "#C4B5FD"];
 
 interface FormState {
   street: string;
@@ -339,52 +340,42 @@ export default function AnalysisPage() {
       {/* ─── Step 3: Dashboard Results ─── */}
       {step === 3 && result && scoring && (
         <div className="space-y-6 animate-fade-up">
-          {/* Hero row: Score ring + KPI cards */}
-          <div className="card p-8">
-            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8">
-              <div className="flex flex-col items-center">
-                <ScoreBadge score={scoring.totalScore} size="xl" label="Gesamtscore" />
-                <ConfidenceBadge level={scoring.confidenceLevel} />
-              </div>
 
-              <div className="flex-1 w-full">
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                  <KPICard label="Bruttorendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(1)}%`} color="text-[var(--accent)]" />
-                  <KPICard label="Risiko-Score" value={`${scoring.subscores.riskScore.value}`} color={scoring.subscores.riskScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
-                  <KPICard label="Bank-Score" value={`${scoring.subscores.bankabilityScore.value}`} color={scoring.subscores.bankabilityScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
-                  <KPICard label="Energie" value={result.energyClass} color="text-[var(--chart-3)]" />
-                </div>
-                <p className="text-sm text-[var(--muted)] leading-relaxed mt-5 max-w-2xl">
-                  {scoring.explanation.split(". ").slice(0, 2).join(". ")}.
-                </p>
-              </div>
+          {/* Row 1: Large central Donut + 4 KPI Cards */}
+          <div className="grid lg:grid-cols-5 gap-5">
+            <div className="lg:col-span-2 card p-6 flex flex-col items-center justify-center">
+              <DonutChart
+                data={Object.values(scoring.subscores).map((sub, i) => ({
+                  name: sub.label,
+                  value: Math.round(sub.value * sub.weight * 100),
+                  color: SUBSCORE_COLORS[i],
+                }))}
+                innerValue={String(scoring.totalScore)}
+                innerLabel="Gesamtscore"
+              />
+              <ConfidenceBadge level={scoring.confidenceLevel} />
+            </div>
+
+            <div className="lg:col-span-3 grid grid-cols-2 gap-4">
+              <KPICard label="Bruttorendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(1)}%`} sub={`Faktor ${scoring.comparisonMetrics.factor.toFixed(1)}x`} color="text-[var(--accent)]" />
+              <KPICard label="Risiko-Score" value={`${scoring.subscores.riskScore.value}`} sub={scoring.subscores.riskScore.value >= 65 ? "Geringes Risiko" : "Erh\u00F6htes Risiko"} color={scoring.subscores.riskScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
+              <KPICard label="Finanzierbarkeit" value={`${scoring.subscores.bankabilityScore.value}`} sub={scoring.subscores.bankabilityScore.value >= 65 ? "Bankf\u00E4hig" : "Einschr\u00E4nkungen"} color={scoring.subscores.bankabilityScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
+              <KPICard label="Energieeffizienz" value={result.energyClass} sub={`Rang ${scoring.comparisonMetrics.energyRank}/100`} color="text-[var(--chart-3)]" />
             </div>
           </div>
 
-          {/* Subscores */}
+          {/* Row 2: Subscore bar chart */}
           <div className="card p-6">
-            <h3 className="section-title mb-4">Teilscores</h3>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Object.values(scoring.subscores).map((sub) => (
-                <div key={sub.label} className="rounded-xl bg-[var(--bg)] p-4 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold">{sub.label}</span>
-                    <ScoreBadge score={sub.value} size="sm" />
-                  </div>
-                  <ProgressBar value={sub.value} />
-                  <p className="text-[11px] text-[var(--muted)]">Gewichtung: {Math.round(sub.weight * 100)}%</p>
-                </div>
-              ))}
-            </div>
+            <h3 className="section-title mb-4">Teilscores im \u00DCberblick</h3>
+            <BarChartComponent
+              data={Object.values(scoring.subscores).map((sub) => ({
+                name: sub.label.replace("-Score", "").replace("Investitions", "Invest.").replace("Vermietbarkeits", "Vermiet.").replace("Finanzierungs", "Finanz.").replace("Zukunfts", "Zukunft"),
+                value: sub.value,
+              }))}
+            />
           </div>
 
-          {/* Chart */}
-          <div className="card p-6">
-            <h3 className="section-title mb-4">Score-Verlauf (Beispieldaten)</h3>
-            <LineChartComponent />
-          </div>
-
-          {/* 3 Cards: Strengths | Risks | Recommendations */}
+          {/* Row 3: 3 Cards — Strengths | Risks | Recommendations */}
           <div className="grid lg:grid-cols-3 gap-5">
             <ListCard title="St\u00E4rken" items={scoring.strengths} accent="emerald" />
             <ListCard title="Risiken" items={scoring.risks} accent="amber" />
@@ -396,19 +387,6 @@ export default function AnalysisPage() {
                 <RecoSection tag="Recht" items={scoring.recommendations.legal} />
                 <RecoSection tag="Strategie" items={scoring.recommendations.strategy} />
               </div>
-            </div>
-          </div>
-
-          {/* Comparison Metrics */}
-          <div className="card p-6">
-            <h3 className="section-title mb-4">Vergleichskennzahlen</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <MetricPill label="Rendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
-              <MetricPill label="Faktor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
-              <MetricPill label="Sanierungen" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
-              <MetricPill label="Energie" value={`${scoring.comparisonMetrics.energyRank}/100`} />
-              <MetricPill label="Bank" value={`${scoring.comparisonMetrics.bankScore}/100`} />
-              <MetricPill label="Risiko" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
             </div>
           </div>
 
@@ -495,20 +473,12 @@ function MiniKPI({ label, value }: { label: string; value: string }) {
   );
 }
 
-function KPICard({ label, value, color }: { label: string; value: string; color: string }) {
+function KPICard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <div className="rounded-xl bg-[var(--bg)] p-4 text-center">
-      <p className={`text-2xl font-extrabold tracking-tight ${color}`}>{value}</p>
-      <p className="kpi-label mt-1">{label}</p>
-    </div>
-  );
-}
-
-function MetricPill({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-[var(--bg)] p-3 text-center">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="font-bold text-sm mt-0.5">{value}</p>
+    <div className="card p-5">
+      <p className="kpi-label">{label}</p>
+      <p className={`text-3xl font-extrabold tracking-tight mt-1.5 ${color}`}>{value}</p>
+      <p className="text-xs text-[var(--muted)] mt-1">{sub}</p>
     </div>
   );
 }

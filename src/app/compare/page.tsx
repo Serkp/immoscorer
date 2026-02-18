@@ -103,13 +103,9 @@ export default function ComparePage() {
 
                   <div className="space-y-2 text-sm">
                     <Row label="Kaufpreis" value={`\u20AC${p.purchasePrice.toLocaleString()}`} />
-                    <Row label="Kaltmiete" value={`\u20AC${p.monthlyRent.toLocaleString()}/Mon.`} />
                     <Row label="Rendite" value={`${((p.monthlyRent * 12) / p.purchasePrice * 100).toFixed(1)}%`} highlight />
                     <Row label="\u20AC/m\u00B2" value={`\u20AC${Math.round(p.purchasePrice / p.areaSqm).toLocaleString()}`} />
-                    <Row label="Fl\u00E4che" value={`${p.areaSqm}\u00A0m\u00B2`} />
-                    <Row label="Baujahr" value={String(p.baujahr)} />
-                    <Row label="Energie" value={p.energyClass} />
-                    <Row label="Lage" value={`Klasse\u00A0${p.locationGrade}`} />
+                    <Row label="Energie" value={`${p.energyClass} \u00B7 Lage ${p.locationGrade}`} />
                     <Row label="Sanierungen" value={`${Object.values(p.renovations).filter(Boolean).length}/6`} />
                   </div>
                 </div>
