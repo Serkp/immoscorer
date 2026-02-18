@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { AIOrb } from "@/components/ui/AIOrb";
@@ -9,9 +9,11 @@ import { AIComment } from "@/components/ui/AIComment";
 import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
+import { Paywall } from "@/components/Paywall";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { saveProperty, saveAnalysis } from "@/lib/storage";
+import { savePropertyDB, saveAnalysisDB, countAnalyses, getSubscriptionStatus } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -56,6 +58,7 @@ const INIT: FormData = {
 
 export default function AnalysisPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -65,6 +68,33 @@ export default function AnalysisPage() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingPct, setLoadingPct] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState<string | null>(null);
+
+  /* ── Paywall state ── */
+  const [paywallCheck, setPaywallCheck] = useState(true);
+  const [showPaywall, setShowPaywall] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    async function check() {
+      try {
+        const [count, sub] = await Promise.all([
+          countAnalyses(user!.id),
+          getSubscriptionStatus(user!.id),
+        ]);
+        if (count >= 1 && !sub) {
+          setShowPaywall(true);
+        }
+      } catch {
+        // On error, allow access
+      } finally {
+        setPaywallCheck(false);
+      }
+    }
+    check();
+  }, [user]);
 
   const set = useCallback((key: keyof FormData, val: string) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -147,22 +177,52 @@ export default function AnalysisPage() {
           };
           const sr = computeScore(input);
           setResult(sr);
+          setSaved(false);
+          setSaveMsg(null);
           setView("result");
         }, 600);
       }
     }, 600);
   }
 
-  function handleSave() {
-    if (!result) return;
-    const input: PropertyInput = {
-      street: form.street, city: form.city, price: Number(form.price), rent: Number(form.rent),
-      hausgeld: Number(form.hausgeld), area: Number(form.area), year: Number(form.year),
-      energyClass: form.energyClass, locationGrade: form.locationGrade || "B", renovations: form.renovations,
-    };
-    const prop = saveProperty(input, result);
-    saveAnalysis(prop.id, input, result);
-    router.push("/properties");
+  async function handleSave() {
+    if (!result || !user || saving || saved) return;
+    setSaving(true);
+    try {
+      const input: PropertyInput = {
+        street: form.street, city: form.city, price: Number(form.price), rent: Number(form.rent),
+        hausgeld: Number(form.hausgeld), area: Number(form.area), year: Number(form.year),
+        energyClass: form.energyClass, locationGrade: form.locationGrade || "B", renovations: form.renovations,
+      };
+      const prop = await savePropertyDB(user.id, {
+        street: input.street,
+        city: input.city,
+        price: input.price,
+        rent: input.rent,
+        hausgeld: input.hausgeld,
+        area: input.area,
+        year: input.year,
+        energyClass: input.energyClass,
+        locationGrade: input.locationGrade,
+        renovations: input.renovations,
+        totalScore: result.totalScore,
+        result: result as unknown as Record<string, unknown>,
+      });
+      await saveAnalysisDB(
+        user.id,
+        prop.id,
+        input as unknown as Record<string, unknown>,
+        result as unknown as Record<string, unknown>
+      );
+      setSaved(true);
+      setSaveMsg("Immobilie gespeichert");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } catch {
+      setSaveMsg("Fehler beim Speichern");
+      setTimeout(() => setSaveMsg(null), 3000);
+    } finally {
+      setSaving(false);
+    }
   }
 
   function reset() {
@@ -172,6 +232,22 @@ export default function AnalysisPage() {
     setLocationDone(false);
     setView("input");
     setExpanded(null);
+    setSaved(false);
+    setSaveMsg(null);
+  }
+
+  /* ── Paywall check loading ── */
+  if (paywallCheck) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <AIOrb size={48} active />
+      </div>
+    );
+  }
+
+  /* ── Paywall ── */
+  if (showPaywall) {
+    return <Paywall />;
   }
 
   /* ══════════════════════════════════
@@ -398,7 +474,7 @@ export default function AnalysisPage() {
           {LOADING_STEPS.map((s, i) => (
             <div key={i} className="flex items-center gap-3 transition-all duration-300" style={{ opacity: loadingStep >= i ? 1 : 0.25 }}>
               <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0" style={{ background: loadingStep > i ? C.greenDim : loadingStep === i ? C.accentMid : C.surface, color: loadingStep > i ? C.green : loadingStep === i ? C.accent : C.dim, border: `1px solid ${loadingStep > i ? C.greenBorder : loadingStep === i ? C.accent : C.border}` }}>
-                {loadingStep > i ? "✓" : i + 1}
+                {loadingStep > i ? "\u2713" : i + 1}
               </div>
               <div>
                 <p className="text-sm font-semibold" style={{ color: loadingStep >= i ? C.text : C.dim }}>{s.title}</p>
@@ -434,6 +510,20 @@ export default function AnalysisPage() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
+        {/* Save Toast */}
+        {saveMsg && (
+          <div
+            className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg animate-fade-up"
+            style={{
+              background: saved ? C.greenDim : C.redDim,
+              color: saved ? C.green : C.red,
+              border: `1px solid ${saved ? C.greenBorder : "rgba(248,113,113,0.2)"}`,
+            }}
+          >
+            {saveMsg}
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -447,7 +537,20 @@ export default function AnalysisPage() {
           </div>
           <div className="flex gap-2">
             <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
-            <button onClick={handleSave} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>Im Portfolio speichern</button>
+            <button
+              onClick={handleSave}
+              disabled={saved || saving}
+              className="rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-60"
+              style={{
+                background: saved
+                  ? C.greenDim
+                  : `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+                color: saved ? C.green : "#fff",
+                border: saved ? `1px solid ${C.greenBorder}` : "none",
+              }}
+            >
+              {saving ? "..." : saved ? "Gespeichert" : "Im Portfolio speichern"}
+            </button>
           </div>
         </div>
 
@@ -519,7 +622,7 @@ export default function AnalysisPage() {
                       <ul className="space-y-1.5">
                         {sub.actions.map((a, i) => (
                           <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                            <span className="mt-0.5 shrink-0" style={{ color: C.green }}>→</span>
+                            <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
                             {a}
                           </li>
                         ))}

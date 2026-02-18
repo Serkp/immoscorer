@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { C } from "@/lib/theme";
 
 const NAV = [
@@ -15,6 +17,28 @@ const NAV = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const { user, signOut } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const displayName =
+    user?.user_metadata?.full_name || user?.email || "";
+  const initials = displayName
+    .split(/[\s@]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s: string) => s[0]?.toUpperCase())
+    .join("");
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <nav
@@ -71,12 +95,60 @@ export function Navbar() {
           PRO
         </span>
 
-        {/* Avatar */}
-        <div
-          className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold"
-          style={{ background: C.surface3, color: C.sub }}
-        >
-          U
+        {/* Avatar + Dropdown */}
+        <div className="relative" ref={menuRef}>
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold cursor-pointer transition-all"
+            style={{
+              background: menuOpen ? C.surface3 : C.surface2,
+              color: C.sub,
+              border: `1px solid ${menuOpen ? C.borderHover : C.border}`,
+            }}
+          >
+            {initials || "U"}
+          </button>
+
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-full mt-2 w-48 rounded-xl py-1 shadow-xl animate-fade-up"
+              style={{
+                background: C.bg2,
+                border: `1px solid ${C.border}`,
+              }}
+            >
+              {/* User info */}
+              <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
+                <p className="text-xs font-semibold truncate" style={{ color: C.text }}>
+                  {user?.user_metadata?.full_name || "Benutzer"}
+                </p>
+                <p className="text-[11px] truncate" style={{ color: C.dim }}>
+                  {user?.email}
+                </p>
+              </div>
+
+              <button
+                disabled
+                className="w-full text-left px-3 py-2 text-xs transition-colors opacity-40 cursor-not-allowed"
+                style={{ color: C.sub }}
+              >
+                Abo verwalten
+              </button>
+
+              <div className="mx-3 h-px" style={{ background: C.border }} />
+
+              <button
+                onClick={async () => {
+                  setMenuOpen(false);
+                  await signOut();
+                }}
+                className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80"
+                style={{ color: C.red }}
+              >
+                Abmelden
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </nav>
