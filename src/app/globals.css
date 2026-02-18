@@ -3,29 +3,174 @@
 @tailwind utilities;
 
 :root {
-  --bg: #F8FAFC;
-  --fg: #0F172A;
-  --muted: #64748B;
-  --border: #E2E8F0;
+  --bg: #F5F7FA;
+  --fg: #111827;
+  --fg-secondary: #374151;
+  --muted: #6B7280;
+  --muted-light: #9CA3AF;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
   --card: #FFFFFF;
-  --accent: #2563EB;
-  --accent-hover: #1D4ED8;
-  --accent-light: #EFF6FF;
-  --success: #16A34A;
-  --warning: #F59E0B;
-  --danger: #EF4444;
+
+  /* Primary accent — indigo family */
+  --accent: #4F46E5;
+  --accent-hover: #4338CA;
+  --accent-light: #EEF2FF;
+  --accent-subtle: #E0E7FF;
+
+  /* Semantic */
+  --success: #059669;
+  --success-light: #ECFDF5;
+  --warning: #D97706;
+  --warning-light: #FFFBEB;
+  --danger: #DC2626;
+  --danger-light: #FEF2F2;
+
+  /* Shadows — refined depth system */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.03);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.03);
+  --shadow-card: 0 2px 8px -2px rgb(0 0 0 / 0.06), 0 1px 3px -1px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 12px -2px rgb(0 0 0 / 0.08), 0 2px 4px -2px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 8px 24px -4px rgb(0 0 0 / 0.08), 0 4px 8px -4px rgb(0 0 0 / 0.04);
+  --shadow-focus: 0 0 0 3px rgb(79 70 229 / 0.15);
+
+  /* Chart palette — indigo to violet gradient */
+  --chart-1: #4F46E5;
+  --chart-2: #6366F1;
+  --chart-3: #7C3AED;
+  --chart-4: #8B5CF6;
+  --chart-5: #A78BFA;
 }
+
+/* ─── Base ─── */
 
 body {
   color: var(--fg);
   background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
   box-sizing: border-box;
 }
 
-/* Smooth page transitions */
 @media (prefers-reduced-motion: no-preference) {
   html { scroll-behavior: smooth; }
+}
+
+/* ─── Card system ─── */
+
+.card {
+  @apply bg-white rounded-2xl border border-[var(--border)];
+  box-shadow: var(--shadow-card);
+}
+
+.card-hover {
+  @apply bg-white rounded-2xl border border-[var(--border)] transition-all duration-200;
+  box-shadow: var(--shadow-card);
+}
+.card-hover:hover {
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent-subtle);
+}
+
+/* ─── KPI typography ─── */
+
+.kpi-value {
+  @apply text-3xl font-extrabold tracking-tight;
+  color: var(--fg);
+}
+
+.kpi-label {
+  @apply text-xs font-semibold uppercase tracking-wider;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ─── Section header ─── */
+
+.section-title {
+  @apply text-lg font-bold tracking-tight;
+  color: var(--fg);
+}
+
+.section-subtitle {
+  @apply text-sm;
+  color: var(--muted);
+}
+
+/* ─── Accent gradient for hero elements ─── */
+
+.accent-gradient {
+  background: linear-gradient(135deg, var(--chart-1), var(--chart-3));
+}
+
+.accent-gradient-text {
+  background: linear-gradient(135deg, var(--chart-1), var(--chart-3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Score ring animation ─── */
+
+@keyframes score-fill {
+  from { stroke-dashoffset: 283; }
+}
+
+.score-ring-animated {
+  animation: score-fill 1.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* ─── Fade-in for result sections ─── */
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.4s ease-out forwards;
+}
+
+/* ─── Stepper connector ─── */
+
+.stepper-connector {
+  @apply h-0.5 flex-1 rounded-full transition-colors duration-300;
+}
+
+/* ─── Input focus ring ─── */
+
+input:focus, select:focus, textarea:focus {
+  box-shadow: var(--shadow-focus);
+}
+
+/* ─── Badge utility ─── */
+
+.badge {
+  @apply inline-flex items-center text-xs font-semibold px-2.5 py-0.5 rounded-full;
+}
+
+/* ─── Scrollbar refinement ─── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted-light);
 }

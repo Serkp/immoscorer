@@ -57,20 +57,22 @@ export default function ComparePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Immobilien vergleichen</h1>
-        <p className="text-sm text-[var(--muted)]">
+        <h1 className="text-2xl font-bold tracking-tight">Immobilien vergleichen</h1>
+        <p className="section-subtitle mt-0.5">
           {favorites.length >= 2
             ? `${favorites.length} favorisierte Immobilien im Vergleich.`
-            : "Markieren Sie mindestens 2 Immobilien als Favoriten. Bis dahin werden alle gespeicherten Objekte angezeigt."}
+            : "Markieren Sie mindestens 2 Immobilien als Favoriten."}
         </p>
       </div>
 
       {comparables.length === 0 ? (
-        <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-12 text-center">
-          <p className="text-4xl mb-3">{"\u2696\uFE0F"}</p>
-          <p className="font-semibold">Keine Immobilien zum Vergleich</p>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Speichern Sie zun\u00E4chst Immobilien \u00FCber die <a href="/analysis" className="text-[var(--accent)] hover:underline">Analyse</a>.
+        <div className="card p-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--accent-light)] flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">{"\u2696\uFE0F"}</span>
+          </div>
+          <p className="font-bold text-lg">Keine Immobilien zum Vergleich</p>
+          <p className="text-sm text-[var(--muted)] mt-1.5 max-w-sm mx-auto">
+            Speichern Sie zun\u00E4chst Immobilien \u00FCber die <a href="/analysis" className="text-[var(--accent)] font-semibold hover:underline">Analyse</a>.
           </p>
         </div>
       ) : (
@@ -79,26 +81,21 @@ export default function ComparePage() {
           <div className="overflow-x-auto">
             <div className="inline-flex gap-4 min-w-full pb-2">
               {comparables.map((p) => (
-                <div
-                  key={p.id}
-                  className="w-72 flex-shrink-0 rounded-2xl bg-white border border-[var(--border)] shadow-sm p-5 space-y-4"
-                >
-                  {/* Header */}
+                <div key={p.id} className="w-72 flex-shrink-0 card p-5 space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
-                      <p className="font-semibold text-sm truncate">{p.street}</p>
+                      <p className="font-bold text-sm truncate">{p.street}</p>
                       <p className="text-xs text-[var(--muted)]">{p.city}</p>
                     </div>
-                    <ScoreBadge score={p.score} />
+                    <ScoreBadge score={p.score} size="lg" />
                   </div>
 
-                  {/* Image or icon */}
-                  <div className="h-28 rounded-xl bg-slate-50 flex items-center justify-center overflow-hidden">
+                  <div className="h-28 rounded-xl bg-gradient-to-br from-indigo-50 to-violet-50 flex items-center justify-center overflow-hidden">
                     {p.exposeImageUrl ? (
                       /* eslint-disable-next-line @next/next/no-img-element */
                       <img src={p.exposeImageUrl} alt={p.street} className="w-full h-full object-cover rounded-xl" />
                     ) : (
-                      <span className="text-3xl">{"\uD83C\uDFE0"}</span>
+                      <span className="text-3xl opacity-40">{"\uD83C\uDFE0"}</span>
                     )}
                   </div>
 
@@ -106,8 +103,8 @@ export default function ComparePage() {
 
                   <div className="space-y-2 text-sm">
                     <Row label="Kaufpreis" value={`\u20AC${p.purchasePrice.toLocaleString()}`} />
-                    <Row label="Kaltmiete" value={`\u20AC${p.monthlyRent.toLocaleString()}/Monat`} />
-                    <Row label="Rendite" value={`${((p.monthlyRent * 12) / p.purchasePrice * 100).toFixed(1)}%`} />
+                    <Row label="Kaltmiete" value={`\u20AC${p.monthlyRent.toLocaleString()}/Mon.`} />
+                    <Row label="Rendite" value={`${((p.monthlyRent * 12) / p.purchasePrice * 100).toFixed(1)}%`} highlight />
                     <Row label="\u20AC/m\u00B2" value={`\u20AC${Math.round(p.purchasePrice / p.areaSqm).toLocaleString()}`} />
                     <Row label="Fl\u00E4che" value={`${p.areaSqm}\u00A0m\u00B2`} />
                     <Row label="Baujahr" value={String(p.baujahr)} />
@@ -122,16 +119,16 @@ export default function ComparePage() {
 
           {/* Pairwise explanations */}
           {comparables.length >= 2 && (
-            <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-4">
-              <h3 className="font-semibold">Vergleichsanalyse</h3>
+            <div className="card p-6 space-y-4">
+              <h3 className="section-title">Vergleichsanalyse</h3>
               {comparables.slice(0, -1).map((a, i) => {
                 const b = comparables[i + 1];
                 return (
                   <div key={`${a.id}-${b.id}`} className="text-sm text-[var(--muted)] border-l-2 border-[var(--accent)] pl-4">
-                    <p className="font-medium text-[var(--fg)]">
+                    <p className="font-semibold text-[var(--fg)]">
                       {a.street} vs. {b.street}
                     </p>
-                    <p>{explain(a, b)}</p>
+                    <p className="mt-0.5">{explain(a, b)}</p>
                   </div>
                 );
               })}
@@ -143,11 +140,11 @@ export default function ComparePage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex justify-between">
       <span className="text-[var(--muted)]">{label}</span>
-      <span className="font-medium">{value}</span>
+      <span className={highlight ? "font-bold text-[var(--accent)]" : "font-medium"}>{value}</span>
     </div>
   );
 }

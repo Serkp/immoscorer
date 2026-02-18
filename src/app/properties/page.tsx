@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getProperties, deleteProperty, toggleFavorite } from "@/lib/storage";
 import { PropertyCard } from "@/components/ui/PropertyCard";
+import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import type { Property } from "@/lib/types";
 
 export default function PropertiesPage() {
@@ -26,21 +27,38 @@ export default function PropertiesPage() {
 
   if (!loaded) return null;
 
+  const totalScore = properties.length
+    ? Math.round(properties.reduce((sum, p) => sum + p.score, 0) / properties.length)
+    : 0;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Meine Immobilien</h1>
-        <p className="text-sm text-[var(--muted)]">
-          {properties.length} gespeicherte {properties.length === 1 ? "Immobilie" : "Immobilien"}
-        </p>
+      {/* Header with portfolio summary */}
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Meine Immobilien</h1>
+          <p className="section-subtitle mt-0.5">
+            {properties.length} gespeicherte {properties.length === 1 ? "Immobilie" : "Immobilien"}
+          </p>
+        </div>
+        {properties.length > 0 && (
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="kpi-label">Durchschnitt</p>
+            </div>
+            <ScoreBadge score={totalScore} size="lg" />
+          </div>
+        )}
       </div>
 
       {properties.length === 0 ? (
-        <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-12 text-center">
-          <p className="text-4xl mb-3">{"\uD83C\uDFE0"}</p>
-          <p className="font-semibold">Noch keine Immobilien vorhanden</p>
-          <p className="text-sm text-[var(--muted)] mt-1">
-            Starten Sie eine <a href="/analysis" className="text-[var(--accent)] hover:underline">Analyse</a>, um Ihre erste Immobilie hinzuzuf\u00FCgen.
+        <div className="card p-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-[var(--accent-light)] flex items-center justify-center mx-auto mb-4">
+            <span className="text-2xl">{"\uD83C\uDFE0"}</span>
+          </div>
+          <p className="font-bold text-lg">Noch keine Immobilien</p>
+          <p className="text-sm text-[var(--muted)] mt-1.5 max-w-sm mx-auto">
+            Starten Sie eine <a href="/analysis" className="text-[var(--accent)] font-semibold hover:underline">Analyse</a>, um Ihre erste Immobilie hinzuzuf\u00FCgen.
           </p>
         </div>
       ) : (
@@ -54,34 +72,35 @@ export default function PropertiesPage() {
                 trend={p.trend}
                 score={p.score}
                 imageUrl={p.exposeImageUrl}
+                metrics={[
+                  { label: "Rendite", value: `${((p.monthlyRent * 12) / p.purchasePrice * 100).toFixed(1)}%` },
+                  { label: "Fl\u00E4che", value: `${p.areaSqm}\u2009m\u00B2` },
+                  { label: "Energie", value: p.energyClass },
+                ]}
               />
 
               {/* Overlay actions */}
-              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-all duration-200">
                 <button
                   onClick={() => handleFavorite(p.id)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shadow-sm border transition-colors ${
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all ${
                     p.favorite
-                      ? "bg-amber-50 border-amber-200 text-amber-500"
-                      : "bg-white border-[var(--border)] text-[var(--muted)] hover:text-amber-500"
+                      ? "bg-amber-50 border border-amber-200 text-amber-500"
+                      : "bg-white/90 backdrop-blur-sm border border-[var(--border)] text-[var(--muted)] hover:text-amber-500"
                   }`}
+                  style={{ boxShadow: "var(--shadow-sm)" }}
                   title={p.favorite ? "Aus Favoriten entfernen" : "Zu Favoriten hinzuf\u00FCgen"}
                 >
                   {p.favorite ? "\u2605" : "\u2606"}
                 </button>
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="w-8 h-8 rounded-full bg-white border border-[var(--border)] flex items-center justify-center text-sm text-[var(--muted)] hover:text-red-500 shadow-sm transition-colors"
+                  className="w-8 h-8 rounded-full bg-white/90 backdrop-blur-sm border border-[var(--border)] flex items-center justify-center text-sm text-[var(--muted)] hover:text-red-500 transition-all"
+                  style={{ boxShadow: "var(--shadow-sm)" }}
                   title="Immobilie l\u00F6schen"
                 >
                   \u00D7
                 </button>
-              </div>
-
-              {/* Bottom detail row */}
-              <div className="mt-0 px-4 pb-3 -translate-y-1 flex items-center justify-between text-xs text-[var(--muted)]">
-                <span>{p.areaSqm}\u00A0m\u00B2 \u00B7 {p.energyClass} \u00B7 Lage\u00A0{p.locationGrade}</span>
-                <span>\u20AC{Math.round(p.monthlyRent).toLocaleString()}/Monat</span>
               </div>
             </div>
           ))}

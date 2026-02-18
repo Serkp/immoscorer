@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { InlineHelp } from "@/components/ui";
 import { PropertyCard } from "@/components/ui/PropertyCard";
 import { ScoreBadge } from "@/components/ui/ScoreBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
+import { LineChartComponent } from "@/components/charts/LineChartComponent";
 import { addProperty } from "@/lib/storage";
 import { computeScore, scoreTrend } from "@/lib/scoring";
 import type { ScoringResult } from "@/lib/scoring";
@@ -21,6 +22,12 @@ const RENOVATION_ITEMS: { key: keyof Renovations; label: string; help: string }[
   { key: "bathroom", label: "Bad", help: "Muss das Badezimmer komplett saniert werden?" },
   { key: "electrical", label: "Elektrik", help: "Ist die Elektroinstallation veraltet (vor 1990)?" },
   { key: "heating", label: "Heizung", help: "Muss die Heizungsanlage erneuert werden?" },
+];
+
+const STEPS = [
+  { num: 1, label: "Basisdaten" },
+  { num: 2, label: "Sanierung" },
+  { num: 3, label: "Ergebnis" },
 ];
 
 interface FormState {
@@ -76,6 +83,19 @@ export default function AnalysisPage() {
     );
   }
 
+  const liveMetrics = useMemo(() => {
+    if (!form.purchasePrice || !form.monthlyRent) return null;
+    const price = Number(form.purchasePrice);
+    const rent = Number(form.monthlyRent);
+    const hg = Number(form.housegeld) || 0;
+    if (!price || !rent) return null;
+    const grossYield = ((rent * 12) / price * 100).toFixed(2);
+    const factor = (price / (rent * 12)).toFixed(1);
+    const netRent = rent - hg;
+    const pricePerSqm = form.areaSqm ? Math.round(price / Number(form.areaSqm)) : null;
+    return { grossYield, factor, netRent, pricePerSqm };
+  }, [form.purchasePrice, form.monthlyRent, form.housegeld, form.areaSqm]);
+
   function handleNext() {
     if (step === 1) setStep(2);
     else if (step === 2) {
@@ -122,279 +142,287 @@ export default function AnalysisPage() {
     router.push("/properties");
   }
 
-  const gross = form.purchasePrice && form.monthlyRent
-    ? ((Number(form.monthlyRent) * 12) / Number(form.purchasePrice) * 100).toFixed(2)
-    : null;
-
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
-      <div className="flex items-center gap-3">
-        {[1, 2, 3].map((s) => (
-          <button
-            key={s}
-            onClick={() => { if (s < step) setStep(s); }}
-            className={`flex items-center gap-2 text-sm font-medium transition-colors ${
-              s === step ? "text-[var(--accent)]" : s < step ? "text-[var(--fg)] cursor-pointer" : "text-[var(--muted)]"
-            }`}
-          >
-            <span
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                s === step
-                  ? "bg-[var(--accent)] text-white"
-                  : s < step
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-slate-100 text-[var(--muted)]"
-              }`}
-            >
-              {s < step ? "\u2713" : s}
-            </span>
-            <span className="hidden sm:inline">
-              {s === 1 ? "Basisdaten" : s === 2 ? "Sanierung" : "Ergebnis"}
-            </span>
-          </button>
-        ))}
-        <div className="flex-1" />
-        {gross && step === 1 && (
-          <span className="text-xs text-[var(--muted)]">
-            Bruttorendite: <strong className="text-[var(--fg)]">{gross}%</strong>
-          </span>
-        )}
-      </div>
-
-      {/* ─── Step 1: Basics ─── */}
-      {step === 1 && (
-        <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
-          <div>
-            <h2 className="text-lg font-semibold">Objektdaten</h2>
-            <p className="text-sm text-[var(--muted)]">Finanzielle Eckdaten und Lageangaben.</p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field label="Stra\u00DFe" value={form.street} onChange={(v) => set("street", v)} placeholder="Berliner Str. 42" />
-            <Field label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Berlin" />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field
-              label="Kaufpreis"
-              value={form.purchasePrice}
-              onChange={(v) => set("purchasePrice", v)}
-              placeholder="250000"
-              type="number"
-              prefix="\u20AC"
-              help="Gesamtangebotspreis inkl. ggf. ausgewiesener Nebenkosten."
-            />
-            <Field
-              label="Monatliche Kaltmiete"
-              value={form.monthlyRent}
-              onChange={(v) => set("monthlyRent", v)}
-              placeholder="950"
-              type="number"
-              prefix="\u20AC"
-              help="Nettokaltmiete ohne Nebenkosten."
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <Field
-              label="Hausgeld"
-              value={form.housegeld}
-              onChange={(v) => set("housegeld", v)}
-              placeholder="350"
-              type="number"
-              prefix="\u20AC"
-              help="Monatliches Hausgeld (Verwaltung + Instandhaltungsr\u00FCcklage)."
-            />
-            <Field
-              label="Wohnfl\u00E4che"
-              value={form.areaSqm}
-              onChange={(v) => set("areaSqm", v)}
-              placeholder="72"
-              type="number"
-              suffix="m\u00B2"
-            />
-          </div>
-
-          <div className="grid sm:grid-cols-3 gap-4">
-            <Field
-              label="Baujahr"
-              value={form.baujahr}
-              onChange={(v) => set("baujahr", v)}
-              placeholder="1985"
-              type="number"
-            />
-            <SelectField
-              label="Energieeffizienzklasse"
-              value={form.energyClass}
-              onChange={(v) => set("energyClass", v)}
-              options={ENERGY_CLASSES}
-              placeholder="Ausw\u00E4hlen"
-            />
-            <SelectField
-              label="Lageklasse"
-              value={form.locationGrade}
-              onChange={(v) => set("locationGrade", v)}
-              options={LOCATION_GRADES}
-              placeholder="Ausw\u00E4hlen"
-              help="A = Top-Lage, D = Entwicklungslage."
-            />
-          </div>
-
-          <Field
-            label="Expos\u00E9-Bild-URL (optional)"
-            value={form.exposeImageUrl}
-            onChange={(v) => set("exposeImageUrl", v)}
-            placeholder="https://example.com/photo.jpg"
-          />
-
-          <button
-            disabled={!canProceed1()}
-            onClick={handleNext}
-            className="w-full rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            Weiter zu Sanierung \u2192
-          </button>
-        </div>
-      )}
-
-      {/* ─── Step 2: Renovations ─── */}
-      {step === 2 && (
-        <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
-          <div>
-            <h2 className="text-lg font-semibold">Sanierungsbedarf</h2>
-            <p className="text-sm text-[var(--muted)]">Markieren Sie Gewerke mit Sanierungsbedarf. Jedes reduziert den Score.</p>
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-3">
-            {RENOVATION_ITEMS.map(({ key, label, help }) => (
-              <label
-                key={key}
-                className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-colors ${
-                  form.renovations[key]
-                    ? "border-amber-300 bg-amber-50"
-                    : "border-[var(--border)] hover:bg-slate-50"
+      {/* ─── Horizontal Stepper ─── */}
+      <div className="card px-6 py-4">
+        <div className="flex items-center gap-0">
+          {STEPS.map((s, i) => (
+            <div key={s.num} className="flex items-center flex-1 last:flex-none">
+              <button
+                onClick={() => { if (s.num < step) setStep(s.num); }}
+                className={`flex items-center gap-2.5 transition-all ${
+                  s.num < step ? "cursor-pointer" : s.num === step ? "" : "opacity-40"
                 }`}
               >
-                <input
-                  type="checkbox"
-                  checked={form.renovations[key]}
-                  onChange={() => toggleReno(key)}
-                  className="w-4 h-4 rounded border-slate-300 text-[var(--accent)] focus:ring-[var(--accent)]"
-                />
-                <span className="text-sm font-medium">{label}</span>
-                <InlineHelp text={help} />
-              </label>
-            ))}
+                <span
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
+                    s.num === step
+                      ? "accent-gradient text-white shadow-sm"
+                      : s.num < step
+                      ? "bg-emerald-100 text-emerald-700"
+                      : "bg-[var(--border-light)] text-[var(--muted)]"
+                  }`}
+                >
+                  {s.num < step ? "\u2713" : s.num}
+                </span>
+                <span className={`text-sm font-semibold hidden sm:inline ${
+                  s.num === step ? "text-[var(--fg)]" : "text-[var(--muted)]"
+                }`}>
+                  {s.label}
+                </span>
+              </button>
+              {i < STEPS.length - 1 && (
+                <div className={`stepper-connector mx-4 ${
+                  s.num < step ? "bg-emerald-300" : "bg-[var(--border)]"
+                }`} />
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ─── Step 1: Two columns with live preview ─── */}
+      {step === 1 && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 card p-6 space-y-5">
+            <div>
+              <h2 className="section-title">Objektdaten</h2>
+              <p className="section-subtitle mt-0.5">Finanzielle Eckdaten und Lageangaben.</p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Stra\u00DFe" value={form.street} onChange={(v) => set("street", v)} placeholder="Berliner Str. 42" />
+              <Field label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Berlin" />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Kaufpreis" value={form.purchasePrice} onChange={(v) => set("purchasePrice", v)} placeholder="250000" type="number" prefix="\u20AC" help="Gesamtangebotspreis inkl. ggf. ausgewiesener Nebenkosten." />
+              <Field label="Monatliche Kaltmiete" value={form.monthlyRent} onChange={(v) => set("monthlyRent", v)} placeholder="950" type="number" prefix="\u20AC" help="Nettokaltmiete ohne Nebenkosten." />
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-4">
+              <Field label="Hausgeld" value={form.housegeld} onChange={(v) => set("housegeld", v)} placeholder="350" type="number" prefix="\u20AC" help="Monatliches Hausgeld (Verwaltung + Instandhaltungsr\u00FCcklage)." />
+              <Field label="Wohnfl\u00E4che" value={form.areaSqm} onChange={(v) => set("areaSqm", v)} placeholder="72" type="number" suffix="m\u00B2" />
+            </div>
+
+            <div className="grid sm:grid-cols-3 gap-4">
+              <Field label="Baujahr" value={form.baujahr} onChange={(v) => set("baujahr", v)} placeholder="1985" type="number" />
+              <SelectField label="Energieklasse" value={form.energyClass} onChange={(v) => set("energyClass", v)} options={ENERGY_CLASSES} placeholder="Ausw\u00E4hlen" />
+              <SelectField label="Lageklasse" value={form.locationGrade} onChange={(v) => set("locationGrade", v)} options={LOCATION_GRADES} placeholder="Ausw\u00E4hlen" help="A = Top-Lage, D = Entwicklungslage." />
+            </div>
+
+            <Field label="Expos\u00E9-Bild-URL (optional)" value={form.exposeImageUrl} onChange={(v) => set("exposeImageUrl", v)} placeholder="https://example.com/photo.jpg" />
+
+            <button
+              disabled={!canProceed1()}
+              onClick={handleNext}
+              className="w-full rounded-xl accent-gradient px-4 py-3 text-sm font-semibold text-white transition-all hover:opacity-90 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              Weiter zu Sanierung \u2192
+            </button>
           </div>
 
-          <div className="flex gap-3">
-            <button
-              onClick={() => setStep(1)}
-              className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
-            >
-              \u2190 Zur\u00FCck
-            </button>
-            <button
-              onClick={handleNext}
-              className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)]"
-            >
-              Score berechnen \u2192
-            </button>
+          {/* Live Preview sidebar */}
+          <div className="space-y-4">
+            <div className="card p-5 space-y-4">
+              <h3 className="kpi-label">Live-Vorschau</h3>
+              {liveMetrics ? (
+                <div className="space-y-4">
+                  <div className="text-center py-2">
+                    <p className="kpi-value">{liveMetrics.grossYield}%</p>
+                    <p className="text-xs text-[var(--muted)] mt-1">Bruttorendite</p>
+                  </div>
+                  <div className="h-px bg-[var(--border)]" />
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniKPI label="Faktor" value={`${liveMetrics.factor}x`} />
+                    <MiniKPI label="Nettomiete" value={`\u20AC${Math.round(liveMetrics.netRent)}`} />
+                    {liveMetrics.pricePerSqm && (
+                      <MiniKPI label="\u20AC/m\u00B2" value={`\u20AC${liveMetrics.pricePerSqm.toLocaleString()}`} />
+                    )}
+                    {form.baujahr && (
+                      <MiniKPI label="Alter" value={`${new Date().getFullYear() - Number(form.baujahr)} J.`} />
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-[var(--muted-light)] text-sm">Geben Sie Kaufpreis und Miete ein</p>
+                </div>
+              )}
+            </div>
+
+            {form.street && (
+              <div className="animate-fade-up">
+                <PropertyCard
+                  street={form.street || "Stra\u00DFe"}
+                  city={form.city || "Stadt"}
+                  price={form.purchasePrice ? `\u20AC${Number(form.purchasePrice).toLocaleString()}` : "\u20AC\u2013"}
+                  score={0}
+                  trend="stable"
+                />
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ─── Step 3: Result ─── */}
-      {step === 3 && result && scoring && (
-        <div className="space-y-6">
-          {/* Total score + confidence + explanation */}
-          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Analyseergebnis</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <p className="text-sm text-[var(--muted)]">Gewichteter Score \u00FCber 6 Dimensionen</p>
-                  <ConfidenceBadge level={scoring.confidenceLevel} />
-                </div>
-              </div>
-              <ScoreBadge score={scoring.totalScore} size="lg" />
+      {/* ─── Step 2: Renovations with summary sidebar ─── */}
+      {step === 2 && (
+        <div className="grid lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 card p-6 space-y-5">
+            <div>
+              <h2 className="section-title">Sanierungsbedarf</h2>
+              <p className="section-subtitle mt-0.5">Markieren Sie Gewerke mit Sanierungsbedarf.</p>
             </div>
 
-            <ProgressBar value={scoring.totalScore} label="Gesamtscore" />
+            <div className="grid sm:grid-cols-2 gap-3">
+              {RENOVATION_ITEMS.map(({ key, label, help }) => (
+                <label
+                  key={key}
+                  className={`flex items-center gap-3 p-4 rounded-xl border cursor-pointer transition-all duration-150 ${
+                    form.renovations[key]
+                      ? "border-amber-300 bg-[var(--warning-light)]"
+                      : "border-[var(--border)] hover:border-[var(--accent-subtle)] hover:bg-[var(--accent-light)]"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={form.renovations[key]}
+                    onChange={() => toggleReno(key)}
+                    className="w-4 h-4 rounded border-slate-300 text-[var(--accent)] focus:ring-[var(--accent)]"
+                  />
+                  <span className="text-sm font-medium">{label}</span>
+                  <InlineHelp text={help} />
+                </label>
+              ))}
+            </div>
 
-            <p className="text-sm text-[var(--muted)] leading-relaxed">{scoring.explanation}</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setStep(1)}
+                className="flex-1 rounded-xl border border-[var(--border)] px-4 py-3 text-sm font-semibold transition-all hover:bg-[var(--border-light)]"
+              >
+                \u2190 Zur\u00FCck
+              </button>
+              <button
+                onClick={handleNext}
+                className="flex-1 rounded-xl accent-gradient px-4 py-3 text-sm font-semibold text-white transition-all hover:opacity-90"
+              >
+                Score berechnen \u2192
+              </button>
+            </div>
+          </div>
+
+          <div className="card p-5 h-fit">
+            <h3 className="kpi-label mb-3">Sanierungsstatus</h3>
+            <div className="space-y-2">
+              {RENOVATION_ITEMS.map(({ key, label }) => (
+                <div key={key} className="flex items-center justify-between text-sm">
+                  <span className="text-[var(--muted)]">{label}</span>
+                  <span className={`badge ${form.renovations[key] ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
+                    {form.renovations[key] ? "Bedarf" : "OK"}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 pt-3 border-t border-[var(--border)]">
+              <div className="flex justify-between text-sm">
+                <span className="font-medium">Gesamt</span>
+                <span className="font-bold">{Object.values(form.renovations).filter(Boolean).length}/6</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Step 3: Dashboard Results ─── */}
+      {step === 3 && result && scoring && (
+        <div className="space-y-6 animate-fade-up">
+          {/* Hero row: Score ring + KPI cards */}
+          <div className="card p-8">
+            <div className="flex flex-col lg:flex-row items-center lg:items-start gap-8">
+              <div className="flex flex-col items-center">
+                <ScoreBadge score={scoring.totalScore} size="xl" label="Gesamtscore" />
+                <ConfidenceBadge level={scoring.confidenceLevel} />
+              </div>
+
+              <div className="flex-1 w-full">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                  <KPICard label="Bruttorendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(1)}%`} color="text-[var(--accent)]" />
+                  <KPICard label="Risiko-Score" value={`${scoring.subscores.riskScore.value}`} color={scoring.subscores.riskScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
+                  <KPICard label="Bank-Score" value={`${scoring.subscores.bankabilityScore.value}`} color={scoring.subscores.bankabilityScore.value >= 65 ? "text-emerald-600" : "text-amber-600"} />
+                  <KPICard label="Energie" value={result.energyClass} color="text-[var(--chart-3)]" />
+                </div>
+                <p className="text-sm text-[var(--muted)] leading-relaxed mt-5 max-w-2xl">
+                  {scoring.explanation.split(". ").slice(0, 2).join(". ")}.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Subscores */}
-          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-4">
-            <h3 className="font-semibold">Teilscores</h3>
+          <div className="card p-6">
+            <h3 className="section-title mb-4">Teilscores</h3>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {Object.values(scoring.subscores).map((sub) => (
-                <div key={sub.label} className="rounded-xl bg-slate-50 p-4 space-y-2">
+                <div key={sub.label} className="rounded-xl bg-[var(--bg)] p-4 space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{sub.label}</span>
+                    <span className="text-sm font-semibold">{sub.label}</span>
                     <ScoreBadge score={sub.value} size="sm" />
                   </div>
                   <ProgressBar value={sub.value} />
-                  <p className="text-xs text-[var(--muted)]">Gewichtung: {Math.round(sub.weight * 100)}%</p>
+                  <p className="text-[11px] text-[var(--muted)]">Gewichtung: {Math.round(sub.weight * 100)}%</p>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* Comparison metrics */}
-          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6">
-            <h3 className="font-semibold mb-3">Vergleichskennzahlen</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-              <MetricCard label="Bruttorendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
-              <MetricCard label="Kaufpreisfaktor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
-              <MetricCard label="Sanierungen" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
-              <MetricCard label="Energie-Rang" value={`${scoring.comparisonMetrics.energyRank}/100`} />
-              <MetricCard label="Bank-Score" value={`${scoring.comparisonMetrics.bankScore}/100`} />
-              <MetricCard label="Risiko-Stufe" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
+          {/* Chart */}
+          <div className="card p-6">
+            <h3 className="section-title mb-4">Score-Verlauf (Beispieldaten)</h3>
+            <LineChartComponent />
+          </div>
+
+          {/* 3 Cards: Strengths | Risks | Recommendations */}
+          <div className="grid lg:grid-cols-3 gap-5">
+            <ListCard title="St\u00E4rken" items={scoring.strengths} accent="emerald" />
+            <ListCard title="Risiken" items={scoring.risks} accent="amber" />
+            <div className="card p-5 space-y-4">
+              <h3 className="text-sm font-bold">Handlungsempfehlungen</h3>
+              <div className="space-y-3">
+                <RecoSection tag="Finanzierung" items={scoring.recommendations.financing} />
+                <RecoSection tag="Technik" items={scoring.recommendations.technical} />
+                <RecoSection tag="Recht" items={scoring.recommendations.legal} />
+                <RecoSection tag="Strategie" items={scoring.recommendations.strategy} />
+              </div>
             </div>
           </div>
 
-          {/* Strengths + risks */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <ListCard title="St\u00E4rken" items={scoring.strengths} icon="\u2705" />
-            <ListCard title="Risiken" items={scoring.risks} icon="\u26A0\uFE0F" />
-          </div>
-
-          {/* Categorized recommendations */}
-          <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-6 space-y-5">
-            <h3 className="font-semibold">Handlungsempfehlungen</h3>
-            <div className="grid sm:grid-cols-2 gap-5">
-              <RecoSection tag="Finanzierung" items={scoring.recommendations.financing} icon="\uD83C\uDFE6" />
-              <RecoSection tag="Technik" items={scoring.recommendations.technical} icon="\uD83D\uDD27" />
-              <RecoSection tag="Recht" items={scoring.recommendations.legal} icon="\u2696\uFE0F" />
-              <RecoSection tag="Strategie" items={scoring.recommendations.strategy} icon="\uD83C\uDFAF" />
+          {/* Comparison Metrics */}
+          <div className="card p-6">
+            <h3 className="section-title mb-4">Vergleichskennzahlen</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <MetricPill label="Rendite" value={`${(scoring.comparisonMetrics.yield * 100).toFixed(2)}%`} />
+              <MetricPill label="Faktor" value={`${scoring.comparisonMetrics.factor.toFixed(1)}x`} />
+              <MetricPill label="Sanierungen" value={`${scoring.comparisonMetrics.renovationCount}/6`} />
+              <MetricPill label="Energie" value={`${scoring.comparisonMetrics.energyRank}/100`} />
+              <MetricPill label="Bank" value={`${scoring.comparisonMetrics.bankScore}/100`} />
+              <MetricPill label="Risiko" value={`${scoring.comparisonMetrics.riskLevel}/100`} />
             </div>
           </div>
 
-          {/* Property preview card */}
-          <div className="max-w-xs">
-            <PropertyCard
-              street={result.street}
-              city={result.city}
-              price={`\u20AC${result.purchasePrice.toLocaleString()}`}
-              trend={result.trend}
-              score={result.score}
-              imageUrl={result.exposeImageUrl}
-            />
-          </div>
-
+          {/* Actions */}
           <div className="flex gap-3">
             <button
               onClick={() => { setStep(1); setResult(null); setScoring(null); }}
-              className="flex-1 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-medium transition hover:bg-slate-50"
+              className="flex-1 rounded-xl border border-[var(--border)] px-4 py-3 text-sm font-semibold transition-all hover:bg-[var(--border-light)]"
             >
               \u2190 Neue Analyse
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-[var(--accent-hover)]"
+              className="flex-1 rounded-xl accent-gradient px-4 py-3 text-sm font-semibold text-white transition-all hover:opacity-90"
             >
               Im Portfolio speichern
             </button>
@@ -405,7 +433,7 @@ export default function AnalysisPage() {
   );
 }
 
-/* ─── Small helper components ─── */
+/* ─── Helper components ─── */
 
 function Field({
   label, value, onChange, placeholder, type = "text", prefix, suffix, help,
@@ -415,30 +443,20 @@ function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-[var(--muted)]">
+      <label className="flex items-center gap-1 text-sm font-medium text-[var(--muted)]">
         {label}
         {help && <InlineHelp text={help} />}
       </label>
       <div className="relative">
-        {prefix && (
-          <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[var(--muted)] text-sm">
-            {prefix}
-          </span>
-        )}
+        {prefix && <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[var(--muted)] text-sm">{prefix}</span>}
         <input
           type={type}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 ${
-            prefix ? "pl-8" : ""
-          } ${suffix ? "pr-10" : ""}`}
+          className={`w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-[var(--accent)] ${prefix ? "pl-8" : ""} ${suffix ? "pr-10" : ""}`}
         />
-        {suffix && (
-          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[var(--muted)] text-sm">
-            {suffix}
-          </span>
-        )}
+        {suffix && <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[var(--muted)] text-sm">{suffix}</span>}
       </div>
     </div>
   );
@@ -452,41 +470,58 @@ function SelectField({
 }) {
   return (
     <div className="space-y-1.5">
-      <label className="block text-sm font-medium text-[var(--muted)]">
+      <label className="flex items-center gap-1 text-sm font-medium text-[var(--muted)]">
         {label}
         {help && <InlineHelp text={help} />}
       </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent)]/20 appearance-none"
+        className="w-full rounded-xl border border-[var(--border)] bg-white px-3 py-2.5 text-sm outline-none transition-all focus:border-[var(--accent)] appearance-none"
       >
         <option value="">{placeholder || "Ausw\u00E4hlen\u2026"}</option>
-        {options.map((o) => (
-          <option key={o} value={o}>{o}</option>
-        ))}
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
     </div>
   );
 }
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+function MiniKPI({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl bg-slate-50 p-3">
-      <p className="text-xs text-[var(--muted)]">{label}</p>
-      <p className="font-semibold mt-0.5">{value}</p>
+    <div className="text-center">
+      <p className="text-base font-bold">{value}</p>
+      <p className="text-[10px] text-[var(--muted)] uppercase tracking-wider mt-0.5">{label}</p>
     </div>
   );
 }
 
-function ListCard({ title, items, icon }: { title: string; items: string[]; icon: string }) {
+function KPICard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-2xl bg-white border border-[var(--border)] shadow-sm p-5 space-y-3">
-      <h3 className="font-semibold text-sm">{title}</h3>
-      <ul className="space-y-2">
+    <div className="rounded-xl bg-[var(--bg)] p-4 text-center">
+      <p className={`text-2xl font-extrabold tracking-tight ${color}`}>{value}</p>
+      <p className="kpi-label mt-1">{label}</p>
+    </div>
+  );
+}
+
+function MetricPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-[var(--bg)] p-3 text-center">
+      <p className="text-xs text-[var(--muted)]">{label}</p>
+      <p className="font-bold text-sm mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function ListCard({ title, items, accent }: { title: string; items: string[]; accent: "emerald" | "amber" }) {
+  const dot = accent === "emerald" ? "bg-emerald-500" : "bg-amber-500";
+  return (
+    <div className="card p-5 space-y-3">
+      <h3 className="text-sm font-bold">{title}</h3>
+      <ul className="space-y-2.5">
         {items.map((item, i) => (
-          <li key={i} className="flex gap-2 text-sm text-[var(--muted)] leading-relaxed">
-            <span className="shrink-0 mt-0.5">{icon}</span>
+          <li key={i} className="flex gap-2.5 text-sm text-[var(--muted)] leading-relaxed">
+            <span className={`shrink-0 mt-1.5 w-1.5 h-1.5 rounded-full ${dot}`} />
             <span>{item}</span>
           </li>
         ))}
@@ -501,27 +536,20 @@ function ConfidenceBadge({ level }: { level: import("@/lib/scoring").ConfidenceL
     medium: "bg-amber-50 text-amber-700 ring-amber-200",
     low: "bg-red-50 text-red-700 ring-red-200",
   };
-  const labels = { high: "Hohe Bewertungssicherheit", medium: "Mittlere Bewertungssicherheit", low: "Geringe Bewertungssicherheit" };
+  const labels = { high: "Hohe Sicherheit", medium: "Mittlere Sicherheit", low: "Geringe Sicherheit" };
   return (
-    <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ring-1 ${styles[level]}`}>
-      {labels[level]}
-    </span>
+    <span className={`mt-3 badge ring-1 ${styles[level]}`}>{labels[level]}</span>
   );
 }
 
-function RecoSection({ tag, items, icon }: { tag: string; items: string[]; icon: string }) {
+function RecoSection({ tag, items }: { tag: string; items: string[] }) {
   if (items.length === 0) return null;
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5">
-        <span className="text-sm">{icon}</span>
-        <h4 className="text-sm font-semibold">{tag}</h4>
-      </div>
-      <ul className="space-y-1.5">
+    <div className="space-y-1.5">
+      <h4 className="text-xs font-bold text-[var(--accent)] uppercase tracking-wider">{tag}</h4>
+      <ul className="space-y-1">
         {items.map((item, i) => (
-          <li key={i} className="text-sm text-[var(--muted)] leading-relaxed pl-5">
-            {item}
-          </li>
+          <li key={i} className="text-xs text-[var(--muted)] leading-relaxed">{item}</li>
         ))}
       </ul>
     </div>
