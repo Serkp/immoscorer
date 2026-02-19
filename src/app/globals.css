@@ -110,16 +110,15 @@ input[type="number"] {
   -moz-appearance: textfield;
 }
 
-/* ── Google Places Autocomplete Dark Theme ── */
+/* ── Google Places Autocomplete Dark Theme (safety fallback) ── */
 .pac-container {
   background: #0D0F16 !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
   margin-top: 4px !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif !important;
   z-index: 10000 !important;
-  padding: 4px !important;
 }
 .pac-item {
   padding: 10px 14px !important;
@@ -127,7 +126,8 @@ input[type="number"] {
   border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
   cursor: pointer !important;
   font-size: 14px !important;
-  line-height: 1.5 !important;
+  display: flex !important;
+  align-items: center !important;
 }
 .pac-item:first-child {
   border-top: none !important;
@@ -143,13 +143,21 @@ input[type="number"] {
   font-weight: 500 !important;
   font-size: 14px !important;
 }
-.pac-icon {
+.pac-icon,
+.pac-icon-marker {
   display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 .pac-matched {
   color: #7C6AFF !important;
   font-weight: 600 !important;
 }
 .pac-logo::after {
+  display: none !important;
+}
+.hdpi.pac-logo::after {
   display: none !important;
 }

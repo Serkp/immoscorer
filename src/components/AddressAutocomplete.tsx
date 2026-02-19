@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { C } from "@/lib/theme";
 
 export interface PlaceResult {
@@ -16,6 +16,12 @@ export interface PlaceResult {
 interface Props {
   onSelect: (place: PlaceResult) => void;
   defaultValue?: string;
+}
+
+interface Prediction {
+  placeId: string;
+  main: string;
+  secondary: string;
 }
 
 declare global {
@@ -65,28 +71,101 @@ function loadGoogleMaps(): Promise<void> {
 }
 
 export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const [value, setValue] = useState(defaultValue);
+  const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmedCity, setConfirmedCity] = useState("");
+  const [ready, setReady] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
+  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
+  const placesService = useRef<google.maps.places.PlacesService | null>(null);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const dummyDiv = useRef<HTMLDivElement>(null);
+
+  // Load Google Maps and init services
   useEffect(() => {
-    let mounted = true;
-
     loadGoogleMaps().then(() => {
-      if (!mounted || !inputRef.current) return;
       if (!window.google?.maps?.places) return;
+      autocompleteService.current = new window.google.maps.places.AutocompleteService();
+      if (dummyDiv.current) {
+        placesService.current = new window.google.maps.places.PlacesService(dummyDiv.current);
+      }
+      setReady(true);
+    });
+  }, []);
 
-      const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
-        types: ["address"],
-        componentRestrictions: { country: "de" },
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setShowDropdown(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  // Fetch predictions
+  const fetchPredictions = useCallback(
+    (input: string) => {
+      if (!autocompleteService.current || input.length < 3) {
+        setPredictions([]);
+        setShowDropdown(false);
+        return;
+      }
+
+      autocompleteService.current.getPlacePredictions(
+        {
+          input,
+          types: ["address"],
+          componentRestrictions: { country: "de" },
+        },
+        (results, status) => {
+          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
+            setPredictions(
+              results.slice(0, 5).map((r) => ({
+                placeId: r.place_id,
+                main: r.structured_formatting.main_text,
+                secondary: r.structured_formatting.secondary_text || "",
+              }))
+            );
+            setShowDropdown(true);
+            setActiveIndex(-1);
+          } else {
+            setPredictions([]);
+            setShowDropdown(false);
+          }
+        }
+      );
+    },
+    []
+  );
+
+  // Handle input change with debounce
+  function handleChange(newValue: string) {
+    setValue(newValue);
+    if (confirmed) setConfirmed(false);
+
+    if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    debounceTimer.current = setTimeout(() => {
+      fetchPredictions(newValue);
+    }, 300);
+  }
+
+  // Handle prediction selection
+  function handleSelect(prediction: Prediction) {
+    if (!placesService.current) return;
+
+    placesService.current.getDetails(
+      {
+        placeId: prediction.placeId,
         fields: ["address_components", "geometry", "formatted_address"],
-      });
-
-      ac.addListener("place_changed", () => {
-        const place = ac.getPlace();
-        if (!place.geometry) return;
+      },
+      (place, status) => {
+        if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.geometry) return;
 
         let street = "";
         let streetNumber = "";
@@ -107,6 +186,8 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
         const formatted = place.formatted_address || fullStreet;
 
         setValue(formatted);
+        setPredictions([]);
+        setShowDropdown(false);
         setConfirmed(true);
         setConfirmedCity(city);
 
@@ -119,35 +200,47 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
           lng: place.geometry.location?.lng() ?? 0,
           formattedAddress: formatted,
         });
-      });
-
-      autocompleteRef.current = ac;
-    });
-
-    return () => {
-      mounted = false;
-      if (autocompleteRef.current) {
-        google.maps.event.clearInstanceListeners(autocompleteRef.current);
       }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    );
+  }
+
+  // Keyboard navigation
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showDropdown || predictions.length === 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => (i < predictions.length - 1 ? i + 1 : 0));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => (i > 0 ? i - 1 : predictions.length - 1));
+    } else if (e.key === "Enter" && activeIndex >= 0) {
+      e.preventDefault();
+      handleSelect(predictions[activeIndex]);
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+    }
+  }
 
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5" ref={wrapperRef}>
+      {/* Hidden div for PlacesService */}
+      <div ref={dummyDiv} style={{ display: "none" }} />
+
       <label className="text-xs font-medium block" style={{ color: C.sub }}>
         Adresse
       </label>
       <div className="relative">
         <input
-          ref={inputRef}
           type="text"
           value={value}
-          onChange={(e) => {
-            setValue(e.target.value);
-            if (confirmed) setConfirmed(false);
+          onChange={(e) => handleChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          onFocus={() => {
+            if (predictions.length > 0) setShowDropdown(true);
           }}
-          placeholder="Straße und Hausnummer eingeben..."
+          placeholder={ready ? "Straße und Hausnummer eingeben..." : "Google Maps wird geladen..."}
+          autoComplete="off"
           className="w-full rounded-xl px-4 py-3.5 text-sm transition-all"
           style={{
             background: C.surface2,
@@ -155,6 +248,42 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
             color: C.text,
           }}
         />
+
+        {/* Custom Dropdown */}
+        {showDropdown && predictions.length > 0 && (
+          <div
+            className="absolute left-0 right-0 mt-1 rounded-xl overflow-hidden shadow-2xl"
+            style={{
+              background: "#0D0F16",
+              border: "1px solid rgba(255,255,255,0.1)",
+              zIndex: 10000,
+            }}
+          >
+            {predictions.map((p, i) => (
+              <button
+                key={p.placeId}
+                type="button"
+                className="w-full text-left px-4 py-3 flex items-baseline gap-2 transition-colors"
+                style={{
+                  background: i === activeIndex ? "rgba(124,106,255,0.1)" : "transparent",
+                  borderTop: i > 0 ? "1px solid rgba(255,255,255,0.05)" : "none",
+                }}
+                onMouseEnter={() => setActiveIndex(i)}
+                onMouseDown={(e) => {
+                  e.preventDefault(); // prevent input blur
+                  handleSelect(p);
+                }}
+              >
+                <span className="text-sm font-medium" style={{ color: C.text }}>
+                  {p.main}
+                </span>
+                <span className="text-xs" style={{ color: C.sub }}>
+                  {p.secondary}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {confirmed && confirmedCity && (
         <p className="text-xs font-medium animate-fade-up" style={{ color: C.green }}>
