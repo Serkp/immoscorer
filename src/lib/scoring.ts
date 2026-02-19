@@ -14,6 +14,9 @@ export interface PropertyInput {
   energyClass: string;
   locationGrade: string;
   renovations: string[];
+  /* Optional: echte Lage-Daten von Google Places */
+  walkScore?: number;
+  transitScore?: number;
 }
 
 export interface SubscoreEntry {
@@ -134,12 +137,23 @@ function calcRentability(p: PropertyInput, k: KPIs): { value: number; reasons: s
   const actions: string[] = [];
   const locRank = LOCATION_RANK[p.locationGrade] || 45;
 
-  s += Math.round((locRank / 100) * 40);
-  reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — ${
-    locRank >= 72 ? "geringe Leerstandsquote und planbare Mietnachfrage gemäß §558 BGB Mietspiegel." :
-    locRank >= 45 ? "durchschnittliches Vermietungspotenzial, Mietspiegel als Orientierung für §558 BGB Mieterhöhungen." :
-    "erhöhtes Leerstandsrisiko, eingeschränkte Mietpreisbremse nach §556d BGB."
-  }`);
+  // Wenn echte walkScore/transitScore vorhanden, verwende sie für die Lage-Bewertung
+  if (p.walkScore != null && p.transitScore != null) {
+    const realLocScore = Math.round((p.walkScore * 0.6 + p.transitScore * 0.4) / 100 * 40);
+    s += realLocScore;
+    reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — Walk-Score ${p.walkScore}, ÖPNV-Score ${p.transitScore}. ${
+      p.walkScore > 80 ? "Exzellente Nahversorgung und geringe Leerstandsquote." :
+      p.walkScore > 60 ? "Gute Erreichbarkeit der täglichen Infrastruktur." :
+      "Eingeschränkte Nahversorgung, erhöhtes Leerstandsrisiko."
+    }`);
+  } else {
+    s += Math.round((locRank / 100) * 40);
+    reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — ${
+      locRank >= 72 ? "geringe Leerstandsquote und planbare Mietnachfrage gemäß §558 BGB Mietspiegel." :
+      locRank >= 45 ? "durchschnittliches Vermietungspotenzial, Mietspiegel als Orientierung für §558 BGB Mieterhöhungen." :
+      "erhöhtes Leerstandsrisiko, eingeschränkte Mietpreisbremse nach §556d BGB."
+    }`);
+  }
 
   if (p.area >= 50 && p.area <= 85) { s += 30; reasons.push(`${p.area} m² Wohnfläche im nachfragestärksten Segment — ideal für Singles und Paare.`); }
   else if (p.area >= 35 && p.area <= 100) { s += 22; reasons.push(`${p.area} m² ist gut vermietbar und deckt breite Zielgruppen ab.`); }
@@ -201,6 +215,15 @@ function calcRisk(p: PropertyInput, k: KPIs): { value: number; reasons: string[]
 
   if (k.netCashflow < 0) { s -= 5; reasons.push(`Negativer Netto-Cashflow von ${Math.round(k.netCashflow)} €/Monat vor Finanzierung.`); }
 
+  // Risiko-Anpassung basierend auf echter Lage-Analyse
+  if (p.walkScore != null) {
+    const riskAdj: Record<string, number> = { A: 5, B: 2, C: 0, D: -10 };
+    const adj = riskAdj[p.locationGrade] ?? 0;
+    s += adj;
+    if (adj > 0) reasons.push(`Lage-Analyse (${p.locationGrade}-Standort) — Risikominderung durch starke Infrastruktur.`);
+    else if (adj < 0) reasons.push(`Lage-Analyse (${p.locationGrade}-Standort) — erhöhtes Standortrisiko durch schwache Infrastruktur.`);
+  }
+
   return { value: clamp(s), reasons, actions };
 }
 
@@ -253,6 +276,15 @@ function calcProjection(p: PropertyInput, k: KPIs): { value: number; reasons: st
   if (locRank >= 72) reasons.push(`Lageklasse ${p.locationGrade} — stabiles Wertwachstum, hohe Wiederverkaufsliquidität.`);
   else if (locRank >= 45) reasons.push(`Lageklasse ${p.locationGrade} — gutes Mietwachstumspotenzial durch Infrastrukturentwicklung.`);
   else { reasons.push(`Lageklasse ${p.locationGrade} — hohes Aufholpotenzial, abhängig von Infrastrukturkatalysatoren.`); actions.push("ÖPNV-Ausbau und Gewerbeansiedlung in der Region beobachten."); }
+
+  // Zukunfts-Bonus/Malus basierend auf echter Lage-Analyse
+  if (p.walkScore != null) {
+    const gradeBonus: Record<string, number> = { A: 15, B: 8, C: 0, D: -10 };
+    const bonus = gradeBonus[p.locationGrade] ?? 0;
+    s += bonus;
+    if (bonus > 0) reasons.push(`Lage-Analyse ergibt ${p.locationGrade}-Standort — Zukunftsbonus +${bonus} Punkte.`);
+    else if (bonus < 0) reasons.push(`Lage-Analyse ergibt ${p.locationGrade}-Standort — Zukunftsmalus ${bonus} Punkte.`);
+  }
 
   if (energyRank >= 76) { s += 30; reasons.push(`Energieklasse ${p.energyClass} — zukunftssicher gegenüber GEG-Verschärfungen.`); }
   else if (energyRank >= 48) { s += 18; reasons.push(`Energieklasse ${p.energyClass} — mittelfristig regulatorisch vertretbar.`); }

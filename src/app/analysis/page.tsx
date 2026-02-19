@@ -11,6 +11,7 @@ import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
 import { Paywall } from "@/components/Paywall";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
+import type { PlaceResult } from "@/components/AddressAutocomplete";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
@@ -53,6 +54,15 @@ interface FormData {
   renovations: string[];
 }
 
+interface LocationData {
+  walkScore: number;
+  transitScore: number;
+  locationGrade: "A" | "B" | "C" | "D";
+  rentGrowth: string;
+  description: string;
+  nearbyHighlights: string[];
+}
+
 const INIT: FormData = {
   street: "", city: "", price: "", rent: "", hausgeld: "", area: "", year: "",
   energyClass: "", locationGrade: "", renovations: [],
@@ -69,6 +79,8 @@ export default function AnalysisPage() {
   const [result, setResult] = useState<ScoringResult | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationDone, setLocationDone] = useState(false);
+  const [locationData, setLocationData] = useState<LocationData | null>(null);
+  const [lat, setLat] = useState<number | null>(null);
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingPct, setLoadingPct] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -154,17 +166,40 @@ export default function AnalysisPage() {
     return { netCashflow, hausgeldRatio, sqmPrice };
   }, [form.price, form.rent, form.hausgeld, form.area]);
 
-  /* ── Lage-Simulation ── */
-  function simulateLocation() {
+  /* ── Echte Lage-Analyse via Google Places ── */
+  async function analyzeLocation(placeLat: number, placeLng: number, city: string) {
     setLocationLoading(true);
-    setTimeout(() => {
-      const grade = form.city.toLowerCase().includes("münchen") || form.city.toLowerCase().includes("berlin") ? "A"
-        : form.city.toLowerCase().includes("hamburg") || form.city.toLowerCase().includes("frankfurt") ? "B"
-        : form.city.toLowerCase().includes("leipzig") || form.city.toLowerCase().includes("dresden") ? "C" : "B";
-      set("locationGrade", grade);
+    try {
+      const res = await fetch("/api/location/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: placeLat, lng: placeLng, city }),
+      });
+      const data = await res.json();
+      if (!data.error) {
+        setLocationData(data);
+        set("locationGrade", data.locationGrade);
+        setLocationDone(true);
+      }
+    } catch (err) {
+      console.error("Lage-Analyse fehlgeschlagen:", err);
+    } finally {
       setLocationLoading(false);
-      setLocationDone(true);
-    }, 2000);
+    }
+  }
+
+  /* ── Address selected from Autocomplete ── */
+  function handleAddressSelect(place: PlaceResult) {
+    if (place.street) set("street", place.street);
+    if (place.city) set("city", place.city);
+
+    if (place.lat && place.lng) {
+      setLat(place.lat);
+      // Automatisch Lage-Analyse starten
+      analyzeLocation(place.lat, place.lng, place.city);
+    } else {
+      setLat(null);
+    }
   }
 
   /* ── Validierung ── */
@@ -196,6 +231,7 @@ export default function AnalysisPage() {
             energyClass: form.energyClass,
             locationGrade: form.locationGrade || "B",
             renovations: form.renovations,
+            ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
           };
           const sr = computeScore(input);
           setResult(sr);
@@ -215,6 +251,7 @@ export default function AnalysisPage() {
         street: form.street, city: form.city, price: Number(form.price), rent: Number(form.rent),
         hausgeld: Number(form.hausgeld), area: Number(form.area), year: Number(form.year),
         energyClass: form.energyClass, locationGrade: form.locationGrade || "B", renovations: form.renovations,
+        ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
       };
       const prop = await savePropertyDB(user.id, {
         street: input.street,
@@ -252,6 +289,8 @@ export default function AnalysisPage() {
     setSection(0);
     setResult(null);
     setLocationDone(false);
+    setLocationData(null);
+    setLat(null);
     setView("input");
     setExpanded(null);
     setSaved(false);
@@ -286,6 +325,26 @@ export default function AnalysisPage() {
     </div>
   ) : null;
 
+  /* Grade color helpers */
+  function gradeColor(grade: string) {
+    if (grade === "A") return C.green;
+    if (grade === "B") return C.blue;
+    if (grade === "C") return C.amber;
+    return C.red;
+  }
+  function gradeBg(grade: string) {
+    if (grade === "A") return C.greenDim;
+    if (grade === "B") return "rgba(76,154,255,0.12)";
+    if (grade === "C") return C.amberDim;
+    return C.redDim;
+  }
+  function gradeBorder(grade: string) {
+    if (grade === "A") return C.greenBorder;
+    if (grade === "B") return "rgba(76,154,255,0.2)";
+    if (grade === "C") return C.amberBorder;
+    return "rgba(248,113,113,0.2)";
+  }
+
   /* ══════════════════════════════════
      INPUT VIEW
      ══════════════════════════════════ */
@@ -317,57 +376,60 @@ export default function AnalysisPage() {
             </div>
 
             <AddressAutocomplete
-              defaultStreet={form.street}
-              defaultCity={form.city}
-              onSelect={(place) => {
-                if (place.street) set("street", place.street);
-                if (place.city) set("city", place.city);
-              }}
+              onSelect={handleAddressSelect}
+              defaultValue={form.street ? `${form.street}, ${form.city}` : ""}
             />
 
-            {/* Lage-Analyse Button */}
-            {form.street && form.city && !locationDone && (
-              <button
-                onClick={simulateLocation}
-                disabled={locationLoading}
-                className="w-full rounded-xl py-2.5 text-sm font-medium transition-all"
-                style={{
-                  background: locationLoading ? C.surface2 : C.surface3,
-                  border: `1px solid ${C.border}`,
-                  color: locationLoading ? C.dim : C.text,
-                }}
-              >
-                {locationLoading ? "Lage wird analysiert..." : "Lage automatisch analysieren"}
-              </button>
+            {/* Loading-State für Lage-Analyse */}
+            {locationLoading && (
+              <div className="flex items-center gap-3 rounded-xl p-4 animate-fade-up" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+                <AIOrb size={24} active />
+                <span className="text-sm" style={{ color: C.sub }}>Lage wird analysiert...</span>
+              </div>
             )}
 
-            {/* Lage-Card */}
-            {locationDone && form.locationGrade && (
+            {/* Lage-Card mit echten Daten */}
+            {locationDone && locationData && (
               <Card className="p-4 space-y-3 animate-fade-up">
                 <div className="flex items-center gap-2">
                   <span
                     className="rounded-lg px-2.5 py-1 text-xs font-bold"
                     style={{
-                      background: form.locationGrade <= "B" ? C.greenDim : C.amberDim,
-                      color: form.locationGrade <= "B" ? C.green : C.amber,
-                      border: `1px solid ${form.locationGrade <= "B" ? C.greenBorder : C.amberBorder}`,
+                      background: gradeBg(locationData.locationGrade),
+                      color: gradeColor(locationData.locationGrade),
+                      border: `1px solid ${gradeBorder(locationData.locationGrade)}`,
                     }}
                   >
-                    Lageklasse {form.locationGrade}
+                    Lageklasse {locationData.locationGrade}
                   </span>
                   <span className="text-xs" style={{ color: C.sub }}>{form.city}</span>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <MiniMetric label="Walk-Score" value={form.locationGrade === "A" ? "92" : form.locationGrade === "B" ? "78" : "61"} />
-                  <MiniMetric label="ÖPNV-Score" value={form.locationGrade === "A" ? "96" : form.locationGrade === "B" ? "82" : "64"} />
-                  <MiniMetric label="Mietwachstum" value={form.locationGrade === "A" ? "+3,2 %" : form.locationGrade === "B" ? "+2,4 %" : "+1,8 %"} />
+                  <MiniMetric label="Walk-Score" value={String(locationData.walkScore)} />
+                  <MiniMetric label="ÖPNV-Score" value={String(locationData.transitScore)} />
+                  <MiniMetric label="Mietwachstum" value={locationData.rentGrowth} />
                 </div>
                 <p className="text-xs leading-relaxed" style={{ color: C.dim }}>
-                  {form.locationGrade === "A" ? "Top-Innenstadtlage mit exzellenter Infrastruktur." :
-                   form.locationGrade === "B" ? "Gute urbane Lage mit solider Anbindung." :
-                   "Durchschnittliche Lage mit Entwicklungspotenzial."}
+                  {locationData.description}
                 </p>
+                {locationData.nearbyHighlights.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <p className="text-[10px] font-semibold" style={{ color: C.sub }}>Umgebung (1 km Radius)</p>
+                    {locationData.nearbyHighlights.map((h, i) => (
+                      <p key={i} className="text-xs" style={{ color: C.dim }}>
+                        <span style={{ color: C.accent }}>·</span> {h}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </Card>
+            )}
+
+            {/* Hinweis wenn keine Google-Adresse gewählt */}
+            {!locationDone && !locationLoading && (form.street || form.city) && !lat && (
+              <p className="text-xs" style={{ color: C.dim }}>
+                Für eine automatische Lage-Analyse wählen Sie eine Adresse aus den Vorschlägen.
+              </p>
             )}
 
             <div className="grid grid-cols-2 gap-3">

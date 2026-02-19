@@ -3,19 +3,19 @@
 import { useEffect, useRef, useState } from "react";
 import { C } from "@/lib/theme";
 
-interface PlaceResult {
+export interface PlaceResult {
   street: string;
   city: string;
   postalCode: string;
+  state: string;
   lat: number;
   lng: number;
-  formatted: string;
+  formattedAddress: string;
 }
 
 interface Props {
   onSelect: (place: PlaceResult) => void;
-  defaultStreet?: string;
-  defaultCity?: string;
+  defaultValue?: string;
 }
 
 declare global {
@@ -46,8 +46,9 @@ function loadGoogleMaps(): Promise<void> {
     window.__googleMapsCallbacks = [resolve];
 
     const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=de`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=de&region=DE`;
     script.async = true;
+    script.defer = true;
     script.onload = () => {
       window.__googleMapsLoaded = true;
       window.__googleMapsLoading = false;
@@ -63,13 +64,12 @@ function loadGoogleMaps(): Promise<void> {
   });
 }
 
-export function AddressAutocomplete({ onSelect, defaultStreet = "", defaultCity = "" }: Props) {
+export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const [street, setStreet] = useState(defaultStreet);
-  const [city, setCity] = useState(defaultCity);
+  const [value, setValue] = useState(defaultValue);
   const [confirmed, setConfirmed] = useState(false);
-  const [available, setAvailable] = useState(false);
+  const [confirmedCity, setConfirmedCity] = useState("");
 
   useEffect(() => {
     let mounted = true;
@@ -77,8 +77,6 @@ export function AddressAutocomplete({ onSelect, defaultStreet = "", defaultCity 
     loadGoogleMaps().then(() => {
       if (!mounted || !inputRef.current) return;
       if (!window.google?.maps?.places) return;
-
-      setAvailable(true);
 
       const ac = new window.google.maps.places.Autocomplete(inputRef.current, {
         types: ["address"],
@@ -88,37 +86,38 @@ export function AddressAutocomplete({ onSelect, defaultStreet = "", defaultCity 
 
       ac.addListener("place_changed", () => {
         const place = ac.getPlace();
-        if (!place.address_components) return;
+        if (!place.geometry) return;
 
-        let route = "";
+        let street = "";
         let streetNumber = "";
-        let locality = "";
-        let postal = "";
+        let city = "";
+        let postalCode = "";
+        let state = "";
 
-        for (const comp of place.address_components) {
-          const t = comp.types[0];
-          if (t === "route") route = comp.long_name;
-          else if (t === "street_number") streetNumber = comp.long_name;
-          else if (t === "locality") locality = comp.long_name;
-          else if (t === "postal_code") postal = comp.long_name;
+        for (const comp of place.address_components || []) {
+          const types = comp.types;
+          if (types.includes("route")) street = comp.long_name;
+          if (types.includes("street_number")) streetNumber = comp.long_name;
+          if (types.includes("locality")) city = comp.long_name;
+          if (types.includes("postal_code")) postalCode = comp.long_name;
+          if (types.includes("administrative_area_level_1")) state = comp.long_name;
         }
 
-        const fullStreet = streetNumber ? `${route} ${streetNumber}` : route;
-        const lat = place.geometry?.location?.lat() ?? 0;
-        const lng = place.geometry?.location?.lng() ?? 0;
+        const fullStreet = streetNumber ? `${street} ${streetNumber}` : street;
+        const formatted = place.formatted_address || fullStreet;
 
-        setStreet(fullStreet);
-        setCity(locality);
+        setValue(formatted);
         setConfirmed(true);
-        setTimeout(() => setConfirmed(false), 3000);
+        setConfirmedCity(city);
 
         onSelect({
           street: fullStreet,
-          city: locality,
-          postalCode: postal,
-          lat,
-          lng,
-          formatted: place.formatted_address || "",
+          city,
+          postalCode,
+          state,
+          lat: place.geometry.location?.lat() ?? 0,
+          lng: place.geometry.location?.lng() ?? 0,
+          formattedAddress: formatted,
         });
       });
 
@@ -134,83 +133,34 @@ export function AddressAutocomplete({ onSelect, defaultStreet = "", defaultCity 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fallback: manual input syncing
-  function handleStreetChange(v: string) {
-    setStreet(v);
-    onSelect({ street: v, city, postalCode: "", lat: 0, lng: 0, formatted: "" });
-  }
-
-  function handleCityChange(v: string) {
-    setCity(v);
-    onSelect({ street, city: v, postalCode: "", lat: 0, lng: 0, formatted: "" });
-  }
-
-  const inputStyle = {
-    background: C.surface2,
-    border: `1px solid ${C.border}`,
-    color: C.text,
-  };
-
   return (
-    <div className="space-y-3">
-      {/* Autocomplete input (combined address) */}
-      {available && (
-        <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ color: C.sub }}>
-            Adresse suchen
-          </label>
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              placeholder="Straße und Hausnummer eingeben..."
-              className="w-full rounded-xl px-4 py-3 text-sm transition-all"
-              style={inputStyle}
-            />
-            {confirmed && (
-              <span
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium animate-fade-up"
-                style={{ color: C.green }}
-              >
-                Adresse erkannt
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Manual fallback fields — always visible for editing */}
-      <div className="grid grid-cols-[2fr_1fr] gap-3">
-        <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ color: C.sub }}>
-            Straße
-            {available && (
-              <span className="ml-1 font-normal" style={{ color: C.dim }}>(wird automatisch gefüllt)</span>
-            )}
-          </label>
-          <input
-            type="text"
-            value={street}
-            onChange={(e) => handleStreetChange(e.target.value)}
-            placeholder="Berliner Str. 42"
-            className="w-full rounded-xl px-4 py-3 text-sm transition-all"
-            style={inputStyle}
-          />
-        </div>
-        <div>
-          <label className="text-xs font-medium mb-1.5 block" style={{ color: C.sub }}>
-            Stadt
-          </label>
-          <input
-            type="text"
-            value={city}
-            onChange={(e) => handleCityChange(e.target.value)}
-            placeholder="Berlin"
-            className="w-full rounded-xl px-4 py-3 text-sm transition-all"
-            style={inputStyle}
-          />
-        </div>
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium block" style={{ color: C.sub }}>
+        Adresse
+      </label>
+      <div className="relative">
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            if (confirmed) setConfirmed(false);
+          }}
+          placeholder="Straße und Hausnummer eingeben..."
+          className="w-full rounded-xl px-4 py-3.5 text-sm transition-all"
+          style={{
+            background: C.surface2,
+            border: `1px solid ${C.border}`,
+            color: C.text,
+          }}
+        />
       </div>
+      {confirmed && confirmedCity && (
+        <p className="text-xs font-medium animate-fade-up" style={{ color: C.green }}>
+          ✓ {confirmedCity} erkannt
+        </p>
+      )}
     </div>
   );
 }

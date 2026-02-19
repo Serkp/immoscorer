@@ -112,38 +112,44 @@ input[type="number"] {
 
 /* ── Google Places Autocomplete Dark Theme ── */
 .pac-container {
-  background: #0D0F16;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  margin-top: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
-  z-index: 9999;
+  background: #0D0F16 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  margin-top: 4px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif !important;
+  z-index: 10000 !important;
+  padding: 4px !important;
 }
 .pac-item {
-  padding: 10px 14px;
-  color: rgba(255, 255, 255, 0.7);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  line-height: 1.4;
+  padding: 10px 14px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
 }
 .pac-item:first-child {
-  border-top: none;
+  border-top: none !important;
 }
 .pac-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-}
-.pac-item-query {
-  color: #EDEEF2;
-  font-weight: 500;
-}
-.pac-icon {
-  display: none;
-}
-.pac-matched {
-  color: #7C6AFF;
-  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06) !important;
 }
 .pac-item-selected {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(124, 106, 255, 0.1) !important;
+}
+.pac-item-query {
+  color: #EDEEF2 !important;
+  font-weight: 500 !important;
+  font-size: 14px !important;
+}
+.pac-icon {
+  display: none !important;
+}
+.pac-matched {
+  color: #7C6AFF !important;
+  font-weight: 600 !important;
+}
+.pac-logo::after {
+  display: none !important;
 }
