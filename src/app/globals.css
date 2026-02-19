@@ -109,3 +109,41 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+/* ── Google Places Autocomplete Dark Theme ── */
+.pac-container {
+  background: #0D0F16;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  margin-top: 4px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", sans-serif;
+  z-index: 9999;
+}
+.pac-item {
+  padding: 10px 14px;
+  color: rgba(255, 255, 255, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.pac-item:first-child {
+  border-top: none;
+}
+.pac-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.pac-item-query {
+  color: #EDEEF2;
+  font-weight: 500;
+}
+.pac-icon {
+  display: none;
+}
+.pac-matched {
+  color: #7C6AFF;
+  font-weight: 600;
+}
+.pac-item-selected {
+  background: rgba(255, 255, 255, 0.08);
+}

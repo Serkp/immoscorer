@@ -72,7 +72,7 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-5">
         {/* Brand */}
-        <Link href="/analysis" className="flex items-center gap-2.5 shrink-0">
+        <Link href="/" className="flex items-center gap-2.5 shrink-0">
           <AIOrb size={26} active />
           <span className="text-sm font-bold tracking-tight" style={{ color: C.text }}>
             ImmoScorer

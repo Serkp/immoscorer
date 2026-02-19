@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
 import { Paywall } from "@/components/Paywall";
+import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
@@ -105,7 +106,7 @@ export default function AnalysisPage() {
     async function check() {
       try {
         const count = await countAnalyses(user!.id);
-        if (count >= 1) {
+        if (count >= 3) {
           setShowPaywall(true);
         }
       } catch {
@@ -315,10 +316,14 @@ export default function AnalysisPage() {
               <h2 className="text-lg font-bold">Welche Immobilie möchten Sie bewerten?</h2>
             </div>
 
-            <div className="grid grid-cols-[2fr_1fr] gap-3">
-              <Input label="Straße" value={form.street} onChange={(v) => set("street", v)} placeholder="Berliner Str. 42" large explain="Straßenname und Hausnummer des Objekts." />
-              <Input label="Stadt" value={form.city} onChange={(v) => set("city", v)} placeholder="Berlin" large explain="Stadt oder Gemeinde." />
-            </div>
+            <AddressAutocomplete
+              defaultStreet={form.street}
+              defaultCity={form.city}
+              onSelect={(place) => {
+                if (place.street) set("street", place.street);
+                if (place.city) set("city", place.city);
+              }}
+            />
 
             {/* Lage-Analyse Button */}
             {form.street && form.city && !locationDone && (

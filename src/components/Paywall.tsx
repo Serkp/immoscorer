@@ -43,7 +43,7 @@ export function Paywall() {
       <div className="flex flex-col items-center gap-4">
         <AIOrb size={48} active />
         <h2 className="text-xl font-bold text-center" style={{ color: C.text }}>
-          Ihre kostenlose Analyse wurde verwendet
+          Ihre 3 kostenlosen Analysen wurden verwendet
         </h2>
         <p className="text-sm text-center leading-relaxed" style={{ color: C.sub }}>
           Schalten Sie alle Funktionen frei — unbegrenzte Analysen, Portfolio-Verwaltung,
@@ -55,7 +55,7 @@ export function Paywall() {
         {/* Price */}
         <div className="text-center space-y-1">
           <p className="text-3xl font-bold" style={{ color: C.text }}>
-            15,99 € <span className="text-sm font-medium" style={{ color: C.sub }}>/ Monat</span>
+            9,99 € <span className="text-sm font-medium" style={{ color: C.sub }}>/ Monat</span>
           </p>
           <p className="text-xs" style={{ color: C.dim }}>
             Monatlich kündbar. Keine Mindestlaufzeit.
