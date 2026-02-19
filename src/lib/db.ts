@@ -1,4 +1,4 @@
-import { supabase } from "./supabase";
+import { getSupabase } from "./supabase";
 
 // ── Properties ──
 
@@ -8,7 +8,7 @@ export async function savePropertyDB(userId: string, data: {
   locationGrade: string; renovations: string[]; totalScore: number;
   result: Record<string, unknown>;
 }) {
-  const { data: property, error } = await supabase
+  const { data: property, error } = await getSupabase()
     .from("properties")
     .insert({
       user_id: userId,
@@ -32,7 +32,7 @@ export async function savePropertyDB(userId: string, data: {
 }
 
 export async function getProperties(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("properties")
     .select("*")
     .eq("user_id", userId)
@@ -42,12 +42,12 @@ export async function getProperties(userId: string) {
 }
 
 export async function deleteProperty(id: string) {
-  const { error } = await supabase.from("properties").delete().eq("id", id);
+  const { error } = await getSupabase().from("properties").delete().eq("id", id);
   if (error) throw error;
 }
 
 export async function toggleFavorite(id: string, current: boolean) {
-  const { error } = await supabase
+  const { error } = await getSupabase()
     .from("properties")
     .update({ is_favorite: !current })
     .eq("id", id);
@@ -62,7 +62,7 @@ export async function saveAnalysisDB(
   inputs: Record<string, unknown>,
   result: Record<string, unknown>
 ) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("analyses")
     .insert({ user_id: userId, property_id: propertyId, inputs, result })
     .select()
@@ -72,7 +72,7 @@ export async function saveAnalysisDB(
 }
 
 export async function getAnalyses(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("analyses")
     .select("*")
     .eq("user_id", userId)
@@ -84,7 +84,7 @@ export async function getAnalyses(userId: string) {
 // ── Subscription ──
 
 export async function getSubscriptionStatus(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabase()
     .from("subscriptions")
     .select("*")
     .eq("user_id", userId)
@@ -95,7 +95,7 @@ export async function getSubscriptionStatus(userId: string) {
 }
 
 export async function countAnalyses(userId: string) {
-  const { count, error } = await supabase
+  const { count, error } = await getSupabase()
     .from("analyses")
     .select("*", { count: "exact", head: true })
     .eq("user_id", userId);

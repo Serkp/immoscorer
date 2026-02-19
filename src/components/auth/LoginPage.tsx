@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { getSupabase } from "@/lib/supabase";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { C } from "@/lib/theme";
 
@@ -22,14 +22,14 @@ export function LoginPage() {
 
     try {
       if (mode === "register") {
-        const { error: err } = await supabase.auth.signUp({
+        const { error: err } = await getSupabase().auth.signUp({
           email,
           password,
           options: { data: { full_name: name } },
         });
         if (err) throw err;
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({
+        const { error: err } = await getSupabase().auth.signInWithPassword({
           email,
           password,
         });
