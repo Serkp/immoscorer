@@ -24,78 +24,17 @@ interface Prediction {
   secondary: string;
 }
 
-declare global {
-  interface Window {
-    __googleMapsLoading?: boolean;
-    __googleMapsLoaded?: boolean;
-    __googleMapsCallbacks?: (() => void)[];
-  }
-}
-
-function loadGoogleMaps(): Promise<void> {
-  if (window.__googleMapsLoaded) return Promise.resolve();
-
-  return new Promise((resolve) => {
-    if (window.__googleMapsLoading) {
-      window.__googleMapsCallbacks = window.__googleMapsCallbacks || [];
-      window.__googleMapsCallbacks.push(resolve);
-      return;
-    }
-
-    const key = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
-    if (!key) {
-      resolve();
-      return;
-    }
-
-    window.__googleMapsLoading = true;
-    window.__googleMapsCallbacks = [resolve];
-
-    const script = document.createElement("script");
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&language=de&region=DE`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      window.__googleMapsLoaded = true;
-      window.__googleMapsLoading = false;
-      window.__googleMapsCallbacks?.forEach((cb) => cb());
-      window.__googleMapsCallbacks = [];
-    };
-    script.onerror = () => {
-      window.__googleMapsLoading = false;
-      window.__googleMapsCallbacks?.forEach((cb) => cb());
-      window.__googleMapsCallbacks = [];
-    };
-    document.head.appendChild(script);
-  });
-}
-
 export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
   const [value, setValue] = useState(defaultValue);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [confirmedCity, setConfirmedCity] = useState("");
-  const [ready, setReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  const autocompleteService = useRef<google.maps.places.AutocompleteService | null>(null);
-  const placesService = useRef<google.maps.places.PlacesService | null>(null);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const dummyDiv = useRef<HTMLDivElement>(null);
-
-  // Load Google Maps and init services
-  useEffect(() => {
-    loadGoogleMaps().then(() => {
-      if (!window.google?.maps?.places) return;
-      autocompleteService.current = new window.google.maps.places.AutocompleteService();
-      if (dummyDiv.current) {
-        placesService.current = new window.google.maps.places.PlacesService(dummyDiv.current);
-      }
-      setReady(true);
-    });
-  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -108,41 +47,34 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
-  // Fetch predictions
-  const fetchPredictions = useCallback(
-    (input: string) => {
-      if (!autocompleteService.current || input.length < 3) {
+  // Fetch predictions via our own API route (server-side Google call)
+  const fetchPredictions = useCallback(async (input: string) => {
+    if (input.length < 3) {
+      setPredictions([]);
+      setShowDropdown(false);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/places/autocomplete?input=${encodeURIComponent(input)}`);
+      const data = await res.json();
+      if (data.predictions && data.predictions.length > 0) {
+        setPredictions(data.predictions);
+        setShowDropdown(true);
+        setActiveIndex(-1);
+      } else {
         setPredictions([]);
         setShowDropdown(false);
-        return;
       }
-
-      autocompleteService.current.getPlacePredictions(
-        {
-          input,
-          types: ["address"],
-          componentRestrictions: { country: "de" },
-        },
-        (results, status) => {
-          if (status === google.maps.places.PlacesServiceStatus.OK && results) {
-            setPredictions(
-              results.slice(0, 5).map((r) => ({
-                placeId: r.place_id,
-                main: r.structured_formatting.main_text,
-                secondary: r.structured_formatting.secondary_text || "",
-              }))
-            );
-            setShowDropdown(true);
-            setActiveIndex(-1);
-          } else {
-            setPredictions([]);
-            setShowDropdown(false);
-          }
-        }
-      );
-    },
-    []
-  );
+    } catch (err) {
+      console.error("Autocomplete fetch error:", err);
+      setPredictions([]);
+      setShowDropdown(false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   // Handle input change with debounce
   function handleChange(newValue: string) {
@@ -155,53 +87,38 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
     }, 300);
   }
 
-  // Handle prediction selection
-  function handleSelect(prediction: Prediction) {
-    if (!placesService.current) return;
+  // Handle prediction selection — fetch details via our API route
+  async function handleSelect(prediction: Prediction) {
+    setShowDropdown(false);
+    setPredictions([]);
+    setValue(prediction.main + (prediction.secondary ? `, ${prediction.secondary}` : ""));
 
-    placesService.current.getDetails(
-      {
-        placeId: prediction.placeId,
-        fields: ["address_components", "geometry", "formatted_address"],
-      },
-      (place, status) => {
-        if (status !== google.maps.places.PlacesServiceStatus.OK || !place?.geometry) return;
+    try {
+      const res = await fetch(`/api/places/details?placeId=${encodeURIComponent(prediction.placeId)}`);
+      const data = await res.json();
 
-        let street = "";
-        let streetNumber = "";
-        let city = "";
-        let postalCode = "";
-        let state = "";
-
-        for (const comp of place.address_components || []) {
-          const types = comp.types;
-          if (types.includes("route")) street = comp.long_name;
-          if (types.includes("street_number")) streetNumber = comp.long_name;
-          if (types.includes("locality")) city = comp.long_name;
-          if (types.includes("postal_code")) postalCode = comp.long_name;
-          if (types.includes("administrative_area_level_1")) state = comp.long_name;
-        }
-
-        const fullStreet = streetNumber ? `${street} ${streetNumber}` : street;
-        const formatted = place.formatted_address || fullStreet;
-
-        setValue(formatted);
-        setPredictions([]);
-        setShowDropdown(false);
-        setConfirmed(true);
-        setConfirmedCity(city);
-
-        onSelect({
-          street: fullStreet,
-          city,
-          postalCode,
-          state,
-          lat: place.geometry.location?.lat() ?? 0,
-          lng: place.geometry.location?.lng() ?? 0,
-          formattedAddress: formatted,
-        });
+      if (data.error) {
+        console.error("Details fetch error:", data.error);
+        return;
       }
-    );
+
+      const formatted = data.formattedAddress || prediction.main;
+      setValue(formatted);
+      setConfirmed(true);
+      setConfirmedCity(data.city || "");
+
+      onSelect({
+        street: data.street || "",
+        city: data.city || "",
+        postalCode: data.postalCode || "",
+        state: data.state || "",
+        lat: data.lat || 0,
+        lng: data.lng || 0,
+        formattedAddress: formatted,
+      });
+    } catch (err) {
+      console.error("Details fetch error:", err);
+    }
   }
 
   // Keyboard navigation
@@ -224,9 +141,6 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
 
   return (
     <div className="space-y-1.5" ref={wrapperRef}>
-      {/* Hidden div for PlacesService */}
-      <div ref={dummyDiv} style={{ display: "none" }} />
-
       <label className="text-xs font-medium block" style={{ color: C.sub }}>
         Adresse
       </label>
@@ -239,7 +153,7 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
           onFocus={() => {
             if (predictions.length > 0) setShowDropdown(true);
           }}
-          placeholder={ready ? "Straße und Hausnummer eingeben..." : "Google Maps wird geladen..."}
+          placeholder="Straße und Hausnummer eingeben..."
           autoComplete="off"
           className="w-full rounded-xl px-4 py-3.5 text-sm transition-all"
           style={{
@@ -248,6 +162,16 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
             color: C.text,
           }}
         />
+
+        {/* Loading indicator */}
+        {loading && (
+          <span
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
+            style={{ color: C.dim }}
+          >
+            Suche...
+          </span>
+        )}
 
         {/* Custom Dropdown */}
         {showDropdown && predictions.length > 0 && (
@@ -270,7 +194,7 @@ export function AddressAutocomplete({ onSelect, defaultValue = "" }: Props) {
                 }}
                 onMouseEnter={() => setActiveIndex(i)}
                 onMouseDown={(e) => {
-                  e.preventDefault(); // prevent input blur
+                  e.preventDefault();
                   handleSelect(p);
                 }}
               >
