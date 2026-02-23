@@ -123,3 +123,104 @@ export function UpgradeBox({ score, onNeedAuth }: UpgradeBoxProps) {
     </div>
   );
 }
+
+/* ── Sticky Upgrade Banner (fixed bottom) ── */
+
+interface StickyBannerProps {
+  score?: number;
+  onNeedAuth?: () => void;
+}
+
+export function StickyUpgradeBanner({ score, onNeedAuth }: StickyBannerProps) {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
+  const [dismissed, setDismissed] = useState(false);
+
+  async function handleCheckout() {
+    if (!user) {
+      onNeedAuth?.();
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // silent
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (dismissed) return null;
+
+  const bannerText = score != null
+    ? score >= 75
+      ? `Ihr Score: ${score} — Erfahren Sie warum dieses Top-Objekt überzeugt.`
+      : score >= 50
+        ? `Ihr Score: ${score} — Erfahren Sie wo Stärken und Schwächen liegen.`
+        : `Ihr Score: ${score} — Erfahren Sie welche Risiken bestehen.`
+    : "Schalten Sie die vollständige Analyse frei.";
+
+  return (
+    <div
+      className="fixed bottom-0 left-0 right-0 z-[1000]"
+      style={{
+        background: "rgba(8,9,14,0.95)",
+        backdropFilter: "blur(16px)",
+        borderTop: "1px solid rgba(124,106,255,0.3)",
+      }}
+    >
+      <div className="mx-auto max-w-[1100px] px-6 py-4 flex items-center gap-4">
+        {/* Lock icon */}
+        <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" className="shrink-0">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0110 0v4" />
+        </svg>
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold" style={{ color: C.text }}>
+            Vollständige Analyse freischalten
+          </p>
+          <p className="text-xs truncate" style={{ color: C.sub }}>
+            {bannerText}
+          </p>
+        </div>
+
+        {/* CTA Button */}
+        <button
+          onClick={handleCheckout}
+          disabled={loading}
+          className="rounded-xl px-5 py-2.5 text-sm font-bold whitespace-nowrap transition-all hover:opacity-90 disabled:opacity-50 shrink-0"
+          style={{
+            background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+            color: "#fff",
+          }}
+        >
+          {loading ? "..." : "Pro freischalten — 9,99 €/Mon."}
+        </button>
+
+        <span className="text-[11px] whitespace-nowrap hidden sm:block" style={{ color: C.dim }}>
+          Monatlich kündbar
+        </span>
+
+        {/* Close X */}
+        <button
+          onClick={() => setDismissed(true)}
+          className="shrink-0 p-1 rounded-lg transition-colors hover:opacity-70"
+          style={{ color: C.dim }}
+        >
+          <svg width={16} height={16} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+            <path d="M4 4l8 8M12 4l-8 8" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  );
+}

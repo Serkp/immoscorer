@@ -9,7 +9,7 @@ import { AIComment } from "@/components/ui/AIComment";
 import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
-import { UpgradeBox } from "@/components/UpgradeBox";
+import { UpgradeBox, StickyUpgradeBanner } from "@/components/UpgradeBox";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { PlaceResult } from "@/components/AddressAutocomplete";
@@ -741,46 +741,270 @@ function AnalysisContent() {
           <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
         </div>
 
-        {/* ── FREE USER: minimal result ── */}
+        {/* ── FREE USER: full layout, values blurred ── */}
         {!isPro ? (
           <>
-            {/* Score Ring only — no radar, no KPIs */}
-            <Card className="p-8 flex flex-col items-center justify-center" glow>
-              <ScoreRing value={result.totalScore} size={160} />
-              <p className="text-lg font-bold mt-3" style={{ color: scoreColor(result.totalScore) }}>{scoreLabel(result.totalScore)}</p>
-              <p className="text-xs mt-1" style={{ color: C.dim }}>Gesamtbewertung</p>
-            </Card>
+            {/* A. Score + Bewertung + KI-Kommentar: KOMPLETT SICHTBAR */}
+            <div className="grid lg:grid-cols-3 gap-5">
+              <Card className="p-6 flex flex-col items-center justify-center" glow>
+                <ScoreRing value={result.totalScore} size={150} />
+                <p className="text-sm font-bold mt-2" style={{ color: scoreColor(result.totalScore) }}>{scoreLabel(result.totalScore)}</p>
+                <p className="text-xs mt-1" style={{ color: C.dim }}>Gesamtbewertung</p>
+              </Card>
 
-            {/* Short KI comment */}
-            <AIComment variant={kiEmpfehlung.variant}>
-              {result.totalScore >= 75
-                ? "Klare Kaufempfehlung. Dieses Objekt gehört zu den Top-Investments."
-                : result.totalScore >= 55
-                  ? "Solides Investment mit Optimierungspotenzial."
-                  : result.totalScore >= 40
-                    ? "Erhöhte Vorsicht geboten. Mehrere Risikofaktoren identifiziert."
-                    : "Von diesem Investment wird abgeraten."}
-            </AIComment>
+              {/* B. Radar Chart: sichtbar, Achsenwerte geblurred */}
+              <Card className="p-4 relative">
+                <ResponsiveContainer width="100%" height={220}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
+                    <PolarGrid stroke={C.border} />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: C.sub, fontSize: 10 }} />
+                    <Radar dataKey="value" stroke={C.accent} fill={C.accent} fillOpacity={0.08} strokeWidth={2} />
+                  </RadarChart>
+                </ResponsiveContainer>
+                {/* Overlay blur on radar values */}
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-[85%] h-[85%] rounded-full" style={{ backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)", background: "rgba(8,9,14,0.15)" }} />
+                </div>
+              </Card>
 
-            {/* UpgradeBox with personalized score text */}
-            <UpgradeBox score={result.totalScore} onNeedAuth={() => setShowAuthModal(true)} />
-
-            {/* Blurred Teilscores teaser */}
-            <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
-              <div className="space-y-2">
-                {result.subscores.map((sub) => (
-                  <Card key={sub.key} className="overflow-hidden">
-                    <div className="flex items-center gap-4 p-4">
-                      <MiniRing value={sub.value} size={40} />
-                      <div className="flex-1 min-w-0">
-                        <span className="text-sm font-bold">{sub.label}</span>
-                        <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
-                      </div>
-                    </div>
-                  </Card>
-                ))}
+              {/* C. Key-Metriken: Labels sichtbar, WERTE geblurred */}
+              <div className="space-y-3">
+                <Card className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs font-medium" style={{ color: C.sub }}>Nettorendite</span>
+                  <BlurredValue value={`${(result.kpis.netYield * 100).toFixed(2)} %`} />
+                </Card>
+                <Card className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs font-medium" style={{ color: C.sub }}>Kaufpreisfaktor</span>
+                  <BlurredValue value={`${result.kpis.factor.toFixed(1)}x`} />
+                </Card>
+                <Card className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs font-medium" style={{ color: C.sub }}>Finanzierbarkeit</span>
+                  <BlurredValue value={`${result.subscores.find(s => s.key === "financing")?.value || 0}/100`} />
+                </Card>
+                <Card className="flex items-center justify-between px-4 py-3">
+                  <span className="text-xs font-medium" style={{ color: C.sub }}>Risiko-Score</span>
+                  <BlurredValue value={`${result.subscores.find(s => s.key === "risk")?.value || 0}/100`} />
+                </Card>
               </div>
             </div>
+
+            {/* KI-Empfehlung: KOMPLETT SICHTBAR */}
+            <AIComment variant={kiEmpfehlung.variant}>
+              {kiEmpfehlung.text}
+            </AIComment>
+
+            {/* ── Inline UpgradeBox (die große mit 8 Features) ── */}
+            <UpgradeBox score={result.totalScore} onNeedAuth={() => setShowAuthModal(true)} />
+
+            {/* D. 6 Teilscores: Titel+Gewicht sichtbar, Score+OneLiner geblurred, NICHT klickbar */}
+            <div className="space-y-2">
+              <p className="text-xs" style={{ color: C.dim }}>6 Teilbewertungen — Details mit Pro freischalten</p>
+              {result.subscores.map((sub) => (
+                <Card key={sub.key} className="overflow-hidden">
+                  <div className="flex items-center gap-4 p-4">
+                    {/* Score: GEBLURRED */}
+                    <div style={{ filter: "blur(8px)", userSelect: "none", pointerEvents: "none" }}>
+                      <MiniRing value={sub.value} size={40} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        {/* Titel: SICHTBAR */}
+                        <span className="text-sm font-bold">{sub.label}</span>
+                        {/* Gewichtung: SICHTBAR */}
+                        <span className="text-[11px] rounded-full px-2 py-0.5" style={{ background: C.surface3, color: C.dim }}>{sub.weight} %</span>
+                      </div>
+                      {/* OneLiner: GEBLURRED */}
+                      <p className="text-xs mt-0.5 truncate" style={{ color: C.sub, filter: "blur(8px)", userSelect: "none" }}>{sub.oneLiner}</p>
+                    </div>
+                    {/* Pfeil sichtbar aber nicht klickbar */}
+                    <svg width={16} height={16} viewBox="0 0 16 16" className="shrink-0" style={{ color: C.dim, opacity: 0.3 }}>
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    </svg>
+                  </div>
+
+                  {/* Begründung/Empfehlung: immer sichtbar aber GEBLURRED */}
+                  <div className="grid md:grid-cols-2 gap-4 px-4 pb-4 border-t" style={{ borderColor: C.border, filter: "blur(8px)", userSelect: "none", pointerEvents: "none" }}>
+                    <div className="pt-4 space-y-2">
+                      <h4 className="text-xs font-bold" style={{ color: C.blue }}>Warum dieser Wert?</h4>
+                      <ul className="space-y-1.5">
+                        {sub.reasons.map((r, i) => (
+                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                            <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.blue }} />
+                            {r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="pt-4 space-y-2">
+                      <h4 className="text-xs font-bold" style={{ color: C.green }}>Empfehlung</h4>
+                      <ul className="space-y-1.5">
+                        {sub.actions.map((a, i) => (
+                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                            <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
+                            {a}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+
+            {/* Stärken + Risiken: GEBLURRED */}
+            <div className="grid md:grid-cols-2 gap-5 mt-6">
+              <Card className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
+                  <h3 className="text-sm font-bold">Stärken</h3>
+                </div>
+                <BlurredBlock>
+                  <ul className="space-y-2">
+                    {result.strengths.map((s, i) => (
+                      <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                        <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.green }} />
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </BlurredBlock>
+              </Card>
+              <Card className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
+                  <h3 className="text-sm font-bold">Risiken</h3>
+                </div>
+                <BlurredBlock>
+                  <ul className="space-y-2">
+                    {result.risks.map((r, i) => (
+                      <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                        <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.amber }} />
+                        {r}
+                      </li>
+                    ))}
+                  </ul>
+                </BlurredBlock>
+              </Card>
+            </div>
+
+            {/* E. Verhandlungsguide: Titel sichtbar, Inhalt GEBLURRED */}
+            <Card className="p-5 space-y-4 mt-6">
+              <div className="flex items-center gap-2">
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z" />
+                </svg>
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Verhandlungsguide</h3>
+              </div>
+              <BlurredBlock>
+                <p className="text-xs mb-3" style={{ color: C.dim }}>
+                  Basierend auf Ihren Analysedaten — nutzen Sie diese Argumente in der Preisverhandlung:
+                </p>
+                <ul className="space-y-2">
+                  {verhandlungsTipps.map((tip, i) => (
+                    <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                      <span className="mt-0.5 shrink-0 font-bold" style={{ color: C.accent }}>{i + 1}.</span>
+                      {tip}
+                    </li>
+                  ))}
+                </ul>
+              </BlurredBlock>
+            </Card>
+
+            {/* F. Finanzierungsanfrage: Titel sichtbar, Button GESPERRT */}
+            <Card className="p-5 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+                  </svg>
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
+                </div>
+              </div>
+              <p className="text-xs" style={{ color: C.dim }}>
+                Lassen Sie sich ein unverbindliches Finanzierungsangebot für dieses Objekt erstellen.
+              </p>
+              <button
+                disabled
+                className="rounded-xl px-4 py-2.5 text-xs font-semibold flex items-center gap-2 opacity-50 cursor-not-allowed"
+                style={{ background: C.surface2, color: C.dim, border: `1px solid ${C.border}` }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                  <path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+                Anfrage starten — nur mit Pro
+              </button>
+            </Card>
+
+            {/* G. Save Choice: Titel sichtbar, Cards GESPERRT */}
+            <div className="border-t pt-6 mt-6 space-y-4" style={{ borderColor: C.border }}>
+              <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                {/* Portfolio Card — LOCKED */}
+                <div
+                  className="rounded-2xl p-5 text-left relative opacity-50"
+                  style={{ background: C.surface2, border: `1px solid ${C.border}` }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
+                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: C.text }}>Meine Immobilie</p>
+                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                    Speichern Sie sie in Ihrem Portfolio für Trends, Wertentwicklung und Empfehlungen.
+                  </p>
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 rounded-2xl flex items-center justify-center" style={{ background: "rgba(8,9,14,0.4)" }}>
+                    <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke={C.dim} strokeWidth="2" strokeLinecap="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Compare Card — LOCKED */}
+                <div
+                  className="rounded-2xl p-5 text-left relative opacity-50"
+                  style={{ background: C.surface2, border: `1px solid ${C.border}` }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(76,154,255,0.12), ${C.accentDim})` }}>
+                      <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="2" y="3" width="8" height="18" rx="1" />
+                        <rect x="14" y="3" width="8" height="18" rx="1" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: C.text }}>Zum Vergleich</p>
+                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
+                    </div>
+                  </div>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                    Speichern Sie sie für den direkten Vergleich mit anderen Objekten.
+                  </p>
+                  {/* Lock overlay */}
+                  <div className="absolute inset-0 rounded-2xl flex items-center justify-center" style={{ background: "rgba(8,9,14,0.4)" }}>
+                    <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke={C.dim} strokeWidth="2" strokeLinecap="round">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0110 0v4" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Sticky Banner am unteren Bildschirmrand */}
+            <StickyUpgradeBanner score={result.totalScore} onNeedAuth={() => setShowAuthModal(true)} />
+
+            {/* Extra padding for sticky banner */}
+            <div className="h-20" />
           </>
         ) : (
           <>
@@ -1154,5 +1378,35 @@ function KPIRow({ label, value, color }: { label: string; value: string; color: 
       <span className="text-xs font-medium" style={{ color: C.sub }}>{label}</span>
       <span className="text-sm font-bold" style={{ color }}>{value}</span>
     </Card>
+  );
+}
+
+function BlurredValue({ value }: { value: string }) {
+  return (
+    <span
+      className="text-sm font-bold"
+      style={{
+        filter: "blur(8px)",
+        userSelect: "none",
+        pointerEvents: "none",
+        color: C.text,
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
+function BlurredBlock({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        filter: "blur(8px)",
+        userSelect: "none",
+        pointerEvents: "none",
+      }}
+    >
+      {children}
+    </div>
   );
 }
