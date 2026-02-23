@@ -1,6 +1,6 @@
 import { getSupabase } from "./supabase";
 
-// ── Properties ──
+// ── Properties (legacy — used by analysis save) ──
 
 export async function savePropertyDB(userId: string, data: {
   street: string; city: string; price: number; rent: number;
@@ -60,25 +60,115 @@ export async function saveAnalysisDB(
   userId: string,
   propertyId: string | null,
   inputs: Record<string, unknown>,
-  result: Record<string, unknown>
+  result: Record<string, unknown>,
+  opts?: { status?: string; saveType?: string }
 ) {
   const { data, error } = await getSupabase()
     .from("analyses")
-    .insert({ user_id: userId, property_id: propertyId, inputs, result })
+    .insert({
+      user_id: userId,
+      property_id: propertyId,
+      inputs,
+      result,
+      status: opts?.status || "temporary",
+      save_type: opts?.saveType || null,
+    })
     .select()
     .single();
   if (error) throw error;
   return data;
 }
 
-export async function getAnalyses(userId: string) {
-  const { data, error } = await getSupabase()
+export async function getAnalyses(userId: string, filters?: { status?: string; saveType?: string }) {
+  let query = getSupabase()
     .from("analyses")
+    .select("*")
+    .eq("user_id", userId);
+  if (filters?.status) query = query.eq("status", filters.status);
+  if (filters?.saveType) query = query.eq("save_type", filters.saveType);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw error;
+  return data;
+}
+
+export async function updateAnalysis(id: string, updates: Record<string, unknown>) {
+  const { error } = await getSupabase()
+    .from("analyses")
+    .update(updates)
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteAnalysis(id: string) {
+  const { error } = await getSupabase().from("analyses").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function toggleAnalysisFavorite(id: string, current: boolean) {
+  const { error } = await getSupabase()
+    .from("analyses")
+    .update({ is_favorite: !current })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+// ── Portfolio Properties ──
+
+export async function savePortfolioProperty(userId: string, data: {
+  address: string; city: string; purchasePrice: number; currentRent: number;
+  area?: number; buildYear?: number; energyClass?: string; houseMoney?: number;
+  locationGrade?: string; renovations?: string[];
+  score?: number; scoreData?: Record<string, unknown>;
+  locationData?: Record<string, unknown>;
+  lat?: number; lng?: number;
+}) {
+  const { data: prop, error } = await getSupabase()
+    .from("portfolio_properties")
+    .insert({
+      user_id: userId,
+      address: data.address,
+      city: data.city,
+      purchase_price: data.purchasePrice,
+      current_rent: data.currentRent,
+      area: data.area || null,
+      build_year: data.buildYear || null,
+      energy_class: data.energyClass || null,
+      house_money: data.houseMoney || null,
+      location_grade: data.locationGrade || null,
+      renovations: data.renovations || [],
+      score: data.score || null,
+      score_data: data.scoreData || null,
+      location_data: data.locationData || null,
+      lat: data.lat || null,
+      lng: data.lng || null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return prop;
+}
+
+export async function getPortfolioProperties(userId: string) {
+  const { data, error } = await getSupabase()
+    .from("portfolio_properties")
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
   if (error) throw error;
   return data;
+}
+
+export async function deletePortfolioProperty(id: string) {
+  const { error } = await getSupabase().from("portfolio_properties").delete().eq("id", id);
+  if (error) throw error;
+}
+
+export async function togglePortfolioFavorite(id: string, current: boolean) {
+  const { error } = await getSupabase()
+    .from("portfolio_properties")
+    .update({ is_favorite: !current })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 // ── Subscription ──

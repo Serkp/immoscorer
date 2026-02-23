@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { savePropertyDB, saveAnalysisDB } from "@/lib/db";
+import { savePortfolioProperty, saveAnalysisDB } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -72,7 +72,7 @@ export default function AnalysisPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { loading: subLoading, refresh: refreshSub } = useSubscription();
+  const { isPro, loading: subLoading, refresh: refreshSub } = useSubscription();
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -84,9 +84,8 @@ export default function AnalysisPage() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingPct, setLoadingPct] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  const [saveChoice, setSaveChoice] = useState<"none" | "portfolio" | "compare">("none");
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; type: "success" | "neutral" } | null>(null);
   const [showFinanzierung, setShowFinanzierung] = useState(false);
   const [finanzForm, setFinanzForm] = useState({ name: "", email: "", phone: "", message: "" });
@@ -212,16 +211,46 @@ export default function AnalysisPage() {
           };
           const sr = computeScore(input);
           setResult(sr);
-          setSaved(false);
-          setSaveMsg(null);
+          setSaveChoice("none");
           setView("result");
         }, 600);
       }
     }, 600);
   }
 
-  async function handleSave() {
-    if (!result || !user || saving || saved) return;
+  async function handleSavePortfolio() {
+    if (!result || !user || saving || saveChoice !== "none") return;
+    setSaving(true);
+    try {
+      await savePortfolioProperty(user.id, {
+        address: form.street,
+        city: form.city,
+        purchasePrice: Number(form.price),
+        currentRent: Number(form.rent),
+        area: Number(form.area) || undefined,
+        buildYear: Number(form.year) || undefined,
+        energyClass: form.energyClass,
+        houseMoney: Number(form.hausgeld) || undefined,
+        locationGrade: form.locationGrade || "B",
+        renovations: form.renovations,
+        score: result.totalScore,
+        scoreData: result as unknown as Record<string, unknown>,
+        locationData: locationData as unknown as Record<string, unknown> || undefined,
+        lat: lat || undefined,
+      });
+      setSaveChoice("portfolio");
+      setToast({ text: "Immobilie im Portfolio gespeichert", type: "success" });
+      setTimeout(() => setToast(null), 3000);
+    } catch {
+      setToast({ text: "Fehler beim Speichern. Bitte versuchen Sie es erneut.", type: "neutral" });
+      setTimeout(() => setToast(null), 3000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSaveCompare() {
+    if (!result || !user || saving || saveChoice !== "none") return;
     setSaving(true);
     try {
       const input: PropertyInput = {
@@ -230,32 +259,19 @@ export default function AnalysisPage() {
         energyClass: form.energyClass, locationGrade: form.locationGrade || "B", renovations: form.renovations,
         ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
       };
-      const prop = await savePropertyDB(user.id, {
-        street: input.street,
-        city: input.city,
-        price: input.price,
-        rent: input.rent,
-        hausgeld: input.hausgeld,
-        area: input.area,
-        year: input.year,
-        energyClass: input.energyClass,
-        locationGrade: input.locationGrade,
-        renovations: input.renovations,
-        totalScore: result.totalScore,
-        result: result as unknown as Record<string, unknown>,
-      });
       await saveAnalysisDB(
         user.id,
-        prop.id,
+        null,
         input as unknown as Record<string, unknown>,
-        result as unknown as Record<string, unknown>
+        result as unknown as Record<string, unknown>,
+        { status: "saved", saveType: "comparison" }
       );
-      setSaved(true);
-      setSaveMsg("Immobilie gespeichert");
-      setTimeout(() => setSaveMsg(null), 3000);
+      setSaveChoice("compare");
+      setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
+      setTimeout(() => setToast(null), 3000);
     } catch {
-      setSaveMsg("Fehler beim Speichern");
-      setTimeout(() => setSaveMsg(null), 3000);
+      setToast({ text: "Fehler beim Speichern. Bitte versuchen Sie es erneut.", type: "neutral" });
+      setTimeout(() => setToast(null), 3000);
     } finally {
       setSaving(false);
     }
@@ -296,8 +312,7 @@ export default function AnalysisPage() {
     setLat(null);
     setView("input");
     setExpanded(null);
-    setSaved(false);
-    setSaveMsg(null);
+    setSaveChoice("none");
     setShowFinanzierung(false);
     setFinanzSent(false);
     setFinanzForm({ name: "", email: "", phone: "", message: "" });
@@ -679,17 +694,17 @@ export default function AnalysisPage() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
-        {/* Save Toast */}
-        {saveMsg && (
+        {/* Toast */}
+        {toast && (
           <div
             className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg animate-fade-up"
             style={{
-              background: saved ? C.greenDim : C.redDim,
-              color: saved ? C.green : C.red,
-              border: `1px solid ${saved ? C.greenBorder : "rgba(248,113,113,0.2)"}`,
+              background: toast.type === "success" ? C.greenDim : C.redDim,
+              color: toast.type === "success" ? C.green : C.red,
+              border: `1px solid ${toast.type === "success" ? C.greenBorder : "rgba(248,113,113,0.2)"}`,
             }}
           >
-            {saveMsg}
+            {toast.text}
           </div>
         )}
 
@@ -704,23 +719,7 @@ export default function AnalysisPage() {
             </div>
             <p className="text-sm mt-1" style={{ color: C.sub }}>{form.street}, {form.city} — {form.area} m², Bj. {form.year}, Klasse {form.energyClass}</p>
           </div>
-          <div className="flex gap-2">
-            <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
-            <button
-              onClick={handleSave}
-              disabled={saved || saving}
-              className="rounded-xl px-4 py-2 text-sm font-semibold transition-all disabled:opacity-60"
-              style={{
-                background: saved
-                  ? C.greenDim
-                  : `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
-                color: saved ? C.green : "#fff",
-                border: saved ? `1px solid ${C.greenBorder}` : "none",
-              }}
-            >
-              {saving ? "..." : saved ? "Gespeichert" : "Im Portfolio speichern"}
-            </button>
-          </div>
+          <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
         </div>
 
         {/* Hero Row: Score + Radar + KPIs (visible to all) */}
@@ -966,14 +965,118 @@ export default function AnalysisPage() {
           </Card>
         </ProContent>
 
-        {/* Footer Actions */}
-        <Card className="p-4">
-          <div className="flex flex-wrap gap-2">
-            <button className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>PDF Export</button>
-            <button onClick={() => router.push("/compare")} className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Zum Vergleich</button>
-            <button onClick={() => router.push("/portfolio")} className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>Zum Portfolio</button>
+        {/* ── Save Choice Section ── */}
+        {isPro ? (
+          <div className="space-y-4">
+            <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Portfolio Card */}
+              <button
+                onClick={handleSavePortfolio}
+                disabled={saving || saveChoice !== "none"}
+                className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
+                style={{
+                  background: saveChoice === "portfolio" ? C.greenDim : C.surface2,
+                  border: `1px solid ${saveChoice === "portfolio" ? C.greenBorder : C.border}`,
+                  cursor: saveChoice !== "none" ? "default" : "pointer",
+                }}
+              >
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                    <polyline points="9 22 9 12 15 12 15 22" />
+                  </svg>
+                </div>
+                <p className="text-sm font-bold mb-0.5" style={{ color: saveChoice === "portfolio" ? C.green : C.text }}>
+                  {saveChoice === "portfolio" ? "Im Portfolio gespeichert" : "Im Portfolio speichern"}
+                </p>
+                <p className="text-xs mb-2" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
+                <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                  Speichern Sie sie in Ihrem Portfolio für Trends, Wertentwicklung und Empfehlungen.
+                </p>
+              </button>
+
+              {/* Compare Card */}
+              <button
+                onClick={handleSaveCompare}
+                disabled={saving || saveChoice !== "none"}
+                className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
+                style={{
+                  background: saveChoice === "compare" ? C.greenDim : C.surface2,
+                  border: `1px solid ${saveChoice === "compare" ? C.greenBorder : C.border}`,
+                  cursor: saveChoice !== "none" ? "default" : "pointer",
+                }}
+              >
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, rgba(76,154,255,0.12), ${C.accentDim})` }}>
+                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="2" y="3" width="8" height="18" rx="1" />
+                    <rect x="14" y="3" width="8" height="18" rx="1" />
+                  </svg>
+                </div>
+                <p className="text-sm font-bold mb-0.5" style={{ color: saveChoice === "compare" ? C.green : C.text }}>
+                  {saveChoice === "compare" ? "Im Vergleich gespeichert" : "Im Vergleich speichern"}
+                </p>
+                <p className="text-xs mb-2" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
+                <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                  Speichern Sie sie für den direkten Vergleich mit anderen Objekten.
+                </p>
+              </button>
+            </div>
+
+            {/* Save Recommendation */}
+            <AIComment variant={result.totalScore >= 75 ? "good" : result.totalScore >= 60 ? "info" : result.totalScore >= 40 ? "warn" : "bad"}>
+              {result.totalScore >= 75
+                ? "Empfehlung: Objekt favorisieren und Finanzierung prüfen."
+                : result.totalScore >= 60
+                  ? "Empfehlung: Speichern und mit anderen Objekten vergleichen."
+                  : result.totalScore >= 40
+                    ? "Empfehlung: Nur bei Verhandlungsspielraum weiterverfolgen."
+                    : "Empfehlung: Andere Objekte bieten ein besseres Rendite-Risiko-Profil."}
+            </AIComment>
+
+            {/* Navigation after save */}
+            {saveChoice !== "none" && (
+              <div className="flex gap-3 animate-fade-up">
+                <button
+                  onClick={() => router.push(saveChoice === "portfolio" ? "/portfolio" : "/compare")}
+                  className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all"
+                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                >
+                  {saveChoice === "portfolio" ? "Zum Portfolio" : "Zum Vergleich"}
+                </button>
+                <button onClick={reset} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
+                  Neue Analyse
+                </button>
+              </div>
+            )}
           </div>
-        </Card>
+        ) : (
+          /* FREE USER: blurred save choice */
+          <ProContent
+            fallbackTitle="Immobilien speichern"
+            fallbackDesc="Pro für 9,99 €/Monat — Immobilien speichern und vergleichen"
+          >
+            <div className="space-y-4">
+              <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
+              <div className="grid md:grid-cols-2 gap-4">
+                <div className="rounded-2xl p-5" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: C.accentDim }}>
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+                  </div>
+                  <p className="text-sm font-bold" style={{ color: C.text }}>Im Portfolio speichern</p>
+                  <p className="text-xs mt-1" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
+                </div>
+                <div className="rounded-2xl p-5" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
+                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: "rgba(76,154,255,0.12)" }}>
+                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2"><rect x="2" y="3" width="8" height="18" rx="1" /><rect x="14" y="3" width="8" height="18" rx="1" /></svg>
+                  </div>
+                  <p className="text-sm font-bold" style={{ color: C.text }}>Im Vergleich speichern</p>
+                  <p className="text-xs mt-1" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
+                </div>
+              </div>
+            </div>
+          </ProContent>
+        )}
       </div>
     );
   }

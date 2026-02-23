@@ -5,25 +5,29 @@ import Link from "next/link";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
 import { MiniRing } from "@/components/ui/ScoreRing";
+import { PropertyCard } from "@/components/PropertyCard";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
-import { getProperties, deleteProperty, toggleFavorite } from "@/lib/db";
+import { getPortfolioProperties, deletePortfolioProperty, togglePortfolioFavorite } from "@/lib/db";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 
-interface DBProperty {
+interface PortfolioProp {
   id: string;
-  street: string;
+  address: string;
   city: string;
-  price: number;
-  rent: number;
-  hausgeld: number;
-  area: number;
-  year: number;
-  energy_class: string;
-  location_grade: string;
+  purchase_price: number;
+  current_rent: number;
+  area: number | null;
+  build_year: number | null;
+  energy_class: string | null;
+  house_money: number | null;
+  location_grade: string | null;
   renovations: string[];
-  total_score: number;
-  result: Record<string, unknown>;
+  score: number | null;
+  score_data: Record<string, unknown> | null;
+  location_data: Record<string, unknown> | null;
+  work_done: string | null;
+  work_needed: string | null;
   is_favorite: boolean;
   created_at: string;
 }
@@ -31,21 +35,22 @@ interface DBProperty {
 export default function PortfolioPage() {
   const { user } = useAuth();
   const { isPro, loading: subLoading } = useSubscription();
-  const [properties, setProperties] = useState<DBProperty[]>([]);
+  const [properties, setProperties] = useState<PortfolioProp[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detail, setDetail] = useState<PortfolioProp | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
   const [sort, setSort] = useState<"date" | "score" | "yield">("date");
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user || subLoading) return;
     if (!isPro) { setLoading(false); return; }
     async function load() {
       try {
-        const data = await getProperties(user!.id);
-        setProperties((data || []) as DBProperty[]);
-      } catch { /* allow empty */ }
+        const data = await getPortfolioProperties(user!.id);
+        setProperties((data || []) as PortfolioProp[]);
+      } catch { /* silent */ }
       finally { setLoading(false); }
     }
     load();
@@ -53,7 +58,7 @@ export default function PortfolioPage() {
 
   async function handleToggleFav(id: string, current: boolean) {
     try {
-      await toggleFavorite(id, current);
+      await togglePortfolioFavorite(id, current);
       setProperties((prev) =>
         prev.map((p) => (p.id === id ? { ...p, is_favorite: !current } : p))
       );
@@ -62,10 +67,12 @@ export default function PortfolioPage() {
 
   async function handleDelete(id: string) {
     try {
-      await deleteProperty(id);
+      await deletePortfolioProperty(id);
       setProperties((prev) => prev.filter((p) => p.id !== id));
       setConfirmDelete(null);
-      setExpanded(null);
+      setDetail(null);
+      setToast("Immobilie entfernt");
+      setTimeout(() => setToast(null), 3000);
     } catch { /* silent */ }
   }
 
@@ -96,39 +103,182 @@ export default function PortfolioPage() {
     );
   }
 
+  // Detail view
+  if (detail) {
+    const sd = detail.score_data as Record<string, unknown> | null;
+    const subscores = (sd?.subscores as Array<Record<string, unknown>>) || [];
+    const strengths = (sd?.strengths as string[]) || [];
+    const risks = (sd?.risks as string[]) || [];
+    const grossYield = detail.purchase_price > 0 ? ((detail.current_rent * 12) / detail.purchase_price) * 100 : 0;
+    const factor = detail.current_rent > 0 ? detail.purchase_price / (detail.current_rent * 12) : 0;
+
+    return (
+      <div className="mx-auto max-w-[800px] space-y-6 animate-fade-up">
+        {/* Back */}
+        <button onClick={() => setDetail(null)} className="flex items-center gap-2 text-xs font-semibold" style={{ color: C.sub }}>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
+          Zurück zum Portfolio
+        </button>
+
+        {/* Header */}
+        <div className="flex items-start gap-4">
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
+            <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-lg font-bold" style={{ color: C.text }}>{detail.address}</h1>
+            <p className="text-sm" style={{ color: C.sub }}>{detail.city}</p>
+          </div>
+        </div>
+
+        {/* Score + Key Metrics */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Card className="p-4 flex flex-col items-center justify-center" glow>
+            <MiniRing value={detail.score || 0} size={56} />
+            <p className="text-xs font-bold mt-1" style={{ color: scoreColor(detail.score || 0) }}>{scoreLabel(detail.score || 0)}</p>
+          </Card>
+          <StatCard label="Kaufpreis" value={`${detail.purchase_price.toLocaleString("de-DE")} €`} />
+          <StatCard label="Miete" value={`${detail.current_rent.toLocaleString("de-DE")} €/Mon.`} />
+          <StatCard label="Rendite" value={`${grossYield.toFixed(2)} %`} color={grossYield >= 4 ? C.green : grossYield >= 3 ? C.amber : C.red} />
+        </div>
+
+        {/* Detail Grid */}
+        <Card className="p-5">
+          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Objektdaten</h3>
+          <div className="grid grid-cols-2 gap-2">
+            <DetailRow label="Fläche" value={detail.area ? `${detail.area} m²` : "—"} />
+            <DetailRow label="Baujahr" value={detail.build_year ? String(detail.build_year) : "—"} />
+            <DetailRow label="Energie" value={detail.energy_class || "—"} />
+            <DetailRow label="Hausgeld" value={detail.house_money ? `${detail.house_money} €/Mon.` : "—"} />
+            <DetailRow label="Lageklasse" value={detail.location_grade ? `Klasse ${detail.location_grade}` : "—"} />
+            <DetailRow label="Faktor" value={`${factor.toFixed(1)}x`} />
+          </div>
+        </Card>
+
+        {/* Teilscores */}
+        {subscores.length > 0 && (
+          <Card className="p-5 space-y-3">
+            <h3 className="text-sm font-bold" style={{ color: C.text }}>Teilscores</h3>
+            {subscores.map((s) => (
+              <div key={s.key as string} className="flex items-center gap-3">
+                <MiniRing value={s.value as number} size={32} />
+                <div className="flex-1">
+                  <span className="text-xs font-semibold" style={{ color: C.text }}>{s.label as string}</span>
+                  {(s.oneLiner as string) ? <p className="text-[10px]" style={{ color: C.dim }}>{s.oneLiner as string}</p> : null}
+                </div>
+                <span className="text-xs font-bold" style={{ color: scoreColor(s.value as number) }}>{s.value as number}/100</span>
+              </div>
+            ))}
+          </Card>
+        )}
+
+        {/* Strengths + Risks */}
+        {(strengths.length > 0 || risks.length > 0) && (
+          <div className="grid md:grid-cols-2 gap-4">
+            {strengths.length > 0 && (
+              <Card className="p-5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
+                  <h4 className="text-xs font-bold">Stärken</h4>
+                </div>
+                {strengths.map((s, i) => (
+                  <p key={i} className="text-xs leading-relaxed" style={{ color: C.sub }}>
+                    <span style={{ color: C.green }}>·</span> {s}
+                  </p>
+                ))}
+              </Card>
+            )}
+            {risks.length > 0 && (
+              <Card className="p-5 space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
+                  <h4 className="text-xs font-bold">Risiken</h4>
+                </div>
+                {risks.map((r, i) => (
+                  <p key={i} className="text-xs leading-relaxed" style={{ color: C.sub }}>
+                    <span style={{ color: C.amber }}>·</span> {r}
+                  </p>
+                ))}
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Work done / needed */}
+        {(detail.work_done || detail.work_needed) && (
+          <div className="grid md:grid-cols-2 gap-4">
+            {detail.work_done && (
+              <Card className="p-5 space-y-2">
+                <h4 className="text-xs font-bold" style={{ color: C.green }}>Getätigte Maßnahmen</h4>
+                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{detail.work_done}</p>
+              </Card>
+            )}
+            {detail.work_needed && (
+              <Card className="p-5 space-y-2">
+                <h4 className="text-xs font-bold" style={{ color: C.amber }}>Ausstehende Maßnahmen</h4>
+                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{detail.work_needed}</p>
+              </Card>
+            )}
+          </div>
+        )}
+
+        {/* Recommendations */}
+        <Card className="p-5 space-y-3">
+          <h3 className="text-sm font-bold" style={{ color: C.text }}>Nächste Schritte</h3>
+          <ul className="space-y-2">
+            {getNextSteps(detail).map((step, i) => (
+              <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
+                {step}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      </div>
+    );
+  }
+
   const filtered = filter === "favorites" ? properties.filter((p) => p.is_favorite) : properties;
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sort === "score") return b.total_score - a.total_score;
+    if (sort === "score") return (b.score || 0) - (a.score || 0);
     if (sort === "yield") {
-      const yieldA = a.price > 0 ? (a.rent * 12) / a.price : 0;
-      const yieldB = b.price > 0 ? (b.rent * 12) / b.price : 0;
-      return yieldB - yieldA;
+      const yA = a.purchase_price > 0 ? (a.current_rent * 12) / a.purchase_price : 0;
+      const yB = b.purchase_price > 0 ? (b.current_rent * 12) / b.purchase_price : 0;
+      return yB - yA;
     }
-    // Default: favorites first, then by date
     if (a.is_favorite && !b.is_favorite) return -1;
     if (!a.is_favorite && b.is_favorite) return 1;
     return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
   });
 
-  // Portfolio stats
-  const totalValue = properties.reduce((sum, p) => sum + p.price, 0);
-  const totalRent = properties.reduce((sum, p) => sum + p.rent, 0);
+  // Stats
+  const totalValue = properties.reduce((sum, p) => sum + p.purchase_price, 0);
   const avgScore = properties.length > 0
-    ? Math.round(properties.reduce((sum, p) => sum + p.total_score, 0) / properties.length)
+    ? Math.round(properties.reduce((sum, p) => sum + (p.score || 0), 0) / properties.length)
+    : 0;
+  const avgYield = properties.length > 0
+    ? properties.reduce((sum, p) => sum + (p.purchase_price > 0 ? ((p.current_rent * 12) / p.purchase_price) * 100 : 0), 0) / properties.length
     : 0;
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg animate-fade-up" style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}>
+          {toast}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold">Portfolio</h1>
           {properties.length > 0 && (
-            <span
-              className="rounded-full px-2.5 py-0.5 text-[11px] font-bold"
-              style={{ background: C.surface3, color: C.sub }}
-            >
+            <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold" style={{ background: C.surface3, color: C.sub }}>
               {properties.length} Objekte
             </span>
           )}
@@ -142,13 +292,13 @@ export default function PortfolioPage() {
         </Link>
       </div>
 
-      {/* Portfolio Summary */}
+      {/* Stats */}
       {properties.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <SummaryCard label="Objektanzahl" value={String(properties.length)} />
-          <SummaryCard label="Gesamtwert" value={`${(totalValue / 1000).toFixed(0)}k €`} />
-          <SummaryCard label="Monatsmiete" value={`${totalRent.toLocaleString("de-DE")} €`} />
-          <SummaryCard label="Ø Score" value={`${avgScore}/100`} color={scoreColor(avgScore)} />
+          <SummaryCard icon="house" label="Immobilien" value={String(properties.length)} />
+          <SummaryCard icon="star" label="Ø Score" value={`${avgScore}/100`} color={scoreColor(avgScore)} />
+          <SummaryCard icon="euro" label="Gesamtwert" value={`${(totalValue / 1000).toFixed(0)}k €`} />
+          <SummaryCard icon="percent" label="Ø Rendite" value={`${avgYield.toFixed(2)} %`} color={avgYield >= 4 ? C.green : avgYield >= 3 ? C.amber : C.red} />
         </div>
       )}
 
@@ -185,22 +335,22 @@ export default function PortfolioPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {sorted.length === 0 && properties.length === 0 && (
+      {/* Empty */}
+      {properties.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-5">
           <AIOrb size={48} active />
           <h2 className="text-base font-bold" style={{ color: C.text }}>
-            Noch keine Immobilien gespeichert
+            Noch keine Immobilien in Ihrem Portfolio
           </h2>
           <p className="text-sm text-center max-w-sm" style={{ color: C.sub }}>
-            Starten Sie Ihre erste Analyse und speichern Sie das Ergebnis.
+            Analysieren Sie eine Immobilie und speichern Sie sie als &quot;Meine Immobilie&quot;.
           </p>
           <Link
             href="/analysis"
             className="rounded-xl px-6 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
             style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
-            Zur Analyse
+            Neue Analyse starten
           </Link>
         </div>
       )}
@@ -213,146 +363,69 @@ export default function PortfolioPage() {
 
       {/* Grid */}
       {sorted.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sorted.map((p) => {
-            const grossYield = p.price > 0 ? ((p.rent * 12) / p.price) * 100 : 0;
-            const sqmPrice = p.area > 0 ? p.price / p.area : 0;
-            const factor = p.rent > 0 ? p.price / (p.rent * 12) : 0;
-            const isExpanded = expanded === p.id;
-            const result = p.result as Record<string, unknown>;
-            const subscores = (result?.subscores as Array<Record<string, unknown>>) || [];
-
-            return (
-              <Card key={p.id} className="overflow-hidden" hover>
-                {/* Top row */}
-                <div className="flex items-start justify-between p-4 pb-0">
-                  <MiniRing value={p.total_score} size={40} />
-                  <div className="flex items-center gap-2">
-                    {/* Delete */}
-                    {confirmDelete === p.id ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => handleDelete(p.id)}
-                          className="rounded-lg px-2 py-1 text-[10px] font-bold"
-                          style={{ background: C.redDim, color: C.red }}
-                        >
-                          Ja
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelete(null)}
-                          className="rounded-lg px-2 py-1 text-[10px] font-bold"
-                          style={{ background: C.surface3, color: C.sub }}
-                        >
-                          Nein
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmDelete(p.id)}
-                        className="p-1.5 rounded-lg transition-all hover:opacity-70"
-                        title="Löschen"
-                      >
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.dim} strokeWidth="1.5" strokeLinecap="round">
-                          <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14" />
-                        </svg>
-                      </button>
-                    )}
-                    {/* Favorite */}
-                    <button
-                      onClick={() => handleToggleFav(p.id, p.is_favorite)}
-                      className="p-1.5 rounded-lg transition-all hover:opacity-70"
-                      title={p.is_favorite ? "Favorit entfernen" : "Als Favorit markieren"}
-                    >
-                      <svg width={16} height={16} viewBox="0 0 24 24" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path
-                          d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"
-                          fill={p.is_favorite ? C.red : "none"}
-                          stroke={p.is_favorite ? C.red : C.dim}
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Title */}
-                <div className="px-4 pt-3">
-                  <p className="text-sm font-bold truncate" style={{ color: C.text }}>{p.street}</p>
-                  <p className="text-xs" style={{ color: C.sub }}>{p.city}</p>
-                </div>
-
-                {/* Metrics */}
-                <div className="grid grid-cols-3 gap-2 px-4 pt-3">
-                  <PropMetric label="Rendite" value={`${grossYield.toFixed(1)} %`} good={grossYield >= 4} />
-                  <PropMetric label="€/m²" value={`${Math.round(sqmPrice).toLocaleString("de-DE")}`} good={sqmPrice <= 3500} />
-                  <PropMetric label="Faktor" value={`${factor.toFixed(1)}x`} good={factor <= 25} />
-                </div>
-
-                {/* Footer */}
-                <div className="flex items-center justify-between px-4 py-3 mt-2 border-t" style={{ borderColor: C.border }}>
-                  <span className="text-[10px]" style={{ color: C.dim }}>
-                    {new Date(p.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
-                  </span>
-                  <button
-                    onClick={() => setExpanded(isExpanded ? null : p.id)}
-                    className="rounded-lg px-3 py-1 text-[11px] font-semibold transition-all"
-                    style={{ background: C.surface3, color: C.sub }}
-                  >
-                    {isExpanded ? "Schließen" : "Details"}
-                  </button>
-                </div>
-
-                {/* Expanded details */}
-                {isExpanded && (
-                  <div className="px-4 pb-4 space-y-3 border-t animate-fade-up" style={{ borderColor: C.border }}>
-                    <div className="pt-3 grid grid-cols-2 gap-2">
-                      <DetailRow label="Kaufpreis" value={`${p.price.toLocaleString("de-DE")} €`} />
-                      <DetailRow label="Kaltmiete" value={`${p.rent.toLocaleString("de-DE")} €/Mon.`} />
-                      <DetailRow label="Hausgeld" value={`${p.hausgeld.toLocaleString("de-DE")} €/Mon.`} />
-                      <DetailRow label="Fläche" value={`${p.area} m²`} />
-                      <DetailRow label="Baujahr" value={String(p.year)} />
-                      <DetailRow label="Energie" value={p.energy_class} />
-                      <DetailRow label="Lage" value={`Klasse ${p.location_grade}`} />
-                      <DetailRow label="Bewertung" value={scoreLabel(p.total_score)} />
-                    </div>
-                    {subscores.length > 0 && (
-                      <div className="space-y-1.5 pt-1">
-                        <p className="text-[10px] font-bold" style={{ color: C.dim }}>Teilscores</p>
-                        {subscores.map((s) => (
-                          <div key={s.key as string} className="flex items-center justify-between">
-                            <span className="text-[11px]" style={{ color: C.sub }}>{s.label as string}</span>
-                            <span className="text-[11px] font-bold" style={{ color: scoreColor(s.value as number) }}>
-                              {s.value as number}/100
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sorted.map((p) => (
+            <PropertyCard
+              key={p.id}
+              id={p.id}
+              address={p.address}
+              city={p.city || ""}
+              score={p.score || 0}
+              price={p.purchase_price}
+              rent={p.current_rent}
+              area={p.area || undefined}
+              locationGrade={p.location_grade || undefined}
+              purchaseDate={new Date(p.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
+              isFavorite={p.is_favorite}
+              onFavoriteToggle={() => handleToggleFav(p.id, p.is_favorite)}
+              onClick={() => setDetail(p)}
+              showDelete
+              confirmingDelete={confirmDelete === p.id}
+              onDelete={() => setConfirmDelete(p.id)}
+              onConfirmDelete={() => handleDelete(p.id)}
+              onCancelDelete={() => setConfirmDelete(null)}
+              badge={p.work_needed ? "Sanierung nötig" : undefined}
+              badgeColor={p.work_needed ? C.amber : undefined}
+            />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-function SummaryCard({ label, value, color }: { label: string; value: string; color?: string }) {
+/* ── Helpers ── */
+
+function SummaryCard({ icon, label, value, color }: { icon: string; label: string; value: string; color?: string }) {
+  const iconSvg = icon === "house" ? (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+  ) : icon === "star" ? (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
+  ) : icon === "euro" ? (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
+  ) : (
+    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2"><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></svg>
+  );
+
   return (
-    <Card className="p-4 text-center">
-      <p className="text-lg font-bold" style={{ color: color || C.text }}>{value}</p>
-      <p className="text-[10px] mt-0.5" style={{ color: C.dim }}>{label}</p>
+    <Card className="p-4 flex items-center gap-3">
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.surface }}>
+        {iconSvg}
+      </div>
+      <div>
+        <p className="text-base font-bold" style={{ color: color || C.text }}>{value}</p>
+        <p className="text-[10px]" style={{ color: C.dim }}>{label}</p>
+      </div>
     </Card>
   );
 }
 
-function PropMetric({ label, value, good }: { label: string; value: string; good: boolean }) {
+function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
-    <div className="rounded-lg p-2 text-center" style={{ background: C.surface }}>
-      <p className="text-xs font-bold" style={{ color: good ? C.green : C.amber }}>{value}</p>
-      <p className="text-[9px] mt-0.5" style={{ color: C.dim }}>{label}</p>
-    </div>
+    <Card className="p-4 text-center">
+      <p className="text-sm font-bold" style={{ color: color || C.text }}>{value}</p>
+      <p className="text-[10px] mt-0.5" style={{ color: C.dim }}>{label}</p>
+    </Card>
   );
 }
 
@@ -363,4 +436,27 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="text-[11px] font-semibold" style={{ color: C.text }}>{value}</span>
     </div>
   );
+}
+
+function getNextSteps(p: PortfolioProp): string[] {
+  const steps: string[] = [];
+  const energyIdx = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"].indexOf(p.energy_class || "");
+  if (energyIdx >= 5) {
+    steps.push("Energetische Sanierung kann den Wert um ~15 % steigern und GEG-Anforderungen erfüllen.");
+  }
+  const grossYield = p.purchase_price > 0 ? ((p.current_rent * 12) / p.purchase_price) * 100 : 0;
+  if (grossYield < 4) {
+    steps.push("Mieterhöhung nach §558 BGB prüfen (Mietspiegel vergleichen).");
+  }
+  if (p.work_needed) {
+    steps.push("Ausstehende Sanierungsmaßnahmen zeitnah umsetzen für Werterhalt.");
+  }
+  if ((p.score || 0) >= 70) {
+    steps.push("Starkes Objekt — Sondertilgungsmöglichkeiten bei der Bank prüfen.");
+  }
+  if (steps.length === 0) {
+    steps.push("Regelmäßig Marktmiete prüfen und bei Bedarf anpassen.");
+    steps.push("Instandhaltungsrücklage im WEG-Wirtschaftsplan kontrollieren.");
+  }
+  return steps;
 }
