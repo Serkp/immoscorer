@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { MiniRing } from "@/components/ui/ScoreRing";
 import { AIComment } from "@/components/ui/AIComment";
 import { PropertyCard } from "@/components/PropertyCard";
+import { UpgradeBox } from "@/components/UpgradeBox";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { getAnalyses, deleteAnalysis, toggleAnalysisFavorite } from "@/lib/db";
@@ -116,15 +117,9 @@ export default function ComparePage() {
 
   if (!isPro) {
     return (
-      <div className="flex flex-col items-center justify-center py-32 gap-6">
-        <AIOrb size={56} active />
-        <h2 className="text-lg font-bold" style={{ color: C.text }}>Vergleichstool freischalten</h2>
-        <p className="text-sm text-center max-w-sm" style={{ color: C.sub }}>
-          Upgrade auf ImmoScorer Pro, um Immobilien nebeneinander zu vergleichen.
-        </p>
-        <Link href="/analysis" className="rounded-xl px-6 py-2.5 text-sm font-semibold transition-all hover:opacity-90" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>
-          Upgrade auf Pro
-        </Link>
+      <div className="mx-auto max-w-[700px] py-12 space-y-6">
+        <h1 className="text-xl font-bold" style={{ color: C.text }}>Immobilien vergleichen</h1>
+        <UpgradeBox />
       </div>
     );
   }

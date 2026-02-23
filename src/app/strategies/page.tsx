@@ -5,7 +5,7 @@ import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
 import { AIComment } from "@/components/ui/AIComment";
 import { useSubscription } from "@/hooks/useSubscription";
-import { ProContent } from "@/components/ProContent";
+import { UpgradeBox } from "@/components/UpgradeBox";
 import { C } from "@/lib/theme";
 import Link from "next/link";
 
@@ -316,12 +316,12 @@ export default function StrategiesPage() {
 
     if (!isPro) {
       return (
-        <ProContent
-          fallbackTitle="Strategien freischalten"
-          fallbackDesc="Ihre persönliche Investment-Strategie ist ein PRO-Feature."
-        >
-          {content}
-        </ProContent>
+        <div className="mx-auto max-w-[800px] space-y-6">
+          <UpgradeBox />
+          <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
+            {content}
+          </div>
+        </div>
       );
     }
 

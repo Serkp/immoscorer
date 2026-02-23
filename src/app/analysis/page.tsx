@@ -9,7 +9,7 @@ import { AIComment } from "@/components/ui/AIComment";
 import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
-import { ProContent } from "@/components/ProContent";
+import { UpgradeBox } from "@/components/UpgradeBox";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { PlaceResult } from "@/components/AddressAutocomplete";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -756,326 +756,336 @@ export default function AnalysisPage() {
           {kiEmpfehlung.text}
         </AIComment>
 
-        {/* ── PRO-only sections: Teilscores, Verhandlungsguide, Finanzierung ── */}
-        <ProContent
-          fallbackTitle="Detailanalyse freischalten"
-          fallbackDesc="Teilscores, Verhandlungsguide und Finanzierungsanfrage sind PRO-Features."
-        >
-          {/* Subscore Cards */}
-          <div className="space-y-2">
-            <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>
-            {result.subscores.map((sub) => {
-              const isExpanded = expanded === sub.key;
-              return (
-                <Card key={sub.key} className="overflow-hidden" hover onClick={() => setExpanded(isExpanded ? null : sub.key)}>
+        {/* ── FREE USER: UpgradeBox directly after Score + KI-Empfehlung ── */}
+        {!isPro && <UpgradeBox />}
+
+        {/* ── PRO: Full detail sections / FREE: blurred teaser ── */}
+        {!isPro ? (
+          <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
+            <div className="space-y-2">
+              {result.subscores.map((sub) => (
+                <Card key={sub.key} className="overflow-hidden">
                   <div className="flex items-center gap-4 p-4">
                     <MiniRing value={sub.value} size={40} />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold">{sub.label}</span>
-                        <span className="text-[11px] rounded-full px-2 py-0.5" style={{ background: C.surface3, color: C.dim }}>{sub.weight} %</span>
-                      </div>
+                      <span className="text-sm font-bold">{sub.label}</span>
                       <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
                     </div>
-                    <svg width={16} height={16} viewBox="0 0 16 16" className={`transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} style={{ color: C.dim }}>
-                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                    </svg>
                   </div>
-
-                  {isExpanded && (
-                    <div className="grid md:grid-cols-2 gap-4 px-4 pb-4 border-t animate-fade-up" style={{ borderColor: C.border }}>
-                      <div className="pt-4 space-y-2">
-                        <h4 className="text-xs font-bold" style={{ color: C.blue }}>Warum dieser Wert?</h4>
-                        <ul className="space-y-1.5">
-                          {sub.reasons.map((r, i) => (
-                            <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                              <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.blue }} />
-                              {r}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                      <div className="pt-4 space-y-2">
-                        <h4 className="text-xs font-bold" style={{ color: C.green }}>Empfehlung</h4>
-                        <ul className="space-y-1.5">
-                          {sub.actions.map((a, i) => (
-                            <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                              <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
-                              {a}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
                 </Card>
-              );
-            })}
-          </div>
-
-          {/* Stärken + Risiken */}
-          <div className="grid md:grid-cols-2 gap-5 mt-6">
-            <Card className="p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
-                <h3 className="text-sm font-bold">Stärken</h3>
-              </div>
-              <ul className="space-y-2">
-                {result.strengths.map((s, i) => (
-                  <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                    <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.green }} />
-                    {s}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-            <Card className="p-5 space-y-3">
-              <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
-                <h3 className="text-sm font-bold">Risiken</h3>
-              </div>
-              <ul className="space-y-2">
-                {result.risks.map((r, i) => (
-                  <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                    <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.amber }} />
-                    {r}
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          </div>
-
-          {/* ── Verhandlungsguide ── */}
-          <Card className="p-5 space-y-4 mt-6">
-            <div className="flex items-center gap-2">
-              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round">
-                <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z" />
-              </svg>
-              <h3 className="text-sm font-bold" style={{ color: C.text }}>Verhandlungsguide</h3>
-            </div>
-            <p className="text-xs" style={{ color: C.dim }}>
-              Basierend auf Ihren Analysedaten — nutzen Sie diese Argumente in der Preisverhandlung:
-            </p>
-            <ul className="space-y-2">
-              {verhandlungsTipps.map((tip, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                  <span className="mt-0.5 shrink-0 font-bold" style={{ color: C.accent }}>{i + 1}.</span>
-                  {tip}
-                </li>
               ))}
-            </ul>
-          </Card>
-
-          {/* ── Finanzierungsanfrage ── */}
-          <Card className="p-5 space-y-4 mt-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round">
-                  <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
-                </svg>
-                <h3 className="text-sm font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
-              </div>
-              {!showFinanzierung && !finanzSent && (
-                <button
-                  onClick={() => setShowFinanzierung(true)}
-                  className="rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:opacity-90"
-                  style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
-                >
-                  Anfrage starten
-                </button>
-              )}
             </div>
-
-            {finanzSent ? (
-              <div className="rounded-xl p-4 text-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
-                <p className="text-sm font-bold" style={{ color: C.green }}>Anfrage gesendet!</p>
-                <p className="text-xs mt-1" style={{ color: C.sub }}>Wir melden uns innerhalb von 24 Stunden bei Ihnen.</p>
-              </div>
-            ) : !showFinanzierung ? (
-              <p className="text-xs" style={{ color: C.dim }}>
-                Lassen Sie sich ein unverbindliches Finanzierungsangebot für dieses Objekt erstellen.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Name</label>
-                    <input
-                      type="text"
-                      value={finanzForm.name}
-                      onChange={(e) => setFinanzForm((f) => ({ ...f, name: e.target.value }))}
-                      placeholder="Max Mustermann"
-                      className="w-full rounded-xl px-3 py-2 text-sm"
-                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>E-Mail</label>
-                    <input
-                      type="email"
-                      value={finanzForm.email}
-                      onChange={(e) => setFinanzForm((f) => ({ ...f, email: e.target.value }))}
-                      placeholder={user?.email || "email@beispiel.de"}
-                      className="w-full rounded-xl px-3 py-2 text-sm"
-                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon (optional)</label>
-                  <input
-                    type="tel"
-                    value={finanzForm.phone}
-                    onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))}
-                    placeholder="+49 170 1234567"
-                    className="w-full rounded-xl px-3 py-2 text-sm"
-                    style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht (optional)</label>
-                  <textarea
-                    value={finanzForm.message}
-                    onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))}
-                    placeholder="Besondere Wünsche oder Fragen..."
-                    rows={2}
-                    className="w-full rounded-xl px-3 py-2 text-sm resize-none"
-                    style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowFinanzierung(false)}
-                    className="rounded-xl px-4 py-2 text-xs font-semibold"
-                    style={{ border: `1px solid ${C.border}`, color: C.sub }}
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    onClick={handleFinanzierung}
-                    disabled={finanzSending || !finanzForm.name}
-                    className="flex-1 rounded-xl px-4 py-2 text-xs font-bold transition-all disabled:opacity-40"
-                    style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})`, color: "#fff" }}
-                  >
-                    {finanzSending ? "Wird gesendet..." : "Unverbindlich anfragen"}
-                  </button>
-                </div>
-              </div>
-            )}
-          </Card>
-        </ProContent>
-
-        {/* ── Save Choice Section ── */}
-        {isPro ? (
-          <div className="space-y-4">
-            <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              {/* Portfolio Card */}
-              <button
-                onClick={handleSavePortfolio}
-                disabled={saving || saveChoice !== "none"}
-                className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
-                style={{
-                  background: saveChoice === "portfolio" ? C.greenDim : C.surface2,
-                  border: `1px solid ${saveChoice === "portfolio" ? C.greenBorder : C.border}`,
-                  cursor: saveChoice !== "none" ? "default" : "pointer",
-                }}
-              >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
-                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                    <polyline points="9 22 9 12 15 12 15 22" />
-                  </svg>
-                </div>
-                <p className="text-sm font-bold mb-0.5" style={{ color: saveChoice === "portfolio" ? C.green : C.text }}>
-                  {saveChoice === "portfolio" ? "Im Portfolio gespeichert" : "Im Portfolio speichern"}
-                </p>
-                <p className="text-xs mb-2" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
-                <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
-                  Speichern Sie sie in Ihrem Portfolio für Trends, Wertentwicklung und Empfehlungen.
-                </p>
-              </button>
-
-              {/* Compare Card */}
-              <button
-                onClick={handleSaveCompare}
-                disabled={saving || saveChoice !== "none"}
-                className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
-                style={{
-                  background: saveChoice === "compare" ? C.greenDim : C.surface2,
-                  border: `1px solid ${saveChoice === "compare" ? C.greenBorder : C.border}`,
-                  cursor: saveChoice !== "none" ? "default" : "pointer",
-                }}
-              >
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: `linear-gradient(135deg, rgba(76,154,255,0.12), ${C.accentDim})` }}>
-                  <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="2" y="3" width="8" height="18" rx="1" />
-                    <rect x="14" y="3" width="8" height="18" rx="1" />
-                  </svg>
-                </div>
-                <p className="text-sm font-bold mb-0.5" style={{ color: saveChoice === "compare" ? C.green : C.text }}>
-                  {saveChoice === "compare" ? "Im Vergleich gespeichert" : "Im Vergleich speichern"}
-                </p>
-                <p className="text-xs mb-2" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
-                <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
-                  Speichern Sie sie für den direkten Vergleich mit anderen Objekten.
-                </p>
-              </button>
-            </div>
-
-            {/* Save Recommendation */}
-            <AIComment variant={result.totalScore >= 75 ? "good" : result.totalScore >= 60 ? "info" : result.totalScore >= 40 ? "warn" : "bad"}>
-              {result.totalScore >= 75
-                ? "Empfehlung: Objekt favorisieren und Finanzierung prüfen."
-                : result.totalScore >= 60
-                  ? "Empfehlung: Speichern und mit anderen Objekten vergleichen."
-                  : result.totalScore >= 40
-                    ? "Empfehlung: Nur bei Verhandlungsspielraum weiterverfolgen."
-                    : "Empfehlung: Andere Objekte bieten ein besseres Rendite-Risiko-Profil."}
-            </AIComment>
-
-            {/* Navigation after save */}
-            {saveChoice !== "none" && (
-              <div className="flex gap-3 animate-fade-up">
-                <button
-                  onClick={() => router.push(saveChoice === "portfolio" ? "/portfolio" : "/compare")}
-                  className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all"
-                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-                >
-                  {saveChoice === "portfolio" ? "Zum Portfolio" : "Zum Vergleich"}
-                </button>
-                <button onClick={reset} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
-                  Neue Analyse
-                </button>
-              </div>
-            )}
           </div>
         ) : (
-          /* FREE USER: blurred save choice */
-          <ProContent
-            fallbackTitle="Immobilien speichern"
-            fallbackDesc="Pro für 9,99 €/Monat — Immobilien speichern und vergleichen"
-          >
-            <div className="space-y-4">
+          <>
+            {/* Subscore Cards */}
+            <div className="space-y-2">
+              <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>
+              {result.subscores.map((sub) => {
+                const isExpanded = expanded === sub.key;
+                return (
+                  <Card key={sub.key} className="overflow-hidden" hover onClick={() => setExpanded(isExpanded ? null : sub.key)}>
+                    <div className="flex items-center gap-4 p-4">
+                      <MiniRing value={sub.value} size={40} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold">{sub.label}</span>
+                          <span className="text-[11px] rounded-full px-2 py-0.5" style={{ background: C.surface3, color: C.dim }}>{sub.weight} %</span>
+                        </div>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
+                      </div>
+                      <svg width={16} height={16} viewBox="0 0 16 16" className={`transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} style={{ color: C.dim }}>
+                        <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                      </svg>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="grid md:grid-cols-2 gap-4 px-4 pb-4 border-t animate-fade-up" style={{ borderColor: C.border }}>
+                        <div className="pt-4 space-y-2">
+                          <h4 className="text-xs font-bold" style={{ color: C.blue }}>Warum dieser Wert?</h4>
+                          <ul className="space-y-1.5">
+                            {sub.reasons.map((r, i) => (
+                              <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                                <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.blue }} />
+                                {r}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                        <div className="pt-4 space-y-2">
+                          <h4 className="text-xs font-bold" style={{ color: C.green }}>Empfehlung</h4>
+                          <ul className="space-y-1.5">
+                            {sub.actions.map((a, i) => (
+                              <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                                <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
+                                {a}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Stärken + Risiken */}
+            <div className="grid md:grid-cols-2 gap-5 mt-6">
+              <Card className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
+                  <h3 className="text-sm font-bold">Stärken</h3>
+                </div>
+                <ul className="space-y-2">
+                  {result.strengths.map((s, i) => (
+                    <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                      <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.green }} />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+              <Card className="p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
+                  <h3 className="text-sm font-bold">Risiken</h3>
+                </div>
+                <ul className="space-y-2">
+                  {result.risks.map((r, i) => (
+                    <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                      <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.amber }} />
+                      {r}
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </div>
+
+            {/* ── Verhandlungsguide ── */}
+            <Card className="p-5 space-y-4 mt-6">
+              <div className="flex items-center gap-2">
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z" />
+                </svg>
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Verhandlungsguide</h3>
+              </div>
+              <p className="text-xs" style={{ color: C.dim }}>
+                Basierend auf Ihren Analysedaten — nutzen Sie diese Argumente in der Preisverhandlung:
+              </p>
+              <ul className="space-y-2">
+                {verhandlungsTipps.map((tip, i) => (
+                  <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                    <span className="mt-0.5 shrink-0 font-bold" style={{ color: C.accent }}>{i + 1}.</span>
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+
+            {/* ── Finanzierungsanfrage ── */}
+            <Card className="p-5 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round">
+                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+                  </svg>
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
+                </div>
+                {!showFinanzierung && !finanzSent && (
+                  <button
+                    onClick={() => setShowFinanzierung(true)}
+                    className="rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:opacity-90"
+                    style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                  >
+                    Anfrage starten
+                  </button>
+                )}
+              </div>
+
+              {finanzSent ? (
+                <div className="rounded-xl p-4 text-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
+                  <p className="text-sm font-bold" style={{ color: C.green }}>Anfrage gesendet!</p>
+                  <p className="text-xs mt-1" style={{ color: C.sub }}>Wir melden uns innerhalb von 24 Stunden bei Ihnen.</p>
+                </div>
+              ) : !showFinanzierung ? (
+                <p className="text-xs" style={{ color: C.dim }}>
+                  Lassen Sie sich ein unverbindliches Finanzierungsangebot für dieses Objekt erstellen.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Name</label>
+                      <input
+                        type="text"
+                        value={finanzForm.name}
+                        onChange={(e) => setFinanzForm((f) => ({ ...f, name: e.target.value }))}
+                        placeholder="Max Mustermann"
+                        className="w-full rounded-xl px-3 py-2 text-sm"
+                        style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>E-Mail</label>
+                      <input
+                        type="email"
+                        value={finanzForm.email}
+                        onChange={(e) => setFinanzForm((f) => ({ ...f, email: e.target.value }))}
+                        placeholder={user?.email || "email@beispiel.de"}
+                        className="w-full rounded-xl px-3 py-2 text-sm"
+                        style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon (optional)</label>
+                    <input
+                      type="tel"
+                      value={finanzForm.phone}
+                      onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))}
+                      placeholder="+49 170 1234567"
+                      className="w-full rounded-xl px-3 py-2 text-sm"
+                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht (optional)</label>
+                    <textarea
+                      value={finanzForm.message}
+                      onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))}
+                      placeholder="Besondere Wünsche oder Fragen..."
+                      rows={2}
+                      className="w-full rounded-xl px-3 py-2 text-sm resize-none"
+                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setShowFinanzierung(false)}
+                      className="rounded-xl px-4 py-2 text-xs font-semibold"
+                      style={{ border: `1px solid ${C.border}`, color: C.sub }}
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      onClick={handleFinanzierung}
+                      disabled={finanzSending || !finanzForm.name}
+                      className="flex-1 rounded-xl px-4 py-2 text-xs font-bold transition-all disabled:opacity-40"
+                      style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})`, color: "#fff" }}
+                    >
+                      {finanzSending ? "Wird gesendet..." : "Unverbindlich anfragen"}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Card>
+
+            {/* ── Save Choice Section (PRO only) ── */}
+            <div className="border-t pt-6 mt-6 space-y-4" style={{ borderColor: C.border }}>
               <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
               <div className="grid md:grid-cols-2 gap-4">
-                <div className="rounded-2xl p-5" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: C.accentDim }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
+                {/* Portfolio Card */}
+                <button
+                  onClick={handleSavePortfolio}
+                  disabled={saving || saveChoice !== "none"}
+                  className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
+                  style={{
+                    background: saveChoice === "portfolio" ? C.greenDim : C.surface2,
+                    border: `1px solid ${saveChoice === "portfolio" ? C.greenBorder : C.border}`,
+                    cursor: saveChoice !== "none" ? "default" : "pointer",
+                  }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
+                      {saveChoice === "portfolio" ? (
+                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                          <polyline points="9 22 9 12 15 12 15 22" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: saveChoice === "portfolio" ? C.green : C.text }}>
+                        {saveChoice === "portfolio" ? "Im Portfolio gespeichert" : "Meine Immobilie"}
+                      </p>
+                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-bold" style={{ color: C.text }}>Im Portfolio speichern</p>
-                  <p className="text-xs mt-1" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
-                </div>
-                <div className="rounded-2xl p-5" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
-                  <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3" style={{ background: "rgba(76,154,255,0.12)" }}>
-                    <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2"><rect x="2" y="3" width="8" height="18" rx="1" /><rect x="14" y="3" width="8" height="18" rx="1" /></svg>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                    Speichern Sie sie in Ihrem Portfolio für Trends, Wertentwicklung und Empfehlungen.
+                  </p>
+                </button>
+
+                {/* Compare Card */}
+                <button
+                  onClick={handleSaveCompare}
+                  disabled={saving || saveChoice !== "none"}
+                  className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
+                  style={{
+                    background: saveChoice === "compare" ? C.greenDim : C.surface2,
+                    border: `1px solid ${saveChoice === "compare" ? C.greenBorder : C.border}`,
+                    cursor: saveChoice !== "none" ? "default" : "pointer",
+                  }}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(76,154,255,0.12), ${C.accentDim})` }}>
+                      {saveChoice === "compare" ? (
+                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <rect x="2" y="3" width="8" height="18" rx="1" />
+                          <rect x="14" y="3" width="8" height="18" rx="1" />
+                        </svg>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold" style={{ color: saveChoice === "compare" ? C.green : C.text }}>
+                        {saveChoice === "compare" ? "Im Vergleich gespeichert" : "Zum Vergleich"}
+                      </p>
+                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
+                    </div>
                   </div>
-                  <p className="text-sm font-bold" style={{ color: C.text }}>Im Vergleich speichern</p>
-                  <p className="text-xs mt-1" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
-                </div>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
+                    Speichern Sie sie für den direkten Vergleich mit anderen Objekten.
+                  </p>
+                </button>
               </div>
+
+              {/* KI-Empfehlung */}
+              <AIComment variant={result.totalScore >= 75 ? "good" : result.totalScore >= 60 ? "info" : result.totalScore >= 40 ? "warn" : "bad"}>
+                {result.totalScore >= 75
+                  ? "Klare Kaufempfehlung. Objekt favorisieren und Finanzierung prüfen."
+                  : result.totalScore >= 60
+                    ? "Solides Objekt. Speichern und mit anderen Objekten vergleichen."
+                    : result.totalScore >= 40
+                      ? "Erhöhte Vorsicht. Nur bei Verhandlungsspielraum weiterverfolgen."
+                      : "Andere Objekte bieten ein besseres Rendite-Risiko-Profil."}
+              </AIComment>
+
+              {/* Navigation after save */}
+              {saveChoice !== "none" && (
+                <div className="flex gap-3 animate-fade-up">
+                  <button
+                    onClick={() => router.push(saveChoice === "portfolio" ? "/portfolio" : "/compare")}
+                    className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all"
+                    style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                  >
+                    {saveChoice === "portfolio" ? "Zum Portfolio" : "Zum Vergleich"}
+                  </button>
+                  <button onClick={reset} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
+                    Neue Analyse
+                  </button>
+                </div>
+              )}
             </div>
-          </ProContent>
+          </>
         )}
       </div>
     );

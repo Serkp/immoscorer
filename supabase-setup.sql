@@ -72,12 +72,19 @@ CREATE TABLE IF NOT EXISTS financing_leads (
   contact_email text,
   contact_phone text,
   message text,
+  source text DEFAULT 'analysis',
   status text DEFAULT 'new',
   created_at timestamptz DEFAULT now()
 );
+-- Add source column if table already exists
+ALTER TABLE financing_leads ADD COLUMN IF NOT EXISTS source text DEFAULT 'analysis';
+
 ALTER TABLE financing_leads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own financing leads" ON financing_leads;
-CREATE POLICY "Users manage own financing leads" ON financing_leads FOR ALL USING (auth.uid() = user_id);
+DROP POLICY IF EXISTS "Users insert own financing leads" ON financing_leads;
+DROP POLICY IF EXISTS "Users read own financing leads" ON financing_leads;
+CREATE POLICY "Users insert own financing leads" ON financing_leads FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users read own financing leads" ON financing_leads FOR SELECT USING (auth.uid() = user_id);
 
 -- ── Strategies ──
 CREATE TABLE IF NOT EXISTS strategies (
@@ -95,3 +102,9 @@ CREATE POLICY "Users manage own strategies" ON strategies FOR ALL USING (auth.ui
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users read own subscription" ON subscriptions;
 CREATE POLICY "Users read own subscription" ON subscriptions FOR SELECT USING (auth.uid() = user_id);
+
+-- ============================================================
+-- Setup abgeschlossen.
+-- Dieses Script kann jederzeit erneut ausgeführt werden.
+-- ============================================================
+DO $$ BEGIN RAISE NOTICE 'ImmoScorer Setup abgeschlossen — alle Tabellen und Policies sind aktuell.'; END $$;
