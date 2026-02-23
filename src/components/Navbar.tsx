@@ -2,10 +2,11 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
 const NAV = [
@@ -18,12 +19,12 @@ const NAV = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
   const { user, signOut } = useAuth();
   const { isPro } = useSubscription();
   const [menuOpen, setMenuOpen] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const displayName =
@@ -47,7 +48,7 @@ export function Navbar() {
 
   async function handleCheckout() {
     if (!user) {
-      router.push("/analysis");
+      setShowAuthModal(true);
       return;
     }
     setCheckoutLoading(true);
@@ -153,6 +154,13 @@ export function Navbar() {
             {checkoutLoading ? "..." : user ? "Upgrade" : "Anmelden"}
           </button>
         )}
+
+        {/* Auth Modal for Anmelden */}
+        <AuthModal
+          open={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setShowAuthModal(false)}
+        />
 
         {/* Avatar + Dropdown (only when logged in) */}
         {user ? (

@@ -84,12 +84,12 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           <div>
             <h2 className="text-lg font-bold" style={{ color: C.text }}>
               {mode === "register"
-                ? "Kostenloses Konto erstellen"
+                ? "Kostenlos registrieren"
                 : "Willkommen zurück"}
             </h2>
             <p className="text-xs mt-1" style={{ color: C.sub }}>
               {mode === "register"
-                ? "Ihr Score wurde berechnet. Registrieren Sie sich um das Ergebnis zu sehen."
+                ? "um Ihre Analyse zu sehen"
                 : "Melden Sie sich an um Ihre Analyse zu sehen."}
             </p>
           </div>
@@ -190,7 +190,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
             style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
-            {loading ? "..." : mode === "login" ? "Anmelden" : "Konto erstellen"}
+            {loading ? "..." : mode === "login" ? "Anmelden & Analyse sehen" : "Registrieren & Analyse sehen"}
           </button>
         </form>
 
