@@ -7,9 +7,7 @@ import { Card } from "@/components/ui/Card";
 import { MiniRing } from "@/components/ui/ScoreRing";
 import { AIComment } from "@/components/ui/AIComment";
 import { PropertyCard } from "@/components/PropertyCard";
-import { UpgradeBox } from "@/components/UpgradeBox";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useSubscription } from "@/hooks/useSubscription";
 import { getAnalyses, deleteAnalysis, toggleAnalysisFavorite } from "@/lib/db";
 import { C } from "@/lib/theme";
 
@@ -23,7 +21,6 @@ interface SavedAnalysis {
 
 export default function ComparePage() {
   const { user } = useAuth();
-  const { isPro, loading: subLoading } = useSubscription();
   const [analyses, setAnalyses] = useState<SavedAnalysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "favorites">("all");
@@ -34,8 +31,7 @@ export default function ComparePage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || subLoading) return;
-    if (!isPro) { setLoading(false); return; }
+    if (!user) { setLoading(false); return; }
     async function load() {
       try {
         const data = await getAnalyses(user!.id, { status: "saved", saveType: "comparison" });
@@ -44,7 +40,7 @@ export default function ComparePage() {
       finally { setLoading(false); }
     }
     load();
-  }, [user, isPro, subLoading]);
+  }, [user]);
 
   function getInput(a: SavedAnalysis) {
     return a.inputs as { street?: string; city?: string; price?: number; rent?: number; area?: number; locationGrade?: string; energyClass?: string; hausgeld?: number; year?: number; renovations?: string[] };
@@ -111,17 +107,8 @@ export default function ComparePage() {
     });
   }, [picks]);
 
-  if (loading || subLoading) {
+  if (loading) {
     return <div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>;
-  }
-
-  if (!isPro) {
-    return (
-      <div className="mx-auto max-w-[700px] py-12 space-y-6">
-        <h1 className="text-xl font-bold" style={{ color: C.text }}>Immobilien vergleichen</h1>
-        <UpgradeBox />
-      </div>
-    );
   }
 
   // Comparison view

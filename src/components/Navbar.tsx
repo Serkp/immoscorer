@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useSubscription } from "@/hooks/useSubscription";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
@@ -20,10 +19,7 @@ const NAV = [
 export function Navbar() {
   const pathname = usePathname();
   const { user, signOut } = useAuth();
-  const { isPro } = useSubscription();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -45,45 +41,6 @@ export function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  async function handleCheckout() {
-    if (!user) {
-      setShowAuthModal(true);
-      return;
-    }
-    setCheckoutLoading(true);
-    try {
-      const res = await fetch("/api/stripe/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, email: user.email }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      // silent
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
-
-  async function handlePortal() {
-    if (!user) return;
-    setPortalLoading(true);
-    try {
-      const res = await fetch("/api/stripe/portal", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id }),
-      });
-      const data = await res.json();
-      if (data.url) window.location.href = data.url;
-    } catch {
-      // Silently fail
-    } finally {
-      setPortalLoading(false);
-    }
-  }
 
   return (
     <nav
@@ -128,34 +85,22 @@ export function Navbar() {
         {/* Spacer */}
         <div className="flex-1" />
 
-        {/* PRO pill or Upgrade button */}
-        {isPro ? (
-          <span
-            className="rounded-full px-2.5 py-0.5 text-[11px] font-bold tracking-wide"
-            style={{
-              background: C.greenDim,
-              color: C.green,
-              border: `1px solid ${C.greenBorder}`,
-            }}
-          >
-            PRO
-          </span>
-        ) : (
+        {/* Anmelden button (only when not logged in) */}
+        {!user && (
           <button
-            onClick={handleCheckout}
-            disabled={checkoutLoading}
-            className="rounded-full px-3 py-1 text-[11px] font-bold tracking-wide transition-all hover:opacity-80 disabled:opacity-50"
+            onClick={() => setShowAuthModal(true)}
+            className="rounded-full px-3 py-1 text-[11px] font-bold tracking-wide transition-all hover:opacity-80"
             style={{
               background: C.accentDim,
               color: C.accent,
               border: "1px solid rgba(124,106,255,0.3)",
             }}
           >
-            {checkoutLoading ? "..." : user ? "Upgrade" : "Anmelden"}
+            Anmelden
           </button>
         )}
 
-        {/* Auth Modal for Anmelden */}
+        {/* Auth Modal */}
         <AuthModal
           open={showAuthModal}
           onClose={() => setShowAuthModal(false)}
@@ -194,25 +139,6 @@ export function Navbar() {
                     {user?.email}
                   </p>
                 </div>
-
-                {isPro ? (
-                  <button
-                    onClick={handlePortal}
-                    disabled={portalLoading}
-                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80 disabled:opacity-40"
-                    style={{ color: C.sub }}
-                  >
-                    {portalLoading ? "..." : "Abo verwalten"}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleCheckout}
-                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80"
-                    style={{ color: C.accent }}
-                  >
-                    Upgrade auf Pro
-                  </button>
-                )}
 
                 <div className="mx-3 h-px" style={{ background: C.border }} />
 

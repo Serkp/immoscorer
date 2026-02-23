@@ -4,8 +4,6 @@ import { useState } from "react";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
 import { AIComment } from "@/components/ui/AIComment";
-import { useSubscription } from "@/hooks/useSubscription";
-import { UpgradeBox } from "@/components/UpgradeBox";
 import { C } from "@/lib/theme";
 import Link from "next/link";
 
@@ -188,7 +186,6 @@ function computeStrategy(answers: Record<string, string>): StrategyResult {
 }
 
 export default function StrategiesPage() {
-  const { isPro, loading: subLoading } = useSubscription();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [result, setResult] = useState<StrategyResult | null>(null);
@@ -208,14 +205,6 @@ export default function StrategiesPage() {
     setStep(0);
     setAnswers({});
     setResult(null);
-  }
-
-  if (subLoading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <AIOrb size={48} active />
-      </div>
-    );
   }
 
   // Show result
@@ -313,17 +302,6 @@ export default function StrategiesPage() {
         </div>
       </div>
     );
-
-    if (!isPro) {
-      return (
-        <div className="mx-auto max-w-[800px] space-y-6">
-          <UpgradeBox />
-          <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
-            {content}
-          </div>
-        </div>
-      );
-    }
 
     return content;
   }

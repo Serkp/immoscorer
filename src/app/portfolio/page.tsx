@@ -6,9 +6,7 @@ import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
 import { MiniRing } from "@/components/ui/ScoreRing";
 import { PropertyCard } from "@/components/PropertyCard";
-import { UpgradeBox } from "@/components/UpgradeBox";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useSubscription } from "@/hooks/useSubscription";
 import { getPortfolioProperties, deletePortfolioProperty, togglePortfolioFavorite } from "@/lib/db";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 
@@ -35,7 +33,6 @@ interface PortfolioProp {
 
 export default function PortfolioPage() {
   const { user } = useAuth();
-  const { isPro, loading: subLoading } = useSubscription();
   const [properties, setProperties] = useState<PortfolioProp[]>([]);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<PortfolioProp | null>(null);
@@ -45,8 +42,7 @@ export default function PortfolioPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || subLoading) return;
-    if (!isPro) { setLoading(false); return; }
+    if (!user) { setLoading(false); return; }
     async function load() {
       try {
         const data = await getPortfolioProperties(user!.id);
@@ -55,7 +51,7 @@ export default function PortfolioPage() {
       finally { setLoading(false); }
     }
     load();
-  }, [user, isPro, subLoading]);
+  }, [user]);
 
   async function handleToggleFav(id: string, current: boolean) {
     try {
@@ -77,19 +73,10 @@ export default function PortfolioPage() {
     } catch { /* silent */ }
   }
 
-  if (loading || subLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
         <AIOrb size={48} active />
-      </div>
-    );
-  }
-
-  if (!isPro) {
-    return (
-      <div className="mx-auto max-w-[700px] py-12 space-y-6">
-        <h1 className="text-xl font-bold" style={{ color: C.text }}>Portfolio</h1>
-        <UpgradeBox />
       </div>
     );
   }
