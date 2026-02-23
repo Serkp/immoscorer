@@ -80,12 +80,12 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         }
       }
 
-      // Small delay to let onAuthStateChange propagate to AuthProvider
-      console.log("[AuthModal] Auth success, waiting for state propagation...");
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      console.log("[AuthModal] Calling onSuccess");
+      // Auth success — close modal, then reload to pick up auth cookie
+      console.log("[AuthModal] Auth success, closing modal and reloading page");
       setLoading(false);
-      onSuccess();
+      onSuccess?.();
+      // Full page reload on same path so auth-state is read from cookie
+      window.location.href = window.location.pathname;
     } catch (err: unknown) {
       console.error("[AuthModal] Unexpected error:", err);
       const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
