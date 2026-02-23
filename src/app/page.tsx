@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { AIOrb } from "@/components/ui/AIOrb";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
 /* ════════════════════════════════════════════
@@ -394,8 +396,17 @@ function MiniRechner() {
    ════════════════════════════════════════════ */
 
 export default function LandingPage() {
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
   return (
+    <AuthProvider>
     <div style={{ background: C.bg, minHeight: "100vh" }}>
+      {/* Auth Modal */}
+      <AuthModal
+        open={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        onSuccess={() => setShowAuthModal(false)}
+      />
       {/* ── Ambient Background ── */}
       <div
         style={{
@@ -469,8 +480,8 @@ export default function LandingPage() {
               >
                 Preise
               </button>
-              <Link
-                href="/analysis"
+              <button
+                onClick={() => setShowAuthModal(true)}
                 className="hidden sm:inline-block text-sm font-semibold px-4 py-2 rounded-xl transition-all"
                 style={{ border: `1px solid ${C.border}`, color: C.text }}
                 onMouseEnter={(e) =>
@@ -481,7 +492,7 @@ export default function LandingPage() {
                 }
               >
                 Anmelden
-              </Link>
+              </button>
               <Link
                 href="/analysis"
                 className="text-sm font-bold px-4 py-2 rounded-xl transition-all"
@@ -1179,5 +1190,6 @@ export default function LandingPage() {
         </footer>
       </div>
     </div>
+    </AuthProvider>
   );
 }
