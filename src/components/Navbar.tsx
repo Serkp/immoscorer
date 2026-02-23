@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
@@ -18,6 +18,7 @@ const NAV = [
 
 export function Navbar() {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -104,7 +105,7 @@ export function Navbar() {
         <AuthModal
           open={showAuthModal}
           onClose={() => setShowAuthModal(false)}
-          onSuccess={() => setShowAuthModal(false)}
+          onSuccess={() => { setShowAuthModal(false); router.refresh(); }}
         />
 
         {/* Avatar + Dropdown (only when logged in) */}
