@@ -372,7 +372,7 @@ function MiniRechner() {
             Vollständige Analyse starten &rarr;
           </Link>
           <p className="text-center text-[11px] mt-2" style={{ color: C.dim }}>
-            Kostenlos &middot; kein Account nötig
+            Unbegrenzt kostenlos &middot; kein Account nötig
           </p>
         </div>
       ) : (
@@ -566,7 +566,7 @@ export default function LandingPage() {
                     Kostenlos starten
                   </Link>
                   <span className="text-xs" style={{ color: C.dim }}>
-                    3 Analysen gratis &middot; kein Abo
+                    Unbegrenzt &middot; kein Abo nötig
                   </span>
                 </div>
               </div>
@@ -911,9 +911,9 @@ export default function LandingPage() {
 
                   <div className="space-y-3 mb-8 flex-1">
                     {[
-                      "3 vollständige Analysen",
-                      "6 Teilscores mit Begründung",
-                      "Strategische Empfehlungen",
+                      "Unbegrenzte Schnell-Analysen",
+                      "Gesamtscore + KI-Empfehlung",
+                      "Automatische Lage-Analyse",
                       "Schnell-Check ohne Account",
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-2.5">
@@ -924,12 +924,11 @@ export default function LandingPage() {
                       </div>
                     ))}
                     {[
-                      "Unbegrenzte Analysen",
-                      "Portfolio & Favoriten",
-                      "Immobilien-Vergleich",
-                      "Automatische Lage-Analyse",
-                      "Trends & Marktdaten",
-                      "KI-Exposé-Analyse",
+                      "Detaillierte Teilscores",
+                      "Verhandlungsguide",
+                      "Finanzierungsanfrage",
+                      "Portfolio & Vergleich",
+                      "Strategie-Finder",
                     ].map((f) => (
                       <div key={f} className="flex items-center gap-2.5">
                         {Icons.x}
@@ -1003,14 +1002,14 @@ export default function LandingPage() {
 
                   <div className="space-y-3 mb-8 flex-1">
                     {[
-                      "Unbegrenzte Analysen",
+                      "Alles aus Free",
                       "6 Teilscores mit Begründung",
-                      "Strategische Empfehlungen",
-                      "Automatische Lage-Analyse",
+                      "Verhandlungsguide",
+                      "Finanzierungsanfrage",
                       "Portfolio & Favoriten",
                       "Immobilien-Vergleich",
-                      "Finanzierbarkeits-Check",
-                      "Strategien & Wissensbereich",
+                      "Strategie-Finder",
+                      "Wissensbereich",
                       "Trends & Marktdaten (bald)",
                       "KI-Exposé-Analyse (bald)",
                     ].map((f) => (
@@ -1031,7 +1030,7 @@ export default function LandingPage() {
                       color: "#fff",
                     }}
                   >
-                    3x kostenlos testen, dann upgraden
+                    Jetzt Pro freischalten
                   </Link>
                   <p
                     className="text-center text-[11px] mt-2.5"
@@ -1071,8 +1070,8 @@ export default function LandingPage() {
                     a: "Nein. Jeder Score wird klar erklärt. Für Einsteiger gebaut, von Profis genutzt.",
                   },
                   {
-                    q: "Was passiert nach den 3 kostenlosen Analysen?",
-                    a: "Schnell-Check bleibt kostenlos. Vollanalysen, Portfolio und Vergleich brauchen Pro für 9,99 €/Monat.",
+                    q: "Was ist bei Free enthalten?",
+                    a: "Unbegrenzte Analysen mit Gesamtscore und KI-Empfehlung. Detaillierte Teilscores, Verhandlungsguide, Portfolio und Vergleich sind Pro-Features für 9,99 €/Monat.",
                   },
                   {
                     q: "Kann ich jederzeit kündigen?",
@@ -1118,7 +1117,7 @@ export default function LandingPage() {
                 Ihre nächste Immobilie verdient eine fundierte Analyse.
               </h2>
               <p className="text-sm mb-8" style={{ color: C.sub }}>
-                3 Analysen kostenlos. In 10 Sekunden wissen ob sich&apos;s
+                Kostenlos und unbegrenzt. In 10 Sekunden wissen ob sich&apos;s
                 lohnt.
               </p>
               <Link

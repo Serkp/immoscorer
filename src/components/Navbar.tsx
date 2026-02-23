@@ -10,7 +10,7 @@ import { C } from "@/lib/theme";
 
 const NAV = [
   { href: "/analysis", label: "Analyse" },
-  { href: "/properties", label: "Immobilien" },
+  { href: "/portfolio", label: "Portfolio" },
   { href: "/compare", label: "Vergleich" },
   { href: "/strategies", label: "Strategien" },
   { href: "/guide", label: "Wissen" },

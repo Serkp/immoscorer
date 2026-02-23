@@ -7,9 +7,9 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { C } from "@/lib/theme";
 
 const FEATURES = [
-  "Unbegrenzte Immobilien-Analysen",
-  "Portfolio & Vergleichstools",
-  "KI-gestützte Empfehlungen",
+  "Detaillierte Teilscores & Verhandlungsguide",
+  "Portfolio, Vergleich & Strategie-Finder",
+  "Finanzierungsanfrage & KI-Empfehlungen",
 ] as const;
 
 export function Paywall() {
@@ -43,11 +43,11 @@ export function Paywall() {
       <div className="flex flex-col items-center gap-4">
         <AIOrb size={48} active />
         <h2 className="text-xl font-bold text-center" style={{ color: C.text }}>
-          Ihre 3 kostenlosen Analysen wurden verwendet
+          PRO-Funktionen freischalten
         </h2>
         <p className="text-sm text-center leading-relaxed" style={{ color: C.sub }}>
-          Schalten Sie alle Funktionen frei — unbegrenzte Analysen, Portfolio-Verwaltung,
-          Vergleichstools und strategische Empfehlungen.
+          Schalten Sie alle Funktionen frei — Teilscores, Verhandlungsguide,
+          Portfolio, Vergleich und Strategie-Finder.
         </p>
       </div>
 

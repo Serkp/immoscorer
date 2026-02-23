@@ -9,14 +9,14 @@ import { AIComment } from "@/components/ui/AIComment";
 import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
-import { Paywall } from "@/components/Paywall";
+import { ProContent } from "@/components/ProContent";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { PlaceResult } from "@/components/AddressAutocomplete";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { savePropertyDB, saveAnalysisDB, countAnalyses } from "@/lib/db";
+import { savePropertyDB, saveAnalysisDB } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -72,7 +72,7 @@ export default function AnalysisPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { isPro, loading: subLoading, refresh: refreshSub } = useSubscription();
+  const { loading: subLoading, refresh: refreshSub } = useSubscription();
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -88,10 +88,10 @@ export default function AnalysisPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [toast, setToast] = useState<{ text: string; type: "success" | "neutral" } | null>(null);
-
-  /* ── Paywall state ── */
-  const [paywallCheck, setPaywallCheck] = useState(true);
-  const [showPaywall, setShowPaywall] = useState(false);
+  const [showFinanzierung, setShowFinanzierung] = useState(false);
+  const [finanzForm, setFinanzForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const [finanzSending, setFinanzSending] = useState(false);
+  const [finanzSent, setFinanzSent] = useState(false);
 
   /* ── Checkout success/cancel handling ── */
   useEffect(() => {
@@ -107,28 +107,6 @@ export default function AnalysisPage() {
       window.history.replaceState({}, "", "/analysis");
     }
   }, [searchParams, refreshSub]);
-
-  useEffect(() => {
-    if (!user || subLoading) return;
-    if (isPro) {
-      setPaywallCheck(false);
-      setShowPaywall(false);
-      return;
-    }
-    async function check() {
-      try {
-        const count = await countAnalyses(user!.id);
-        if (count >= 3) {
-          setShowPaywall(true);
-        }
-      } catch {
-        // On error, allow access
-      } finally {
-        setPaywallCheck(false);
-      }
-    }
-    check();
-  }, [user, isPro, subLoading]);
 
   const set = useCallback((key: keyof FormData, val: string) => {
     setForm((f) => ({ ...f, [key]: val }));
@@ -195,7 +173,6 @@ export default function AnalysisPage() {
 
     if (place.lat && place.lng) {
       setLat(place.lat);
-      // Automatisch Lage-Analyse starten
       analyzeLocation(place.lat, place.lng, place.city);
     } else {
       setLat(null);
@@ -284,6 +261,32 @@ export default function AnalysisPage() {
     }
   }
 
+  async function handleFinanzierung() {
+    if (!user || !result || finanzSending) return;
+    setFinanzSending(true);
+    try {
+      await fetch("/api/financing/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          property: `${form.street}, ${form.city}`,
+          price: Number(form.price),
+          score: result.totalScore,
+          name: finanzForm.name,
+          email: finanzForm.email || user.email,
+          phone: finanzForm.phone,
+          message: finanzForm.message,
+        }),
+      });
+      setFinanzSent(true);
+    } catch {
+      // silent
+    } finally {
+      setFinanzSending(false);
+    }
+  }
+
   function reset() {
     setForm(INIT);
     setSection(0);
@@ -295,20 +298,18 @@ export default function AnalysisPage() {
     setExpanded(null);
     setSaved(false);
     setSaveMsg(null);
+    setShowFinanzierung(false);
+    setFinanzSent(false);
+    setFinanzForm({ name: "", email: "", phone: "", message: "" });
   }
 
-  /* ── Paywall check loading ── */
-  if (paywallCheck || subLoading) {
+  /* ── Loading ── */
+  if (subLoading) {
     return (
       <div className="flex items-center justify-center py-24">
         <AIOrb size={48} active />
       </div>
     );
-  }
-
-  /* ── Paywall ── */
-  if (showPaywall) {
-    return <Paywall />;
   }
 
   /* ── Global checkout toast ── */
@@ -343,6 +344,68 @@ export default function AnalysisPage() {
     if (grade === "B") return "rgba(76,154,255,0.2)";
     if (grade === "C") return C.amberBorder;
     return "rgba(248,113,113,0.2)";
+  }
+
+  /* ── Verhandlungsguide generator ── */
+  function getVerhandlungsTipps(sr: ScoringResult) {
+    const tipps: string[] = [];
+    const score = sr.totalScore;
+    const price = Number(form.price);
+    const rent = Number(form.rent);
+    const factor = price / (rent * 12);
+    const grossYield = ((rent * 12) / price) * 100;
+
+    if (factor > 25) {
+      tipps.push(`Der Kaufpreisfaktor liegt bei ${factor.toFixed(1)}x — argumentieren Sie mit dem Marktdurchschnitt von 20–22x für vergleichbare Objekte.`);
+    }
+    if (grossYield < 4) {
+      tipps.push(`Die Bruttorendite von ${grossYield.toFixed(1)} % liegt unter dem Marktdurchschnitt. Fordern Sie einen Preisnachlass von ${Math.round(price * 0.08).toLocaleString("de-DE")}–${Math.round(price * 0.12).toLocaleString("de-DE")} €.`);
+    }
+    if (form.renovations.length > 0) {
+      const renoCost = form.renovations.length * 15000;
+      tipps.push(`${form.renovations.length} Sanierungsgewerke identifiziert — geschätzte Kosten ca. ${renoCost.toLocaleString("de-DE")} €. Nutzen Sie dies als Verhandlungsbasis.`);
+    }
+    if (score < 50) {
+      tipps.push("Der Gesamtscore unter 50 signalisiert erhöhtes Risiko — verlangen Sie mindestens 10–15 % Preisnachlass oder zusätzliche Garantien.");
+    }
+    if (score >= 70) {
+      tipps.push("Starker Score — bei diesem Objekt haben Sie gute Chancen auf eine schnelle Bankzusage. Nutzen Sie das als Argument für schnellen Abschluss bei Preisnachlass.");
+    }
+    const energyIdx = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"].indexOf(form.energyClass);
+    if (energyIdx >= 5) {
+      tipps.push(`Energieklasse ${form.energyClass}: GEG-Nachrüstpflichten bei Eigentümerwechsel. Argumentieren Sie mit den anfallenden Sanierungskosten.`);
+    }
+    if (tipps.length === 0) {
+      tipps.push("Das Objekt zeigt insgesamt solide Kennzahlen. Verhandeln Sie dennoch — 3–5 % Preisnachlass sind im Markt üblich.");
+    }
+    return tipps;
+  }
+
+  /* ── KI-Empfehlung generator ── */
+  function getKIEmpfehlung(sr: ScoringResult): { text: string; variant: "good" | "info" | "warn" | "bad" } {
+    const score = sr.totalScore;
+    if (score >= 75) {
+      return {
+        text: `Klare Kaufempfehlung. Mit einem Score von ${score}/100 gehört dieses Objekt zu den Top-Investments. Sichern Sie sich zeitnah eine Finanzierungszusage und prüfen Sie Sondertilgungsoptionen.`,
+        variant: "good",
+      };
+    }
+    if (score >= 55) {
+      return {
+        text: `Solides Investment mit Optimierungspotenzial (${score}/100). Prüfen Sie die schwächeren Teilscores und verhandeln Sie gezielt auf Basis der identifizierten Schwächen.`,
+        variant: "info",
+      };
+    }
+    if (score >= 40) {
+      return {
+        text: `Erhöhte Vorsicht geboten (${score}/100). Mehrere Risikofaktoren identifiziert. Verhandeln Sie deutliche Preisabschläge oder prüfen Sie alternative Objekte.`,
+        variant: "warn",
+      };
+    }
+    return {
+      text: `Von diesem Investment wird abgeraten (${score}/100). Die Risiken überwiegen deutlich. Suchen Sie nach Objekten mit besserem Rendite-Risiko-Profil.`,
+      variant: "bad",
+    };
   }
 
   /* ══════════════════════════════════
@@ -611,6 +674,9 @@ export default function AnalysisPage() {
       fullMark: 100,
     }));
 
+    const kiEmpfehlung = getKIEmpfehlung(result);
+    const verhandlungsTipps = getVerhandlungsTipps(result);
+
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
         {/* Save Toast */}
@@ -657,7 +723,7 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        {/* Hero Row: 3 columns */}
+        {/* Hero Row: Score + Radar + KPIs (visible to all) */}
         <div className="grid lg:grid-cols-3 gap-5">
           {/* Score Ring */}
           <Card className="p-6 flex flex-col items-center justify-center" glow>
@@ -686,96 +752,226 @@ export default function AnalysisPage() {
           </div>
         </div>
 
-        {/* Subscore Cards */}
-        <div className="space-y-2">
-          <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>
-          {result.subscores.map((sub) => {
-            const isExpanded = expanded === sub.key;
-            return (
-              <Card key={sub.key} className="overflow-hidden" hover onClick={() => setExpanded(isExpanded ? null : sub.key)}>
-                <div className="flex items-center gap-4 p-4">
-                  <MiniRing value={sub.value} size={40} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold">{sub.label}</span>
-                      <span className="text-[11px] rounded-full px-2 py-0.5" style={{ background: C.surface3, color: C.dim }}>{sub.weight} %</span>
+        {/* KI-Empfehlung (visible to all) */}
+        <AIComment variant={kiEmpfehlung.variant}>
+          {kiEmpfehlung.text}
+        </AIComment>
+
+        {/* ── PRO-only sections: Teilscores, Verhandlungsguide, Finanzierung ── */}
+        <ProContent
+          fallbackTitle="Detailanalyse freischalten"
+          fallbackDesc="Teilscores, Verhandlungsguide und Finanzierungsanfrage sind PRO-Features."
+        >
+          {/* Subscore Cards */}
+          <div className="space-y-2">
+            <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>
+            {result.subscores.map((sub) => {
+              const isExpanded = expanded === sub.key;
+              return (
+                <Card key={sub.key} className="overflow-hidden" hover onClick={() => setExpanded(isExpanded ? null : sub.key)}>
+                  <div className="flex items-center gap-4 p-4">
+                    <MiniRing value={sub.value} size={40} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold">{sub.label}</span>
+                        <span className="text-[11px] rounded-full px-2 py-0.5" style={{ background: C.surface3, color: C.dim }}>{sub.weight} %</span>
+                      </div>
+                      <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
                     </div>
-                    <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
+                    <svg width={16} height={16} viewBox="0 0 16 16" className={`transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} style={{ color: C.dim }}>
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                    </svg>
                   </div>
-                  <svg width={16} height={16} viewBox="0 0 16 16" className={`transition-transform shrink-0 ${isExpanded ? "rotate-180" : ""}`} style={{ color: C.dim }}>
-                    <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
-                  </svg>
+
+                  {isExpanded && (
+                    <div className="grid md:grid-cols-2 gap-4 px-4 pb-4 border-t animate-fade-up" style={{ borderColor: C.border }}>
+                      <div className="pt-4 space-y-2">
+                        <h4 className="text-xs font-bold" style={{ color: C.blue }}>Warum dieser Wert?</h4>
+                        <ul className="space-y-1.5">
+                          {sub.reasons.map((r, i) => (
+                            <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                              <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.blue }} />
+                              {r}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="pt-4 space-y-2">
+                        <h4 className="text-xs font-bold" style={{ color: C.green }}>Empfehlung</h4>
+                        <ul className="space-y-1.5">
+                          {sub.actions.map((a, i) => (
+                            <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                              <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
+                              {a}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Stärken + Risiken */}
+          <div className="grid md:grid-cols-2 gap-5 mt-6">
+            <Card className="p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
+                <h3 className="text-sm font-bold">Stärken</h3>
+              </div>
+              <ul className="space-y-2">
+                {result.strengths.map((s, i) => (
+                  <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                    <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.green }} />
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+            <Card className="p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
+                <h3 className="text-sm font-bold">Risiken</h3>
+              </div>
+              <ul className="space-y-2">
+                {result.risks.map((r, i) => (
+                  <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                    <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.amber }} />
+                    {r}
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          </div>
+
+          {/* ── Verhandlungsguide ── */}
+          <Card className="p-5 space-y-4 mt-6">
+            <div className="flex items-center gap-2">
+              <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round">
+                <path d="M12 2l2 7h7l-5.5 4 2 7L12 16l-5.5 4 2-7L3 9h7l2-7z" />
+              </svg>
+              <h3 className="text-sm font-bold" style={{ color: C.text }}>Verhandlungsguide</h3>
+            </div>
+            <p className="text-xs" style={{ color: C.dim }}>
+              Basierend auf Ihren Analysedaten — nutzen Sie diese Argumente in der Preisverhandlung:
+            </p>
+            <ul className="space-y-2">
+              {verhandlungsTipps.map((tip, i) => (
+                <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+                  <span className="mt-0.5 shrink-0 font-bold" style={{ color: C.accent }}>{i + 1}.</span>
+                  {tip}
+                </li>
+              ))}
+            </ul>
+          </Card>
+
+          {/* ── Finanzierungsanfrage ── */}
+          <Card className="p-5 space-y-4 mt-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round">
+                  <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
+                </svg>
+                <h3 className="text-sm font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
+              </div>
+              {!showFinanzierung && !finanzSent && (
+                <button
+                  onClick={() => setShowFinanzierung(true)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:opacity-90"
+                  style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                >
+                  Anfrage starten
+                </button>
+              )}
+            </div>
+
+            {finanzSent ? (
+              <div className="rounded-xl p-4 text-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
+                <p className="text-sm font-bold" style={{ color: C.green }}>Anfrage gesendet!</p>
+                <p className="text-xs mt-1" style={{ color: C.sub }}>Wir melden uns innerhalb von 24 Stunden bei Ihnen.</p>
+              </div>
+            ) : !showFinanzierung ? (
+              <p className="text-xs" style={{ color: C.dim }}>
+                Lassen Sie sich ein unverbindliches Finanzierungsangebot für dieses Objekt erstellen.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Name</label>
+                    <input
+                      type="text"
+                      value={finanzForm.name}
+                      onChange={(e) => setFinanzForm((f) => ({ ...f, name: e.target.value }))}
+                      placeholder="Max Mustermann"
+                      className="w-full rounded-xl px-3 py-2 text-sm"
+                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>E-Mail</label>
+                    <input
+                      type="email"
+                      value={finanzForm.email}
+                      onChange={(e) => setFinanzForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder={user?.email || "email@beispiel.de"}
+                      className="w-full rounded-xl px-3 py-2 text-sm"
+                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                    />
+                  </div>
                 </div>
-
-                {isExpanded && (
-                  <div className="grid md:grid-cols-2 gap-4 px-4 pb-4 border-t animate-fade-up" style={{ borderColor: C.border }}>
-                    <div className="pt-4 space-y-2">
-                      <h4 className="text-xs font-bold" style={{ color: C.blue }}>Warum dieser Wert?</h4>
-                      <ul className="space-y-1.5">
-                        {sub.reasons.map((r, i) => (
-                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                            <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.blue }} />
-                            {r}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    <div className="pt-4 space-y-2">
-                      <h4 className="text-xs font-bold" style={{ color: C.green }}>Empfehlung</h4>
-                      <ul className="space-y-1.5">
-                        {sub.actions.map((a, i) => (
-                          <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                            <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
-                            {a}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
-
-        {/* Stärken + Risiken */}
-        <div className="grid md:grid-cols-2 gap-5">
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
-              <h3 className="text-sm font-bold">Stärken</h3>
-            </div>
-            <ul className="space-y-2">
-              {result.strengths.map((s, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                  <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.green }} />
-                  {s}
-                </li>
-              ))}
-            </ul>
+                <div>
+                  <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon (optional)</label>
+                  <input
+                    type="tel"
+                    value={finanzForm.phone}
+                    onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="+49 170 1234567"
+                    className="w-full rounded-xl px-3 py-2 text-sm"
+                    style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht (optional)</label>
+                  <textarea
+                    value={finanzForm.message}
+                    onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))}
+                    placeholder="Besondere Wünsche oder Fragen..."
+                    rows={2}
+                    className="w-full rounded-xl px-3 py-2 text-sm resize-none"
+                    style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowFinanzierung(false)}
+                    className="rounded-xl px-4 py-2 text-xs font-semibold"
+                    style={{ border: `1px solid ${C.border}`, color: C.sub }}
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={handleFinanzierung}
+                    disabled={finanzSending || !finanzForm.name}
+                    className="flex-1 rounded-xl px-4 py-2 text-xs font-bold transition-all disabled:opacity-40"
+                    style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})`, color: "#fff" }}
+                  >
+                    {finanzSending ? "Wird gesendet..." : "Unverbindlich anfragen"}
+                  </button>
+                </div>
+              </div>
+            )}
           </Card>
-          <Card className="p-5 space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
-              <h3 className="text-sm font-bold">Risiken</h3>
-            </div>
-            <ul className="space-y-2">
-              {result.risks.map((r, i) => (
-                <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                  <span className="mt-1.5 w-1 h-1 rounded-full shrink-0" style={{ background: C.amber }} />
-                  {r}
-                </li>
-              ))}
-            </ul>
-          </Card>
-        </div>
+        </ProContent>
 
         {/* Footer Actions */}
         <Card className="p-4">
           <div className="flex flex-wrap gap-2">
             <button className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>PDF Export</button>
             <button onClick={() => router.push("/compare")} className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Zum Vergleich</button>
-            <button className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>KI-Assistent fragen</button>
+            <button onClick={() => router.push("/portfolio")} className="rounded-xl px-4 py-2 text-xs font-semibold" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>Zum Portfolio</button>
           </div>
         </Card>
       </div>
