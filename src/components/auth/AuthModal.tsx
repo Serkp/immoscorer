@@ -37,13 +37,27 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
 
     try {
       const supabase = getSupabase();
+
       if (mode === "register") {
+        console.log("[AuthModal] Register attempt:", email);
         const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
           options: { data: { full_name: name } },
         });
-        if (err) throw err;
+        console.log("[AuthModal] Register result:", { user: data?.user?.id, session: !!data?.session, error: err?.message });
+        if (err) {
+          setError(err.message);
+          setLoading(false);
+          return;
+        }
+
+        // If no session, email confirmation might be required
+        if (!data.session) {
+          setError("Bitte bestätigen Sie Ihre E-Mail-Adresse. Wir haben Ihnen eine Bestätigungs-E-Mail gesendet.");
+          setLoading(false);
+          return;
+        }
 
         // Update newsletter preference
         if (data.user) {
@@ -53,17 +67,29 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
             .eq("id", data.user.id);
         }
       } else {
-        const { error: err } = await supabase.auth.signInWithPassword({
+        console.log("[AuthModal] Login attempt:", email);
+        const { data, error: err } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        if (err) throw err;
+        console.log("[AuthModal] Login result:", { user: data?.user?.id, session: !!data?.session, error: err?.message });
+        if (err) {
+          setError(err.message);
+          setLoading(false);
+          return;
+        }
       }
+
+      // Small delay to let onAuthStateChange propagate to AuthProvider
+      console.log("[AuthModal] Auth success, waiting for state propagation...");
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      console.log("[AuthModal] Calling onSuccess");
+      setLoading(false);
       onSuccess();
     } catch (err: unknown) {
+      console.error("[AuthModal] Unexpected error:", err);
       const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
       setError(msg);
-    } finally {
       setLoading(false);
     }
   }
@@ -100,6 +126,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           {(["register", "login"] as Mode[]).map((m) => (
             <button
               key={m}
+              type="button"
               onClick={() => { setMode(m); setError(null); }}
               className="flex-1 rounded-lg py-2 text-sm font-semibold transition-all"
               style={{
