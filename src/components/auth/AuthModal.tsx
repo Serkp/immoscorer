@@ -1,20 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getSupabase } from "@/lib/supabase";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { C } from "@/lib/theme";
 
 type Mode = "login" | "register";
 
-export function LoginPage() {
-  const [mode, setMode] = useState<Mode>("login");
+interface AuthModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
+  const [mode, setMode] = useState<Mode>("register");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newsletter, setNewsletter] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setError(null);
+    }
+  }, [open]);
+
+  if (!open) return null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,6 +44,8 @@ export function LoginPage() {
           options: { data: { full_name: name } },
         });
         if (err) throw err;
+
+        // Update newsletter preference
         if (data.user) {
           await supabase
             .from("profiles")
@@ -37,15 +53,15 @@ export function LoginPage() {
             .eq("id", data.user.id);
         }
       } else {
-        const { error: err } = await getSupabase().auth.signInWithPassword({
+        const { error: err } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
         if (err) throw err;
       }
+      onSuccess();
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
+      const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
       setError(msg);
     } finally {
       setLoading(false);
@@ -54,24 +70,34 @@ export function LoginPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
-      style={{ background: C.bg }}
+      className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="w-full max-w-[400px] space-y-8">
-        {/* Logo */}
-        <div className="flex flex-col items-center gap-4">
-          <AIOrb size={56} active />
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: C.text }}>
-            ImmoScorer
-          </h1>
+      <div
+        className="w-full max-w-[420px] rounded-2xl p-6 space-y-6 animate-fade-up"
+        style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: `0 0 60px ${C.accentDim}` }}
+      >
+        {/* Header */}
+        <div className="flex flex-col items-center gap-3 text-center">
+          <AIOrb size={40} active />
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: C.text }}>
+              {mode === "register"
+                ? "Kostenloses Konto erstellen"
+                : "Willkommen zurück"}
+            </h2>
+            <p className="text-xs mt-1" style={{ color: C.sub }}>
+              {mode === "register"
+                ? "Ihr Score wurde berechnet. Registrieren Sie sich um das Ergebnis zu sehen."
+                : "Melden Sie sich an um Ihre Analyse zu sehen."}
+            </p>
+          </div>
         </div>
 
         {/* Tab Toggle */}
-        <div
-          className="flex rounded-xl p-1"
-          style={{ background: C.surface }}
-        >
-          {(["login", "register"] as Mode[]).map((m) => (
+        <div className="flex rounded-xl p-1" style={{ background: C.surface }}>
+          {(["register", "login"] as Mode[]).map((m) => (
             <button
               key={m}
               onClick={() => { setMode(m); setError(null); }}
@@ -90,11 +116,7 @@ export function LoginPage() {
         {error && (
           <div
             className="rounded-xl px-4 py-3 text-sm"
-            style={{
-              background: C.redDim,
-              color: C.red,
-              border: `1px solid rgba(248,113,113,0.2)`,
-            }}
+            style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}
           >
             {error}
           </div>
@@ -104,30 +126,20 @@ export function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "register" && (
             <div className="space-y-1.5">
-              <label className="text-xs font-medium" style={{ color: C.sub }}>
-                Name
-              </label>
+              <label className="text-xs font-medium" style={{ color: C.sub }}>Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Max Mustermann"
                 className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-                style={{
-                  background: C.surface2,
-                  border: `1px solid ${C.border}`,
-                  color: C.text,
-                  // @ts-expect-error CSS custom property
-                  "--tw-ring-color": C.accent,
-                }}
+                style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
               />
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: C.sub }}>
-              E-Mail-Adresse
-            </label>
+            <label className="text-xs font-medium" style={{ color: C.sub }}>E-Mail-Adresse</label>
             <input
               type="email"
               value={email}
@@ -135,20 +147,12 @@ export function LoginPage() {
               required
               placeholder="name@beispiel.de"
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-              style={{
-                background: C.surface2,
-                border: `1px solid ${C.border}`,
-                color: C.text,
-                // @ts-expect-error CSS custom property
-                "--tw-ring-color": C.accent,
-              }}
+              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: C.sub }}>
-              Passwort
-            </label>
+            <label className="text-xs font-medium" style={{ color: C.sub }}>Passwort</label>
             <input
               type="password"
               value={password}
@@ -157,13 +161,7 @@ export function LoginPage() {
               minLength={6}
               placeholder="Mindestens 6 Zeichen"
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-              style={{
-                background: C.surface2,
-                border: `1px solid ${C.border}`,
-                color: C.text,
-                // @ts-expect-error CSS custom property
-                "--tw-ring-color": C.accent,
-              }}
+              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
             />
           </div>
 
@@ -190,18 +188,20 @@ export function LoginPage() {
             type="submit"
             disabled={loading}
             className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
-            style={{
-              background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
-              color: "#fff",
-            }}
+            style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
-            {loading
-              ? "..."
-              : mode === "login"
-                ? "Anmelden"
-                : "Konto erstellen"}
+            {loading ? "..." : mode === "login" ? "Anmelden" : "Konto erstellen"}
           </button>
         </form>
+
+        {/* Close hint */}
+        <button
+          onClick={onClose}
+          className="w-full text-center text-xs py-1"
+          style={{ color: C.dim }}
+        >
+          Abbrechen
+        </button>
       </div>
     </div>
   );

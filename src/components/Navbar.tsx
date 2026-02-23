@@ -23,6 +23,7 @@ export function Navbar() {
   const { isPro } = useSubscription();
   const [menuOpen, setMenuOpen] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const displayName =
@@ -43,6 +44,27 @@ export function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  async function handleCheckout() {
+    if (!user) {
+      router.push("/analysis");
+      return;
+    }
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.url) window.location.href = data.url;
+    } catch {
+      // silent
+    } finally {
+      setCheckoutLoading(false);
+    }
+  }
 
   async function handlePortal() {
     if (!user) return;
@@ -119,84 +141,87 @@ export function Navbar() {
           </span>
         ) : (
           <button
-            onClick={() => router.push("/analysis")}
-            className="rounded-full px-3 py-1 text-[11px] font-bold tracking-wide transition-all hover:opacity-80"
+            onClick={handleCheckout}
+            disabled={checkoutLoading}
+            className="rounded-full px-3 py-1 text-[11px] font-bold tracking-wide transition-all hover:opacity-80 disabled:opacity-50"
             style={{
               background: C.accentDim,
               color: C.accent,
               border: "1px solid rgba(124,106,255,0.3)",
             }}
           >
-            Upgrade
+            {checkoutLoading ? "..." : user ? "Upgrade" : "Anmelden"}
           </button>
         )}
 
-        {/* Avatar + Dropdown */}
-        <div className="relative" ref={menuRef}>
-          <button
-            onClick={() => setMenuOpen((o) => !o)}
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold cursor-pointer transition-all"
-            style={{
-              background: menuOpen ? C.surface3 : C.surface2,
-              color: C.sub,
-              border: `1px solid ${menuOpen ? C.borderHover : C.border}`,
-            }}
-          >
-            {initials || "U"}
-          </button>
-
-          {menuOpen && (
-            <div
-              className="absolute right-0 top-full mt-2 w-48 rounded-xl py-1 shadow-xl animate-fade-up"
+        {/* Avatar + Dropdown (only when logged in) */}
+        {user ? (
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold cursor-pointer transition-all"
               style={{
-                background: C.bg2,
-                border: `1px solid ${C.border}`,
+                background: menuOpen ? C.surface3 : C.surface2,
+                color: C.sub,
+                border: `1px solid ${menuOpen ? C.borderHover : C.border}`,
               }}
             >
-              {/* User info */}
-              <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
-                <p className="text-xs font-semibold truncate" style={{ color: C.text }}>
-                  {user?.user_metadata?.full_name || "Benutzer"}
-                </p>
-                <p className="text-[11px] truncate" style={{ color: C.dim }}>
-                  {user?.email}
-                </p>
-              </div>
+              {initials || "U"}
+            </button>
 
-              {isPro ? (
-                <button
-                  onClick={handlePortal}
-                  disabled={portalLoading}
-                  className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80 disabled:opacity-40"
-                  style={{ color: C.sub }}
-                >
-                  {portalLoading ? "..." : "Abo verwalten"}
-                </button>
-              ) : (
-                <button
-                  disabled
-                  className="w-full text-left px-3 py-2 text-xs transition-colors opacity-40 cursor-not-allowed"
-                  style={{ color: C.sub }}
-                >
-                  Abo verwalten
-                </button>
-              )}
-
-              <div className="mx-3 h-px" style={{ background: C.border }} />
-
-              <button
-                onClick={async () => {
-                  setMenuOpen(false);
-                  await signOut();
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-full mt-2 w-48 rounded-xl py-1 shadow-xl animate-fade-up"
+                style={{
+                  background: C.bg2,
+                  border: `1px solid ${C.border}`,
                 }}
-                className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80"
-                style={{ color: C.red }}
               >
-                Abmelden
-              </button>
-            </div>
-          )}
-        </div>
+                {/* User info */}
+                <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
+                  <p className="text-xs font-semibold truncate" style={{ color: C.text }}>
+                    {user?.user_metadata?.full_name || "Benutzer"}
+                  </p>
+                  <p className="text-[11px] truncate" style={{ color: C.dim }}>
+                    {user?.email}
+                  </p>
+                </div>
+
+                {isPro ? (
+                  <button
+                    onClick={handlePortal}
+                    disabled={portalLoading}
+                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80 disabled:opacity-40"
+                    style={{ color: C.sub }}
+                  >
+                    {portalLoading ? "..." : "Abo verwalten"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCheckout}
+                    className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80"
+                    style={{ color: C.accent }}
+                  >
+                    Upgrade auf Pro
+                  </button>
+                )}
+
+                <div className="mx-3 h-px" style={{ background: C.border }} />
+
+                <button
+                  onClick={async () => {
+                    setMenuOpen(false);
+                    await signOut();
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs transition-colors hover:opacity-80"
+                  style={{ color: C.red }}
+                >
+                  Abmelden
+                </button>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </nav>
   );

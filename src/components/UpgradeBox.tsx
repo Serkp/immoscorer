@@ -5,22 +5,30 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { C } from "@/lib/theme";
 
 const PRO_FEATURES = [
-  "Detaillierte Teilscores mit Begründungen",
-  "Verhandlungsguide mit Preisargumenten",
-  "Finanzierungsanfrage direkt stellen",
-  "Immobilien im Portfolio speichern",
-  "Immobilien vergleichen (Side-by-Side)",
-  "Persönliche Investment-Strategie",
-  "KI-gestützte Empfehlungen",
-  "Unbegrenzte Analysen",
+  "Nettorendite & Kaufpreisfaktor",
+  "6 detaillierte Teilscores",
+  "Verhandlungsguide mit Zielpreis",
+  "Strategische Empfehlungen",
+  "Immobilien speichern & vergleichen",
+  "Portfolio für vorhandene Immobilien",
+  "Personalisierte Investitionsstrategie",
+  "Kostenlose Finanzierungsanfrage",
 ];
 
-export function UpgradeBox() {
+interface UpgradeBoxProps {
+  score?: number;
+  onNeedAuth?: () => void;
+}
+
+export function UpgradeBox({ score, onNeedAuth }: UpgradeBoxProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
 
   async function handleCheckout() {
-    if (!user) return;
+    if (!user) {
+      onNeedAuth?.();
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/stripe/checkout", {
@@ -36,6 +44,14 @@ export function UpgradeBox() {
       setLoading(false);
     }
   }
+
+  const subtitle = score != null
+    ? score >= 75
+      ? `Ihr Score: ${score} — ein starkes Objekt. Erfahren Sie genau warum und wie Sie den Kaufpreis optimal verhandeln.`
+      : score >= 50
+        ? `Ihr Score: ${score} — es gibt Potenzial. Erfahren Sie wo die Stärken und Schwächen liegen.`
+        : `Ihr Score: ${score} — hier ist Vorsicht geboten. Erfahren Sie welche Risiken bestehen und ob sich Verhandlung lohnt.`
+    : "Mit ImmoScorer Pro erhalten Sie Zugang zu allen Funktionen:";
 
   return (
     <div
@@ -59,10 +75,10 @@ export function UpgradeBox() {
         </div>
         <div>
           <h3 className="text-lg font-bold" style={{ color: C.text }}>
-            Alle Features freischalten
+            Vollständige Analyse freischalten
           </h3>
-          <p className="text-sm mt-1" style={{ color: C.sub }}>
-            Mit ImmoScorer Pro erhalten Sie Zugang zu allen Funktionen:
+          <p className="text-sm mt-1 leading-relaxed" style={{ color: C.sub }}>
+            {subtitle}
           </p>
         </div>
       </div>
@@ -102,7 +118,7 @@ export function UpgradeBox() {
         {loading ? "Wird geladen..." : "Jetzt Pro freischalten — 9,99 €/Mon."}
       </button>
       <p className="text-xs text-center" style={{ color: C.dim }}>
-        Monatlich kündbar. Keine versteckten Kosten.
+        Monatlich kündbar · Sofort Zugang
       </p>
     </div>
   );

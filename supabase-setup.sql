@@ -12,6 +12,9 @@ ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_favorite boolean DEFAULT false;
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS status text DEFAULT 'temporary';
 ALTER TABLE analyses ADD COLUMN IF NOT EXISTS save_type text DEFAULT NULL;
 
+-- ── Profiles: newsletter opt-in ──
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS newsletter_opt_in boolean DEFAULT true;
+
 -- ── Profiles RLS ──
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own profile" ON profiles;

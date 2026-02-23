@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { Suspense, useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { AIOrb } from "@/components/ui/AIOrb";
@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/Input";
 import { PillSelect } from "@/components/ui/PillSelect";
 import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
 import { UpgradeBox } from "@/components/UpgradeBox";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { PlaceResult } from "@/components/AddressAutocomplete";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -69,10 +70,18 @@ const INIT: FormData = {
 };
 
 export default function AnalysisPage() {
+  return (
+    <Suspense>
+      <AnalysisContent />
+    </Suspense>
+  );
+}
+
+function AnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user } = useAuth();
-  const { isPro, loading: subLoading, refresh: refreshSub } = useSubscription();
+  const { isPro, refresh: refreshSub } = useSubscription();
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -91,6 +100,7 @@ export default function AnalysisPage() {
   const [finanzForm, setFinanzForm] = useState({ name: "", email: "", phone: "", message: "" });
   const [finanzSending, setFinanzSending] = useState(false);
   const [finanzSent, setFinanzSent] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
   /* ── Checkout success/cancel handling ── */
   useEffect(() => {
@@ -184,6 +194,14 @@ export default function AnalysisPage() {
 
   /* ── Analyse starten ── */
   function startAnalysis() {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+    runAnalysis();
+  }
+
+  function runAnalysis() {
     setView("loading");
     setLoadingStep(0);
     setLoadingPct(0);
@@ -318,15 +336,6 @@ export default function AnalysisPage() {
     setFinanzForm({ name: "", email: "", phone: "", message: "" });
   }
 
-  /* ── Loading ── */
-  if (subLoading) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <AIOrb size={48} active />
-      </div>
-    );
-  }
-
   /* ── Global checkout toast ── */
   const checkoutToast = toast ? (
     <div
@@ -429,6 +438,11 @@ export default function AnalysisPage() {
   if (view === "input") {
     return (
       <div className="mx-auto max-w-[640px] space-y-6">
+        <AuthModal
+          open={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => { setShowAuthModal(false); runAnalysis(); }}
+        />
         {checkoutToast}
         {/* Progress bars */}
         <div className="flex gap-2">
@@ -694,6 +708,11 @@ export default function AnalysisPage() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
+        <AuthModal
+          open={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={() => setShowAuthModal(false)}
+        />
         {/* Toast */}
         {toast && (
           <div
@@ -722,62 +741,77 @@ export default function AnalysisPage() {
           <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
         </div>
 
-        {/* Hero Row: Score + Radar + KPIs (visible to all) */}
-        <div className="grid lg:grid-cols-3 gap-5">
-          {/* Score Ring */}
-          <Card className="p-6 flex flex-col items-center justify-center" glow>
-            <ScoreRing value={result.totalScore} size={150} />
-            <p className="text-sm font-bold mt-2" style={{ color: scoreColor(result.totalScore) }}>{scoreLabel(result.totalScore)}</p>
-            <p className="text-xs mt-1" style={{ color: C.dim }}>Gesamtbewertung</p>
-          </Card>
-
-          {/* Radar Chart */}
-          <Card className="p-4">
-            <ResponsiveContainer width="100%" height={220}>
-              <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
-                <PolarGrid stroke={C.border} />
-                <PolarAngleAxis dataKey="subject" tick={{ fill: C.sub, fontSize: 10 }} />
-                <Radar dataKey="value" stroke={C.accent} fill={C.accent} fillOpacity={0.08} strokeWidth={2} />
-              </RadarChart>
-            </ResponsiveContainer>
-          </Card>
-
-          {/* KPI Rows */}
-          <div className="space-y-3">
-            <KPIRow label="Nettorendite" value={`${(result.kpis.netYield * 100).toFixed(2)} %`} color={result.kpis.netYield >= 0.03 ? C.green : result.kpis.netYield >= 0.01 ? C.amber : C.red} />
-            <KPIRow label="Kaufpreisfaktor" value={`${result.kpis.factor.toFixed(1)}x`} color={result.kpis.factor <= 25 ? C.green : result.kpis.factor <= 30 ? C.amber : C.red} />
-            <KPIRow label="Finanzierbarkeit" value={`${result.subscores.find(s => s.key === "financing")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "financing")?.value || 0)} />
-            <KPIRow label="Risiko-Score" value={`${result.subscores.find(s => s.key === "risk")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "risk")?.value || 0)} />
-          </div>
-        </div>
-
-        {/* KI-Empfehlung (visible to all) */}
-        <AIComment variant={kiEmpfehlung.variant}>
-          {kiEmpfehlung.text}
-        </AIComment>
-
-        {/* ── FREE USER: UpgradeBox directly after Score + KI-Empfehlung ── */}
-        {!isPro && <UpgradeBox />}
-
-        {/* ── PRO: Full detail sections / FREE: blurred teaser ── */}
+        {/* ── FREE USER: minimal result ── */}
         {!isPro ? (
-          <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
-            <div className="space-y-2">
-              {result.subscores.map((sub) => (
-                <Card key={sub.key} className="overflow-hidden">
-                  <div className="flex items-center gap-4 p-4">
-                    <MiniRing value={sub.value} size={40} />
-                    <div className="flex-1 min-w-0">
-                      <span className="text-sm font-bold">{sub.label}</span>
-                      <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
+          <>
+            {/* Score Ring only — no radar, no KPIs */}
+            <Card className="p-8 flex flex-col items-center justify-center" glow>
+              <ScoreRing value={result.totalScore} size={160} />
+              <p className="text-lg font-bold mt-3" style={{ color: scoreColor(result.totalScore) }}>{scoreLabel(result.totalScore)}</p>
+              <p className="text-xs mt-1" style={{ color: C.dim }}>Gesamtbewertung</p>
+            </Card>
+
+            {/* Short KI comment */}
+            <AIComment variant={kiEmpfehlung.variant}>
+              {result.totalScore >= 75
+                ? "Klare Kaufempfehlung. Dieses Objekt gehört zu den Top-Investments."
+                : result.totalScore >= 55
+                  ? "Solides Investment mit Optimierungspotenzial."
+                  : result.totalScore >= 40
+                    ? "Erhöhte Vorsicht geboten. Mehrere Risikofaktoren identifiziert."
+                    : "Von diesem Investment wird abgeraten."}
+            </AIComment>
+
+            {/* UpgradeBox with personalized score text */}
+            <UpgradeBox score={result.totalScore} onNeedAuth={() => setShowAuthModal(true)} />
+
+            {/* Blurred Teilscores teaser */}
+            <div className="select-none pointer-events-none" style={{ filter: "blur(8px)", opacity: 0.4 }} aria-hidden="true">
+              <div className="space-y-2">
+                {result.subscores.map((sub) => (
+                  <Card key={sub.key} className="overflow-hidden">
+                    <div className="flex items-center gap-4 p-4">
+                      <MiniRing value={sub.value} size={40} />
+                      <div className="flex-1 min-w-0">
+                        <span className="text-sm font-bold">{sub.label}</span>
+                        <p className="text-xs mt-0.5 truncate" style={{ color: C.sub }}>{sub.oneLiner}</p>
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))}
+              </div>
             </div>
-          </div>
+          </>
         ) : (
           <>
+            {/* PRO: Full Hero Row */}
+            <div className="grid lg:grid-cols-3 gap-5">
+              <Card className="p-6 flex flex-col items-center justify-center" glow>
+                <ScoreRing value={result.totalScore} size={150} />
+                <p className="text-sm font-bold mt-2" style={{ color: scoreColor(result.totalScore) }}>{scoreLabel(result.totalScore)}</p>
+                <p className="text-xs mt-1" style={{ color: C.dim }}>Gesamtbewertung</p>
+              </Card>
+              <Card className="p-4">
+                <ResponsiveContainer width="100%" height={220}>
+                  <RadarChart cx="50%" cy="50%" outerRadius="72%" data={radarData}>
+                    <PolarGrid stroke={C.border} />
+                    <PolarAngleAxis dataKey="subject" tick={{ fill: C.sub, fontSize: 10 }} />
+                    <Radar dataKey="value" stroke={C.accent} fill={C.accent} fillOpacity={0.08} strokeWidth={2} />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </Card>
+              <div className="space-y-3">
+                <KPIRow label="Nettorendite" value={`${(result.kpis.netYield * 100).toFixed(2)} %`} color={result.kpis.netYield >= 0.03 ? C.green : result.kpis.netYield >= 0.01 ? C.amber : C.red} />
+                <KPIRow label="Kaufpreisfaktor" value={`${result.kpis.factor.toFixed(1)}x`} color={result.kpis.factor <= 25 ? C.green : result.kpis.factor <= 30 ? C.amber : C.red} />
+                <KPIRow label="Finanzierbarkeit" value={`${result.subscores.find(s => s.key === "financing")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "financing")?.value || 0)} />
+                <KPIRow label="Risiko-Score" value={`${result.subscores.find(s => s.key === "risk")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "risk")?.value || 0)} />
+              </div>
+            </div>
+
+            <AIComment variant={kiEmpfehlung.variant}>
+              {kiEmpfehlung.text}
+            </AIComment>
+
             {/* Subscore Cards */}
             <div className="space-y-2">
               <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>
