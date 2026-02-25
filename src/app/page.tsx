@@ -483,19 +483,6 @@ function LandingContent() {
             </div>
             <div className="flex items-center gap-3">
               <button
-                onClick={() =>
-                  document
-                    .getElementById("pricing")
-                    ?.scrollIntoView({ behavior: "smooth" })
-                }
-                className="hidden sm:inline-block text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ color: C.sub }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = C.text)}
-                onMouseLeave={(e) => (e.currentTarget.style.color = C.sub)}
-              >
-                Preise
-              </button>
-              <button
                 onClick={() => setShowAuthModal(true)}
                 className="hidden sm:inline-block text-sm font-semibold px-4 py-2 rounded-xl transition-all"
                 style={{ border: `1px solid ${C.border}`, color: C.text }}

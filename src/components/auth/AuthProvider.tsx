@@ -26,9 +26,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const supabase = getSupabase();
 
-    supabase.auth.getSession().then(({ data: { session: s } }) => {
-      setSession(s);
-      setUser(s?.user ?? null);
+    // Use getUser() — validates token server-side, reads from cookie
+    supabase.auth.getUser().then(({ data: { user: u } }) => {
+      setUser(u ?? null);
       setLoading(false);
     });
 
