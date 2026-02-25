@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
-import Link from "next/link";
 import { AIOrb } from "@/components/ui/AIOrb";
-import { AuthProvider } from "@/components/auth/AuthProvider";
+import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
@@ -211,7 +210,7 @@ function FAQItem({ q, a }: { q: string; a: string }) {
    MINI RECHNER
    ════════════════════════════════════════════ */
 
-function MiniRechner() {
+function MiniRechner({ onCta }: { onCta: () => void }) {
   const [price, setPrice] = useState("");
   const [rent, setRent] = useState("");
 
@@ -363,8 +362,8 @@ function MiniRechner() {
           </div>
 
           {/* CTA */}
-          <Link
-            href="/analysis"
+          <button
+            onClick={onCta}
             className="block w-full text-center rounded-xl py-2.5 text-sm font-bold transition-all"
             style={{
               background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
@@ -372,7 +371,7 @@ function MiniRechner() {
             }}
           >
             Vollständige Analyse starten &rarr;
-          </Link>
+          </button>
           <p className="text-center text-[11px] mt-2" style={{ color: C.dim }}>
             Unbegrenzt kostenlos &middot; kein Account nötig
           </p>
@@ -396,10 +395,26 @@ function MiniRechner() {
    ════════════════════════════════════════════ */
 
 export default function LandingPage() {
-  const [showAuthModal, setShowAuthModal] = useState(false);
-
   return (
     <AuthProvider>
+      <LandingContent />
+    </AuthProvider>
+  );
+}
+
+function LandingContent() {
+  const { user } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+
+  function handleCta() {
+    if (user) {
+      window.location.href = "/analysis";
+    } else {
+      setShowAuthModal(true);
+    }
+  }
+
+  return (
     <div style={{ background: C.bg, minHeight: "100vh" }}>
       {/* Auth Modal */}
       <AuthModal
@@ -493,8 +508,8 @@ export default function LandingPage() {
               >
                 Anmelden
               </button>
-              <Link
-                href="/analysis"
+              <button
+                onClick={handleCta}
                 className="text-sm font-bold px-4 py-2 rounded-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
@@ -502,7 +517,7 @@ export default function LandingPage() {
                 }}
               >
                 Kostenlos testen
-              </Link>
+              </button>
             </div>
           </div>
         </nav>
@@ -566,8 +581,8 @@ export default function LandingPage() {
 
                 {/* CTA */}
                 <div className="flex items-center gap-4 flex-wrap">
-                  <Link
-                    href="/analysis"
+                  <button
+                    onClick={handleCta}
                     className="inline-block text-sm font-bold px-7 py-3 rounded-xl transition-all"
                     style={{
                       background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
@@ -575,7 +590,7 @@ export default function LandingPage() {
                     }}
                   >
                     Kostenlos starten
-                  </Link>
+                  </button>
                   <span className="text-xs" style={{ color: C.dim }}>
                     Unbegrenzt &middot; kein Abo nötig
                   </span>
@@ -585,7 +600,7 @@ export default function LandingPage() {
 
             {/* Right: Mini-Rechner */}
             <FadeIn delay={0.15}>
-              <MiniRechner />
+              <MiniRechner onCta={handleCta} />
             </FadeIn>
           </div>
         </section>
@@ -953,8 +968,8 @@ export default function LandingPage() {
                     ))}
                   </div>
 
-                  <Link
-                    href="/analysis"
+                  <button
+                    onClick={handleCta}
                     className="block w-full text-center text-sm font-bold py-3 rounded-xl transition-all"
                     style={{ border: `1px solid ${C.border}`, color: C.text }}
                     onMouseEnter={(e) =>
@@ -965,7 +980,7 @@ export default function LandingPage() {
                     }
                   >
                     Kostenlos starten
-                  </Link>
+                  </button>
                 </div>
               </FadeIn>
 
@@ -1033,8 +1048,8 @@ export default function LandingPage() {
                     ))}
                   </div>
 
-                  <Link
-                    href="/analysis"
+                  <button
+                    onClick={handleCta}
                     className="block w-full text-center text-sm font-bold py-3 rounded-xl transition-all"
                     style={{
                       background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
@@ -1042,7 +1057,7 @@ export default function LandingPage() {
                     }}
                   >
                     Jetzt Pro freischalten
-                  </Link>
+                  </button>
                   <p
                     className="text-center text-[11px] mt-2.5"
                     style={{ color: C.dim }}
@@ -1131,8 +1146,8 @@ export default function LandingPage() {
                 Kostenlos und unbegrenzt. In 10 Sekunden wissen ob sich&apos;s
                 lohnt.
               </p>
-              <Link
-                href="/analysis"
+              <button
+                onClick={handleCta}
                 className="inline-block text-sm font-bold px-8 py-3.5 rounded-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
@@ -1140,7 +1155,7 @@ export default function LandingPage() {
                 }}
               >
                 Jetzt kostenlos starten
-              </Link>
+              </button>
             </div>
           </FadeIn>
         </section>
@@ -1190,6 +1205,5 @@ export default function LandingPage() {
         </footer>
       </div>
     </div>
-    </AuthProvider>
   );
 }
