@@ -158,7 +158,14 @@ function AnalysisContent() {
       const res = await fetch("/api/location/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: placeLat, lng: placeLng, city }),
+        body: JSON.stringify({
+          lat: placeLat,
+          lng: placeLng,
+          city,
+          price: Number(form.price) || undefined,
+          rent: Number(form.rent) || undefined,
+          area: Number(form.area) || undefined,
+        }),
       });
       const data = await res.json();
       if (!data.error) {

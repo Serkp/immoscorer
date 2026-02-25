@@ -162,6 +162,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Max Mustermann"
+                autoComplete="name"
                 className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
                 style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
               />
@@ -176,6 +177,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="name@beispiel.de"
+              autoComplete="email"
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
               style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
             />
@@ -190,6 +192,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               required
               minLength={6}
               placeholder="Mindestens 6 Zeichen"
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
               style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
             />
