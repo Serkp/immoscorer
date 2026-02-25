@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, type ReactNode } from "react";
 import { AIOrb } from "@/components/ui/AIOrb";
-import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
+import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
@@ -403,15 +403,10 @@ export default function LandingPage() {
 }
 
 function LandingContent() {
-  const { user } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   function handleCta() {
-    if (user) {
-      window.location.href = "/analysis";
-    } else {
-      setShowAuthModal(true);
-    }
+    setShowAuthModal(true);
   }
 
   return (
