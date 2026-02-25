@@ -59,12 +59,16 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
           return;
         }
 
-        // Update newsletter preference
+        // Create/update profile with name, email, newsletter preference
         if (data.user) {
           await supabase
             .from("profiles")
-            .update({ newsletter_opt_in: newsletter })
-            .eq("id", data.user.id);
+            .upsert({
+              id: data.user.id,
+              full_name: name,
+              email,
+              newsletter_opt_in: newsletter,
+            }, { onConflict: "id" });
         }
       } else {
         console.log("[AuthModal] Login attempt:", email);

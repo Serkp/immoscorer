@@ -496,7 +496,7 @@ function LandingContent() {
                 Anmelden
               </button>
               <button
-                onClick={handleCta}
+                onClick={() => setShowAuthModal(true)}
                 className="text-sm font-bold px-4 py-2 rounded-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
