@@ -194,8 +194,21 @@ function AnalysisContent() {
   }
 
   /* ── Validierung ── */
-  const canNext0 = !!(form.street && form.city && form.price && form.rent);
-  const canNext1 = !!(form.hausgeld && form.area && form.year && form.energyClass);
+  const priceNum = Number(form.price);
+  const rentNum = Number(form.rent);
+  const hausgeldNum = Number(form.hausgeld);
+  const areaNum = Number(form.area);
+  const yearNum = Number(form.year);
+
+  const priceValid = !form.price || (priceNum >= 10000 && priceNum <= 50000000);
+  const rentValid = !form.rent || (rentNum >= 50 && rentNum <= 50000);
+  const hausgeldValid = !form.hausgeld || (hausgeldNum >= 0 && hausgeldNum <= 5000);
+  const areaValid = !form.area || (areaNum >= 10 && areaNum <= 10000);
+  const yearValid = !form.year || (yearNum >= 1800 && yearNum <= 2026 && form.year.length === 4);
+  const hausgeldWarn = form.hausgeld && form.rent && hausgeldNum > rentNum;
+
+  const canNext0 = !!(form.street && form.city && form.price && form.rent && priceValid && rentValid);
+  const canNext1 = !!(form.hausgeld && form.area && form.year && form.energyClass && hausgeldValid && areaValid && yearValid);
 
   /* ── Analyse starten ── */
   function startAnalysis() {
@@ -521,8 +534,14 @@ function AnalysisContent() {
             )}
 
             <div className="grid grid-cols-2 gap-3">
-              <Input label="Kaufpreis" value={form.price} onChange={(v) => set("price", v)} placeholder="250000" type="number" suffix="€" large explain="Gesamtangebotspreis inkl. ausgewiesener Nebenkosten." />
-              <Input label="Monatliche Kaltmiete" value={form.rent} onChange={(v) => set("rent", v)} placeholder="950" type="number" suffix="€" large explain="Nettokaltmiete ohne Nebenkosten." />
+              <div>
+                <Input label="Kaufpreis" value={form.price} onChange={(v) => set("price", v)} placeholder="250000" type="number" suffix="€" large explain="Gesamtangebotspreis inkl. ausgewiesener Nebenkosten." />
+                {form.price && !priceValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Kaufpreis zwischen 10.000 und 50.000.000 € eingeben</p>}
+              </div>
+              <div>
+                <Input label="Monatliche Kaltmiete" value={form.rent} onChange={(v) => set("rent", v)} placeholder="950" type="number" suffix="€" large explain="Nettokaltmiete ohne Nebenkosten." />
+                {form.rent && !rentValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Kaltmiete zwischen 50 und 50.000 € eingeben</p>}
+              </div>
             </div>
 
             {/* Live-Metriken */}
@@ -566,11 +585,21 @@ function AnalysisContent() {
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Input label="Hausgeld" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="350" type="number" suffix="€/Mon." explain="Monatliches Hausgeld (Verwaltung + Instandhaltungsrücklage)." />
-              <Input label="Wohnfläche" value={form.area} onChange={(v) => set("area", v)} placeholder="72" type="number" suffix="m²" explain="Wohnfläche laut Grundriss oder Teilungserklärung." />
+              <div>
+                <Input label="Hausgeld" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="350" type="number" suffix="€/Mon." explain="Monatliches Hausgeld (Verwaltung + Instandhaltungsrücklage)." />
+                {form.hausgeld && !hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Hausgeld zwischen 0 und 5.000 € eingeben</p>}
+                {hausgeldWarn && hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.amber }}>Hausgeld ist höher als Kaltmiete — Cashflow negativ!</p>}
+              </div>
+              <div>
+                <Input label="Wohnfläche" value={form.area} onChange={(v) => set("area", v)} placeholder="72" type="number" suffix="m²" explain="Wohnfläche laut Grundriss oder Teilungserklärung." />
+                {form.area && !areaValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Wohnfläche zwischen 10 und 10.000 m² eingeben</p>}
+              </div>
             </div>
 
-            <Input label="Baujahr" value={form.year} onChange={(v) => set("year", v)} placeholder="1985" type="number" explain="Baujahr des Gebäudes — relevant für Substanzbewertung und GEG-Pflichten." />
+            <div>
+              <Input label="Baujahr" value={form.year} onChange={(v) => set("year", v)} placeholder="1985" type="number" explain="Baujahr des Gebäudes — relevant für Substanzbewertung und GEG-Pflichten." />
+              {form.year && !yearValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte gültiges Baujahr eingeben (1800–2026)</p>}
+            </div>
 
             <PillSelect label="Energieeffizienzklasse" options={ENERGY_OPTIONS} value={form.energyClass} onChange={(v) => set("energyClass", v)} explain="Laut Energieausweis. A+ ist die beste, H die schlechteste Klasse." />
 

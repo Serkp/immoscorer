@@ -22,10 +22,17 @@ export const C = {
   amberBorder: "rgba(251,191,36,0.2)",
   red: "#F87171",
   redDim: "rgba(248,113,113,0.12)",
+  orange: "#FB923C",
+  darkRed: "#DC2626",
 };
 
 export const scoreColor = (v: number) =>
-  v >= 75 ? C.green : v >= 55 ? C.blue : v >= 40 ? C.amber : C.red;
+  v >= 80 ? C.green : v >= 65 ? C.blue : v >= 50 ? C.amber : v >= 35 ? C.orange : C.red;
 
 export const scoreLabel = (v: number) =>
-  v >= 75 ? "Hervorragend" : v >= 55 ? "Gut" : v >= 40 ? "Moderat" : "Kritisch";
+  v >= 80 ? "Sehr gut" :
+  v >= 65 ? "Gut" :
+  v >= 50 ? "Moderat" :
+  v >= 35 ? "Unterdurchschnittlich" :
+  v >= 20 ? "Kritisch" :
+  "Nicht empfohlen";
