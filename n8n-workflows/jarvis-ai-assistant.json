@@ -1,0 +1,1420 @@
+{
+  "name": "Jarvis AI Executive Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": {}
+      },
+      "id": "node-telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 300],
+      "webhookId": "jarvis-telegram-webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-user-input",
+              "name": "user_input",
+              "value": "={{ $json.message.text }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-chat-id",
+              "name": "chat_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "number"
+            },
+            {
+              "id": "assign-timestamp",
+              "name": "timestamp",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-extract-input",
+      "name": "Extract Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-ja",
+              "leftValue": "={{ $json.user_input }}",
+              "rightValue": "JA",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-check-confirmation",
+      "name": "Check If Confirmation",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "filterByFormula": "AND({action}='pending_confirmation', {result}='awaiting')",
+        "options": {
+          "sort": {
+            "property": [
+              {
+                "field": "created_at",
+                "direction": "desc"
+              }
+            ]
+          }
+        }
+      },
+      "id": "node-fetch-pending-action",
+      "name": "Fetch Pending Action",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [660, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-has-pending",
+              "leftValue": "={{ $json.fields?.intent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-has-pending",
+      "name": "Has Pending Action?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [880, 100]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: 'You are Jarvis, an AI executive assistant for Serkan Parlak. Parse the user message and return ONLY valid JSON with this exact schema: {\"intent\": \"gmail_send | gmail_read | calendar_create | calendar_delete | calendar_read | airtable_create | airtable_read | notion_create | notion_read | general\", \"requires_confirmation\": true/false, \"data\": {}}. For gmail_send data must include: to, subject, body. For calendar_create data must include: summary, start, end, description. For calendar_delete data must include: eventId. For airtable_create data must include: table, fields. For airtable_read data must include: table. For notion_create data must include: database, properties. For notion_read data must include: database. Set requires_confirmation=true for gmail_send, calendar_create, calendar_delete. Set requires_confirmation=false for read operations and general.' }, { role: 'user', content: $json.user_input } ] }) }}",
+        "options": {}
+      },
+      "id": "node-intent-engine",
+      "name": "Intent Engine (GPT-4o)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 500]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-parsed-intent",
+              "name": "parsed",
+              "value": "={{ JSON.parse($json.choices[0].message.content) }}",
+              "type": "object"
+            },
+            {
+              "id": "assign-intent",
+              "name": "intent",
+              "value": "={{ JSON.parse($json.choices[0].message.content).intent }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-requires-confirmation",
+              "name": "requires_confirmation",
+              "value": "={{ JSON.parse($json.choices[0].message.content).requires_confirmation }}",
+              "type": "boolean"
+            },
+            {
+              "id": "assign-data",
+              "name": "data",
+              "value": "={{ JSON.parse($json.choices[0].message.content).data }}",
+              "type": "object"
+            },
+            {
+              "id": "keep-user-input",
+              "name": "user_input",
+              "value": "={{ $('Extract Input').item.json.user_input }}",
+              "type": "string"
+            },
+            {
+              "id": "keep-chat-id",
+              "name": "chat_id",
+              "value": "={{ $('Extract Input').item.json.chat_id }}",
+              "type": "number"
+            },
+            {
+              "id": "keep-timestamp",
+              "name": "timestamp",
+              "value": "={{ $('Extract Input').item.json.timestamp }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-parse-intent",
+      "name": "Parse Intent",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 500]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "gmail_send", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "gmail_send"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "gmail_read", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "gmail_read"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "calendar_create", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "calendar_create"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "calendar_delete", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "calendar_delete"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "calendar_read", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "calendar_read"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "airtable_create", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "airtable_create"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "airtable_read", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "airtable_read"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "notion_create", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "notion_create"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "notion_read", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "notion_read"
+            },
+            {
+              "conditions": {
+                "options": { "caseSensitive": false, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [{ "leftValue": "={{ $json.intent }}", "rightValue": "general", "operator": { "type": "string", "operation": "equals" } }],
+                "combinator": "and"
+              },
+              "renameOutput": "general"
+            }
+          ],
+          "fallbackOutput": {
+            "renameOutput": "general_fallback"
+          }
+        },
+        "options": {
+          "allMatchingOutputs": false
+        }
+      },
+      "id": "node-intent-router",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [1120, 500]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "={{ $json.data.subject }}",
+        "message": "={{ $json.data.body }}",
+        "toList": {
+          "values": [
+            {
+              "email": "={{ $json.data.to }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-gmail-create-draft",
+      "name": "Gmail Create Draft",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1400, -200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-confirm-send",
+              "leftValue": "={{ $('Parse Intent').item.json.requires_confirmation }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-gmail-needs-confirm",
+      "name": "Gmail Needs Confirm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1620, -200]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $('Extract Input').item.json.user_input }}",
+            "intent": "gmail_send",
+            "action": "pending_confirmation",
+            "result": "awaiting",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-gmail-store-pending",
+      "name": "Gmail Store Pending",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1840, -300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 10,
+        "options": {
+          "labelIds": ["INBOX"]
+        }
+      },
+      "id": "node-gmail-read-inbox",
+      "name": "Gmail Read Inbox",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1400, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0.3, messages: [ { role: 'system', content: 'Summarize the following emails concisely. For each email provide: From, Subject, and a 1-2 sentence summary. Format for Telegram (use bold with * for headers).' }, { role: 'user', content: JSON.stringify($input.all().map(i => ({ from: i.json.from, subject: i.json.subject, snippet: i.json.snippet }))) } ] }) }}",
+        "options": {}
+      },
+      "id": "node-gmail-summarize",
+      "name": "Summarize Emails",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1620, 0]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "getAll",
+        "returnAll": false,
+        "limit": 20,
+        "options": {
+          "timeMin": "={{ $now.toISO() }}",
+          "timeMax": "={{ $now.plus({ days: 7 }).toISO() }}"
+        }
+      },
+      "id": "node-calendar-read",
+      "name": "Calendar Read Events",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [1400, 400]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendarId": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "id"
+        },
+        "start": "={{ $json.data.start }}",
+        "end": "={{ $json.data.end }}",
+        "additionalFields": {
+          "summary": "={{ $json.data.summary }}",
+          "description": "={{ $json.data.description || '' }}"
+        }
+      },
+      "id": "node-calendar-create",
+      "name": "Calendar Create Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [1400, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-cal-confirm",
+              "leftValue": "={{ $('Parse Intent').item.json.requires_confirmation }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-calendar-create-confirm",
+      "name": "Cal Create Confirm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1620, 200]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $('Extract Input').item.json.user_input }}",
+            "intent": "calendar_create",
+            "action": "pending_confirmation",
+            "result": "awaiting",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-calendar-store-pending",
+      "name": "Cal Store Pending",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1840, 120]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "delete",
+        "calendarId": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "id"
+        },
+        "eventId": "={{ $json.data.eventId }}"
+      },
+      "id": "node-calendar-delete",
+      "name": "Calendar Delete Event",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 3,
+      "position": [1400, 600]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+          "conditions": [
+            {
+              "id": "cond-cal-del-confirm",
+              "leftValue": "={{ $('Parse Intent').item.json.requires_confirmation }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-calendar-delete-confirm",
+      "name": "Cal Delete Confirm?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1620, 600]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $('Extract Input').item.json.user_input }}",
+            "intent": "calendar_delete",
+            "action": "pending_confirmation",
+            "result": "awaiting",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-calendar-delete-store",
+      "name": "Cal Delete Store Pending",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1840, 520]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "={{ $json.data.table }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "id": "node-airtable-read",
+      "name": "Airtable Read Records",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1400, 1000]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "={{ $json.data.table }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData"
+        },
+        "options": {}
+      },
+      "id": "node-airtable-create",
+      "name": "Airtable Create Record",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1400, 800]
+    },
+    {
+      "parameters": {
+        "resource": "page",
+        "operation": "create",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $json.data.database === 'linkedin' ? '30c200a7fa45803da95cdf096f8ffe63' : '312200a7fa4580f182e4cef08199d99d' }}",
+          "mode": "id"
+        },
+        "title": "={{ $json.data.properties?.title || $json.data.properties?.Name || 'New Entry' }}",
+        "options": {}
+      },
+      "id": "node-notion-create",
+      "name": "Notion Create Entry",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1400, 1200]
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "={{ $json.data.database === 'linkedin' ? '30c200a7fa45803da95cdf096f8ffe63' : '312200a7fa4580f182e4cef08199d99d' }}",
+          "mode": "id"
+        },
+        "returnAll": false,
+        "limit": 20,
+        "options": {}
+      },
+      "id": "node-notion-read",
+      "name": "Notion Read Entries",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [1400, 1400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0.5, messages: [ { role: 'system', content: 'You are Jarvis, executive assistant of Serkan Parlak. Answer general questions concisely, professionally, and action-oriented.' }, { role: 'user', content: $('Extract Input').item.json.user_input } ] }) }}",
+        "options": {}
+      },
+      "id": "node-general-gpt",
+      "name": "General GPT Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 1600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0.3, messages: [ { role: 'system', content: 'You are Jarvis, executive assistant of Serkan Parlak. Respond concise, professional, action-oriented. Format the following tool execution result as a clean Telegram message. Use *bold* for headers. Keep it short.' }, { role: 'user', content: 'User asked: ' + $('Extract Input').item.json.user_input + '\\n\\nResult: ' + JSON.stringify($input.first().json).substring(0, 3000) } ] }) }}",
+        "options": {}
+      },
+      "id": "node-response-builder",
+      "name": "Response Builder (GPT)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0.3, messages: [ { role: 'system', content: 'You are Jarvis. Generate a confirmation request message for Telegram. Use *bold*. Ask the user to reply JA to confirm.' }, { role: 'user', content: 'Action pending confirmation: ' + $('Extract Input').item.json.user_input + '\\nIntent: ' + $('Parse Intent').item.json.intent } ] }) }}",
+        "options": {}
+      },
+      "id": "node-confirm-response-builder",
+      "name": "Confirm Response Builder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2100, -100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Input').item.json.chat_id }}",
+        "text": "={{ $json.choices[0].message.content }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-telegram-send-response",
+      "name": "Send Telegram Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, 500]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Input').item.json.chat_id }}",
+        "text": "={{ $json.choices[0].message.content }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-telegram-send-confirm",
+      "name": "Send Confirmation Request",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, -100]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $('Extract Input').item.json.user_input }}",
+            "intent": "={{ $('Parse Intent').item.json.intent }}",
+            "action": "executed",
+            "result": "={{ JSON.stringify($('Response Builder (GPT)').item.json.choices[0].message.content).substring(0, 500) }}",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-log-memory",
+      "name": "Log to Memory",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [2560, 500]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Input').item.json.chat_id }}",
+        "text": "={{ '⚠️ *Jarvis Error*\\n\\nSomething went wrong while processing your request. I\\'ve logged the issue and will investigate.\\n\\nPlease try again or rephrase your request.' }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-error-telegram",
+      "name": "Error Telegram Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [2340, 1800]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "={{ $('Extract Input').item.json.user_input }}",
+            "intent": "error",
+            "action": "error_handler",
+            "result": "={{ 'Error: ' + $json.error?.message || 'Unknown error occurred' }}",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-error-log",
+      "name": "Log Error to Memory",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [2100, 1800]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'gpt-4o', temperature: 0.3, messages: [ { role: 'system', content: 'You are Jarvis. The user confirmed a pending action. Summarize what was executed as a Telegram message. Use *bold*. Be concise.' }, { role: 'user', content: 'Confirmed and executed pending action: ' + JSON.stringify($json.fields || $json) } ] }) }}",
+        "options": {}
+      },
+      "id": "node-confirm-exec-response",
+      "name": "Confirmed Action Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Input').item.json.chat_id }}",
+        "text": "={{ $json.choices[0].message.content }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "node-telegram-confirmed",
+      "name": "Send Confirmed Response",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "resource": "record",
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "app9hkRZEMb4yiCAv",
+          "mode": "id"
+        },
+        "table": {
+          "__rl": true,
+          "value": "Jarvis Memory",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "user_input": "JA (confirmation)",
+            "intent": "confirmation_executed",
+            "action": "executed",
+            "result": "Pending action confirmed and executed",
+            "created_at": "={{ $now.toISO() }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-log-confirmation",
+      "name": "Log Confirmation",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Extract Input').item.json.chat_id }}",
+        "text": "No pending action found to confirm. Please send a new request.",
+        "additionalFields": {}
+      },
+      "id": "node-no-pending",
+      "name": "No Pending Action",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1100, -20]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extract Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Input": {
+      "main": [
+        [
+          {
+            "node": "Check If Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check If Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Fetch Pending Action",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Intent Engine (GPT-4o)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Pending Action": {
+      "main": [
+        [
+          {
+            "node": "Has Pending Action?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Pending Action?": {
+      "main": [
+        [
+          {
+            "node": "Confirmed Action Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Pending Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmed Action Response": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmed Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Confirmed Response": {
+      "main": [
+        [
+          {
+            "node": "Log Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Engine (GPT-4o)": {
+      "main": [
+        [
+          {
+            "node": "Parse Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Intent": {
+      "main": [
+        [
+          {
+            "node": "Intent Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intent Router": {
+      "main": [
+        [
+          {
+            "node": "Gmail Create Draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Gmail Read Inbox",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar Create Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar Delete Event",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Calendar Read Events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Airtable Create Record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Airtable Read Records",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion Create Entry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notion Read Entries",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "General GPT Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "General GPT Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Create Draft": {
+      "main": [
+        [
+          {
+            "node": "Gmail Needs Confirm?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Needs Confirm?": {
+      "main": [
+        [
+          {
+            "node": "Gmail Store Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Store Pending": {
+      "main": [
+        [
+          {
+            "node": "Confirm Response Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Read Inbox": {
+      "main": [
+        [
+          {
+            "node": "Summarize Emails",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Emails": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Create Event": {
+      "main": [
+        [
+          {
+            "node": "Cal Create Confirm?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cal Create Confirm?": {
+      "main": [
+        [
+          {
+            "node": "Cal Store Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cal Store Pending": {
+      "main": [
+        [
+          {
+            "node": "Confirm Response Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Delete Event": {
+      "main": [
+        [
+          {
+            "node": "Cal Delete Confirm?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cal Delete Confirm?": {
+      "main": [
+        [
+          {
+            "node": "Cal Delete Store Pending",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cal Delete Store Pending": {
+      "main": [
+        [
+          {
+            "node": "Confirm Response Builder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calendar Read Events": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Create Record": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Airtable Read Records": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Create Entry": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notion Read Entries": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "General GPT Response": {
+      "main": [
+        [
+          {
+            "node": "Response Builder (GPT)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Response Builder": {
+      "main": [
+        [
+          {
+            "node": "Send Confirmation Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Builder (GPT)": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Response": {
+      "main": [
+        [
+          {
+            "node": "Log to Memory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Error to Memory": {
+      "main": [
+        [
+          {
+            "node": "Error Telegram Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "AI Assistant",
+      "id": "tag-ai-assistant"
+    },
+    {
+      "name": "Production",
+      "id": "tag-production"
+    }
+  ],
+  "triggerCount": 1,
+  "updatedAt": "2026-02-26T00:00:00.000Z",
+  "versionId": "1"
+}
