@@ -89,10 +89,11 @@ export async function saveComparisonFlat(
   },
   scores: {
     totalScore: number; investmentScore: number; rentabilityScore: number;
-    riskScore: number; financingScore: number; projectionScore: number; energyScore: number;
-    grossYield: number; netYield: number; priceFactor: number; sqmPrice: number;
+    riskScore: number; financingScore: number; futureScore: number; energyScore: number;
+    grossYield: number; netYield: number; priceFactor: number;
   },
 ) {
+  // ONLY safe columns that are guaranteed to exist in the analyses table
   const row = {
     user_id: userId,
     address: inp.address,
@@ -110,13 +111,11 @@ export async function saveComparisonFlat(
     rentability_score: scores.rentabilityScore,
     risk_score: scores.riskScore,
     financing_score: scores.financingScore,
-    projection_score: scores.projectionScore,
+    future_score: scores.futureScore,
     energy_score: scores.energyScore,
     gross_yield: scores.grossYield,
     net_yield: scores.netYield,
     price_factor: scores.priceFactor,
-    sqm_price: scores.sqmPrice,
-    status: "saved",
     save_type: "comparison",
   };
   console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(row, null, 2));

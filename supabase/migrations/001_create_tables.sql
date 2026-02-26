@@ -24,13 +24,12 @@ CREATE TABLE IF NOT EXISTS analyses (
   rentability_score INTEGER,
   risk_score INTEGER,
   financing_score INTEGER,
-  projection_score INTEGER,
+  future_score INTEGER,
   energy_score INTEGER,
   -- KPIs
   gross_yield NUMERIC,
   net_yield NUMERIC,
   price_factor NUMERIC,
-  sqm_price NUMERIC,
   -- Legacy JSON fields
   property_id UUID,
   inputs JSONB,
@@ -131,3 +130,29 @@ CREATE POLICY properties_delete_own ON properties FOR DELETE USING (auth.uid() =
 CREATE POLICY subscriptions_select_own ON subscriptions FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY subscriptions_insert_own ON subscriptions FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY subscriptions_update_own ON subscriptions FOR UPDATE USING (auth.uid() = user_id);
+
+-- ══════════════════════════════════════
+-- ALTER TABLE statements for existing tables with missing columns
+-- Run these if your table already exists but is missing columns:
+-- ══════════════════════════════════════
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS future_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS investment_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS rentability_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS risk_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS financing_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS energy_score INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS gross_yield NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS net_yield NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS price_factor NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS location_grade TEXT;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS management_fee NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS renovation_count INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS area_sqm NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS building_year INTEGER;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS monthly_rent NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS purchase_price NUMERIC;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS address TEXT;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS city TEXT;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS energy_class TEXT;
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS save_type TEXT DEFAULT 'comparison';
+-- ALTER TABLE analyses ADD COLUMN IF NOT EXISTS is_favorite BOOLEAN DEFAULT false;

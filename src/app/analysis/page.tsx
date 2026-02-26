@@ -378,12 +378,11 @@ function AnalysisContent() {
           rentabilityScore: getSub("rentability"),
           riskScore: getSub("risk"),
           financingScore: getSub("financing"),
-          projectionScore: getSub("projection"),
+          futureScore: getSub("projection"),
           energyScore: getSub("energy"),
           grossYield: price > 0 ? ((rent * 12) / price) * 100 : 0,
           netYield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
           priceFactor: rent > 0 ? price / (rent * 12) : 0,
-          sqmPrice: area > 0 ? price / area : 0,
         },
       );
       setSaveChoice("compare");
