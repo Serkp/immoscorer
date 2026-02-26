@@ -79,6 +79,54 @@ export async function saveAnalysisDB(
   return data;
 }
 
+/** Save analysis with flat columns (for comparison) */
+export async function saveComparisonFlat(
+  userId: string,
+  inp: {
+    address: string; city: string; purchasePrice: number; monthlyRent: number;
+    areaSqm: number; buildingYear: number; energyClass: string; locationGrade: string;
+    managementFee: number; renovationCount: number;
+  },
+  scores: {
+    totalScore: number; investmentScore: number; rentabilityScore: number;
+    riskScore: number; financingScore: number; projectionScore: number; energyScore: number;
+    grossYield: number; netYield: number; priceFactor: number; sqmPrice: number;
+  },
+) {
+  const { data, error } = await getSupabase()
+    .from("analyses")
+    .insert({
+      user_id: userId,
+      address: inp.address,
+      city: inp.city,
+      purchase_price: inp.purchasePrice,
+      monthly_rent: inp.monthlyRent,
+      area_sqm: inp.areaSqm,
+      building_year: inp.buildingYear,
+      energy_class: inp.energyClass,
+      location_grade: inp.locationGrade,
+      management_fee: inp.managementFee,
+      renovation_count: inp.renovationCount,
+      total_score: scores.totalScore,
+      investment_score: scores.investmentScore,
+      rentability_score: scores.rentabilityScore,
+      risk_score: scores.riskScore,
+      financing_score: scores.financingScore,
+      projection_score: scores.projectionScore,
+      energy_score: scores.energyScore,
+      gross_yield: scores.grossYield,
+      net_yield: scores.netYield,
+      price_factor: scores.priceFactor,
+      sqm_price: scores.sqmPrice,
+      status: "saved",
+      save_type: "comparison",
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 export async function getAnalyses(userId: string, filters?: { status?: string; saveType?: string }) {
   let query = getSupabase()
     .from("analyses")

@@ -10,6 +10,7 @@ import { getAnalyses } from "@/lib/db";
 import { C } from "@/lib/theme";
 
 const NAV = [
+  { href: "/dashboard", label: "Dashboard" },
   { href: "/analysis", label: "Analyse" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/compare", label: "Vergleich" },
@@ -62,7 +63,7 @@ export function Navbar() {
     >
       <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-5">
         {/* Brand */}
-        <Link href="/" className="flex items-center gap-2.5 shrink-0">
+        <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2.5 shrink-0">
           <AIOrb size={26} active />
           <span className="text-sm font-bold tracking-tight" style={{ color: C.text }}>
             ImmoScorer

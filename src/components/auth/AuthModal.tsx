@@ -84,11 +84,11 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         }
       }
 
-      // Auth success — hard redirect to /analysis so auth cookie is picked up
-      console.log("[AuthModal] Auth success, redirecting to /analysis");
+      // Auth success — hard redirect to /dashboard so auth cookie is picked up
+      console.log("[AuthModal] Auth success, redirecting to /dashboard");
       setLoading(false);
       onSuccess?.();
-      window.location.href = "/analysis";
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       console.error("[AuthModal] Unexpected error:", err);
       const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";

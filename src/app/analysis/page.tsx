@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { saveAnalysisDB } from "@/lib/db";
+import { saveComparisonFlat } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -290,18 +290,40 @@ function AnalysisContent() {
     if (!result || !user || saving || saveChoice !== "none") return;
     setSaving(true);
     try {
-      const input: PropertyInput = {
-        street: form.street, city: form.city, price: Number(form.price), rent: Number(form.rent),
-        hausgeld: Number(form.hausgeld), area: Number(form.area), year: Number(form.year),
-        energyClass: form.energyClass, locationGrade: form.locationGrade || "B", renovations: form.renovations,
-        ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
-      };
-      await saveAnalysisDB(
+      const price = Number(form.price);
+      const rent = Number(form.rent);
+      const hausgeld = Number(form.hausgeld);
+      const area = Number(form.area);
+
+      const getSub = (key: string) => result.subscores.find((s) => s.key === key)?.value || 0;
+
+      await saveComparisonFlat(
         user.id,
-        null,
-        input as unknown as Record<string, unknown>,
-        result as unknown as Record<string, unknown>,
-        { status: "saved", saveType: "comparison" }
+        {
+          address: `${form.street}, ${form.city}`,
+          city: form.city,
+          purchasePrice: price,
+          monthlyRent: rent,
+          areaSqm: area,
+          buildingYear: Number(form.year),
+          energyClass: form.energyClass,
+          locationGrade: form.locationGrade || "B",
+          managementFee: hausgeld,
+          renovationCount: form.renovations.length,
+        },
+        {
+          totalScore: result.totalScore,
+          investmentScore: getSub("investment"),
+          rentabilityScore: getSub("rentability"),
+          riskScore: getSub("risk"),
+          financingScore: getSub("financing"),
+          projectionScore: getSub("projection"),
+          energyScore: getSub("energy"),
+          grossYield: price > 0 ? ((rent * 12) / price) * 100 : 0,
+          netYield: price > 0 ? (((rent - hausgeld) * 12) / price) * 100 : 0,
+          priceFactor: rent > 0 ? price / (rent * 12) : 0,
+          sqmPrice: area > 0 ? price / area : 0,
+        },
       );
       setSaveChoice("compare");
       setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
