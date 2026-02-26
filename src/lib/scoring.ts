@@ -159,62 +159,80 @@ function calcInvestment(p: PropertyInput, k: KPIs): { value: number; reasons: st
 }
 
 /* ═══════════════════════════════════════════════════════════
-   2. Vermietbarkeits-Score (15%)
+   2. Vermietbarkeits-Score (15%) — OVERHAULED
+   Lage ist der wichtigste Faktor (50%), nicht 40%.
    ═══════════════════════════════════════════════════════════ */
 
 function calcRentability(p: PropertyInput, k: KPIs): { value: number; reasons: string[]; actions: string[] } {
-  let s = 0;
   const reasons: string[] = [];
   const actions: string[] = [];
-  const locRank = LOCATION_RANK[p.locationGrade] || 45;
-  const energyRank = ENERGY_RANK[p.energyClass] || 50;
 
-  // Location component
+  // ─── Component A: Lageklasse (50% Gewichtung — wichtigster Faktor) ───
+  let locPts: number;
   if (p.walkScore != null && p.transitScore != null) {
-    const realLocScore = Math.round((p.walkScore * 0.6 + p.transitScore * 0.4) / 100 * 40);
-    s += realLocScore;
+    // With real location data: blend walkScore/transitScore with location grade
+    const realScore = p.walkScore * 0.6 + p.transitScore * 0.4;
+    // Map to location grade scale but preserve grade floor
+    const gradeFloor: Record<string, number> = { A: 90, B: 75, C: 45, D: 20 };
+    locPts = Math.max(gradeFloor[p.locationGrade] || 45, Math.round(realScore));
     reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — Walk-Score ${p.walkScore}, ÖPNV-Score ${p.transitScore}. ${
-      p.walkScore > 80 ? "Exzellente Nahversorgung und geringe Leerstandsquote." :
-      p.walkScore > 60 ? "Gute Erreichbarkeit der täglichen Infrastruktur." :
-      "Eingeschränkte Nahversorgung, erhöhtes Leerstandsrisiko."
+      p.locationGrade === "A" ? "Top-Lage mit hervorragender Infrastruktur und minimaler Leerstandsquote." :
+      p.locationGrade === "B" ? "Beliebte Wohnlage mit stabiler Nachfrage und geringem Leerstandsrisiko." :
+      p.locationGrade === "C" ? "Durchschnittliche Lage mit moderatem Vermietungspotenzial." :
+      "Entwicklungslage mit eingeschränkter Nachfrage."
     }`);
   } else {
-    s += Math.round((locRank / 100) * 40);
+    // Without real data: use fixed grade scores
+    const gradeScores: Record<string, number> = { A: 100, B: 85, C: 55, D: 25 };
+    locPts = gradeScores[p.locationGrade] || 55;
     reasons.push(`${LOCATION_LABEL[p.locationGrade] || "Unbekannte Lage"} (Klasse ${p.locationGrade}) — ${
-      locRank >= 72 ? "geringe Leerstandsquote und planbare Mietnachfrage gemäß §558 BGB Mietspiegel." :
-      locRank >= 45 ? "durchschnittliches Vermietungspotenzial, Mietspiegel als Orientierung für §558 BGB Mieterhöhungen." :
-      "erhöhtes Leerstandsrisiko, eingeschränkte Mietpreisbremse nach §556d BGB."
+      p.locationGrade === "A" ? "Top-Lage mit hervorragender Infrastruktur und minimaler Leerstandsquote." :
+      p.locationGrade === "B" ? "Beliebte Wohnlage mit stabiler Nachfrage und geringem Leerstandsrisiko." :
+      p.locationGrade === "C" ? "Durchschnittliche Lage, Mietspiegel als Orientierung für §558 BGB Mieterhöhungen." :
+      "Entwicklungslage — erhöhtes Leerstandsrisiko, eingeschränkte Mietpreisbremse nach §556d BGB."
     }`);
   }
 
-  // Area
-  if (p.area >= 50 && p.area <= 85) { s += 25; reasons.push(`${p.area} m² Wohnfläche im nachfragestärksten Segment — ideal für Singles und Paare.`); }
-  else if (p.area >= 35 && p.area <= 100) { s += 18; reasons.push(`${p.area} m² ist gut vermietbar und deckt breite Zielgruppen ab.`); }
-  else if (p.area > 100) { s += 10; reasons.push(`${p.area} m² — große Einheiten sind schwieriger vermietbar mit höherem m²-Leerstandsverlust.`); }
-  else { s += 6; reasons.push(`${p.area} m² ist eine sehr kleine Einheit — eingeschränkter Mieterkreis.`); }
+  // ─── Component B: Wohnungsgröße (20% Gewichtung) ───
+  let areaPts: number;
+  if (p.area >= 50 && p.area <= 80) { areaPts = 100; reasons.push(`${p.area} m² Wohnfläche im Sweet Spot — breiteste Zielgruppe (Singles, Paare, junge Familien).`); }
+  else if (p.area >= 30 && p.area < 50) { areaPts = 90; reasons.push(`Kompakte ${p.area} m² — in urbanen Lagen stark nachgefragt bei Singles und Paaren.`); }
+  else if (p.area > 80 && p.area <= 120) { areaPts = 75; reasons.push(`${p.area} m² — Familiensegment, solide Nachfrage bei etwas kleinerem Markt.`); }
+  else if (p.area < 30) { areaPts = 70; reasons.push(`${p.area} m² Mikrowohnung — Nischenmarkt, hohe m²-Miete aber eingeschränkter Mieterkreis.`); }
+  else { areaPts = 50; reasons.push(`${p.area} m² — großzügige Fläche, eingeschränkter Mietmarkt im Luxussegment.`); }
 
-  // Age component
-  if (k.age <= 10) { s += 25; reasons.push(`Neubau (${p.year}) — moderne Ausstattung, hohe Mieterakzeptanz.`); }
-  else if (k.age <= 25) { s += 20; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — zeitgemäße Bausubstanz.`); }
-  else if (k.age <= 40) { s += 14; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — solide Substanz, mittelfristiger Modernisierungsbedarf möglich.`); }
-  else if (k.age <= 60) { s += 7; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — ältere Bausubstanz, Mieter erwarten ggf. Modernisierungsstandard.`); }
-  else { s += 3; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — vor modernen Baustandards, eingeschränkte Mieterakzeptanz.`); }
+  // ─── Component C: Baujahr (15% Gewichtung) ───
+  let agePts: number;
+  if (k.age <= 10) { agePts = 100; reasons.push(`Neubau (${p.year}) — moderne Ausstattung, hohe Mieterakzeptanz und geringe Instandhaltung.`); }
+  else if (k.age <= 30) { agePts = 85; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — zeitgemäße Bausubstanz, attraktiv für Mieter.`); }
+  else if (k.age <= 50) { agePts = 70; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — solide Substanz, ggf. Modernisierungsbedarf bei Neuvermietung.`); }
+  else if (k.age <= 80) { agePts = 55; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — ältere Substanz, aber Altbau-Charme kann bei Mietern positiv wirken.`); }
+  else { agePts = 40; reasons.push(`Baujahr ${p.year} (${k.age} Jahre) — historische Substanz, Modernisierungsstandard prüfen.`); }
 
-  // Altbau + bad energy = hard cap
-  if (k.age > 50 && energyRank <= 35) {
-    s = Math.min(s, 40);
-    reasons.push(`Altbau (${k.age} J.) mit Energieklasse ${p.energyClass} — deutlich eingeschränkte Vermietbarkeit an moderne Mietererwartungen.`);
+  // ─── Component D: Energieklasse (15% Gewichtung) ───
+  let energyPts: number;
+  const ec = p.energyClass;
+  if (ec === "A+" || ec === "A" || ec === "B") { energyPts = 100; reasons.push(`Energieklasse ${ec} — moderne Energieeffizienz, attraktiv für umweltbewusste Mieter.`); }
+  else if (ec === "C" || ec === "D") { energyPts = 70; reasons.push(`Energieklasse ${ec} — akzeptabel für die meisten Mieter, mittelfristig Modernisierung sinnvoll.`); }
+  else if (ec === "E") { energyPts = 45; reasons.push(`Energieklasse ${ec} — höhere Nebenkosten können Mieter abschrecken.`); }
+  else { energyPts = 25; reasons.push(`Energieklasse ${ec} — hohe Nebenkosten, eingeschränkte Vermietbarkeit an energiebewusste Mieter.`); }
+
+  // ─── Weighted sum: 50/20/15/15 ───
+  const s = Math.round(locPts * 0.50 + areaPts * 0.20 + agePts * 0.15 + energyPts * 0.15);
+
+  // ─── Actions ───
+  if (p.locationGrade === "A" || p.locationGrade === "B") {
+    actions.push("Mietpreisbremse prüfen (§556d BGB) — Höchstmiete 10 % über Mietspiegel bei Neuvermietung.");
   }
-
-  // Neubau + good energy = bonus
-  if (k.age <= 15 && energyRank >= 76) {
-    s += 10;
-    reasons.push(`Neuwertig + Energieklasse ${p.energyClass} — Premium-Segment, schnelle Wiedervermietung.`);
+  if (p.area >= 30 && p.area <= 80) {
+    actions.push("Zielgruppe Singles/Paare — hohe Nachfrage, kurze Wiedervermietungszeiten.");
   }
-
-  if (locRank >= 72) actions.push("Mietpreisbremse prüfen (§556d BGB) — Höchstmiete 10 % über Mietspiegel bei Neuvermietung.");
-  if (p.area >= 50 && p.area <= 85) actions.push("Zielgruppe Singles/Paare — hohe Nachfrage, kurze Wiedervermietungszeiten.");
-  if (k.age >= 40) actions.push("Modernisierungskosten nach §559 BGB zu 8 % p.a. auf Mieter umlegbar (gedeckelt §559 Abs. 3a BGB).");
+  if (k.age >= 40) {
+    actions.push("Modernisierungskosten nach §559 BGB zu 8 % p.a. auf Mieter umlegbar (gedeckelt §559 Abs. 3a BGB).");
+  }
+  if (energyPts <= 45) {
+    actions.push("Energetische Sanierung kann Vermietbarkeit und Mietpreispotenzial deutlich steigern.");
+  }
 
   return { value: clamp(s), reasons, actions };
 }
