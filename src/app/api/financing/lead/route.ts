@@ -4,9 +4,9 @@ import { getSupabase } from "@/lib/supabase";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { userId, property, price, score, name, email, phone, message } = body;
+    const { userId, firstName, lastName, email, phone, message, propertyAddress, purchasePrice, monthlyRent, score } = body;
 
-    if (!userId || !name || !email) {
+    if (!userId || !firstName || !lastName || !phone) {
       return NextResponse.json({ error: "Fehlende Pflichtfelder" }, { status: 400 });
     }
 
@@ -14,13 +14,15 @@ export async function POST(req: NextRequest) {
       .from("financing_leads")
       .insert({
         user_id: userId,
-        property_address: property,
-        property_price: price,
-        score,
-        contact_name: name,
-        contact_email: email,
-        contact_phone: phone || null,
+        first_name: firstName,
+        last_name: lastName,
+        contact_email: email || null,
+        contact_phone: phone,
         message: message || null,
+        property_address: propertyAddress || null,
+        property_price: purchasePrice || null,
+        monthly_rent: monthlyRent || null,
+        score: score || null,
         status: "new",
       });
 

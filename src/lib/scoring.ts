@@ -349,7 +349,7 @@ function calcFinancing(p: PropertyInput, k: KPIs): { value: number; reasons: str
   else if (k.hausgeldRatio <= 0.35) { s += 12; }
   else { s += 3; reasons.push("Hausgeld-Quote >35 % — belastet Cashflow-Bewertung der Bank."); }
 
-  actions.push("Mindestens 3 Finanzierungsangebote einholen (Interhyp, Direktbanken, Hausbank).");
+  actions.push("Lassen Sie Ihre Finanzierung kostenlos von unseren Experten prüfen — unverbindlich, innerhalb von 24h.");
   if (dscr >= 1.0) actions.push("Stresstest bei 5,5 % Zinssatz durchführen.");
 
   return { value: clamp(s), reasons, actions };

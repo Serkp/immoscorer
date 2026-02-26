@@ -16,7 +16,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { savePortfolioProperty, saveAnalysisDB } from "@/lib/db";
+import { saveAnalysisDB } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -96,9 +96,44 @@ function AnalysisContent() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ text: string; type: "success" | "neutral" } | null>(null);
   const [showFinanzierung, setShowFinanzierung] = useState(false);
-  const [finanzForm, setFinanzForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const [finanzForm, setFinanzForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
   const [finanzSending, setFinanzSending] = useState(false);
   const [finanzSent, setFinanzSent] = useState(false);
+
+  /* ── Restore from sessionStorage (Feature 2: Zwischenspeicher) ── */
+  useEffect(() => {
+    try {
+      const savedForm = sessionStorage.getItem("immoscorer_analysis");
+      if (savedForm) {
+        const parsed = JSON.parse(savedForm) as FormData;
+        setForm(parsed);
+      }
+      const savedStep = sessionStorage.getItem("immoscorer_step");
+      if (savedStep) {
+        setSection(Number(savedStep));
+      }
+      const savedResult = sessionStorage.getItem("immoscorer_result");
+      if (savedResult) {
+        const parsed = JSON.parse(savedResult) as ScoringResult;
+        setResult(parsed);
+        setView("result");
+      }
+    } catch { /* ignore parse errors */ }
+  }, []);
+
+  /* ── Persist form to sessionStorage on change ── */
+  useEffect(() => {
+    if (form.street || form.city || form.price || form.rent) {
+      sessionStorage.setItem("immoscorer_analysis", JSON.stringify(form));
+    }
+  }, [form]);
+
+  /* ── Persist step to sessionStorage ── */
+  useEffect(() => {
+    if (view === "input") {
+      sessionStorage.setItem("immoscorer_step", String(section));
+    }
+  }, [section, view]);
 
   /* ── Checkout success/cancel handling ── */
   useEffect(() => {
@@ -243,42 +278,12 @@ function AnalysisContent() {
           };
           const sr = computeScore(input);
           setResult(sr);
+          sessionStorage.setItem("immoscorer_result", JSON.stringify(sr));
           setSaveChoice("none");
           setView("result");
         }, 600);
       }
     }, 600);
-  }
-
-  async function handleSavePortfolio() {
-    if (!result || !user || saving || saveChoice !== "none") return;
-    setSaving(true);
-    try {
-      await savePortfolioProperty(user.id, {
-        address: form.street,
-        city: form.city,
-        purchasePrice: Number(form.price),
-        currentRent: Number(form.rent),
-        area: Number(form.area) || undefined,
-        buildYear: Number(form.year) || undefined,
-        energyClass: form.energyClass,
-        houseMoney: Number(form.hausgeld) || undefined,
-        locationGrade: form.locationGrade || "B",
-        renovations: form.renovations,
-        score: result.totalScore,
-        scoreData: result as unknown as Record<string, unknown>,
-        locationData: locationData as unknown as Record<string, unknown> || undefined,
-        lat: lat || undefined,
-      });
-      setSaveChoice("portfolio");
-      setToast({ text: "Immobilie im Portfolio gespeichert", type: "success" });
-      setTimeout(() => setToast(null), 3000);
-    } catch {
-      setToast({ text: "Fehler beim Speichern. Bitte versuchen Sie es erneut.", type: "neutral" });
-      setTimeout(() => setToast(null), 3000);
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function handleSaveCompare() {
@@ -311,6 +316,7 @@ function AnalysisContent() {
 
   async function handleFinanzierung() {
     if (!user || !result || finanzSending) return;
+    if (!finanzForm.firstName || !finanzForm.lastName || !finanzForm.phone || !finanzForm.consent) return;
     setFinanzSending(true);
     try {
       await fetch("/api/financing/lead", {
@@ -318,13 +324,15 @@ function AnalysisContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          property: `${form.street}, ${form.city}`,
-          price: Number(form.price),
-          score: result.totalScore,
-          name: finanzForm.name,
+          firstName: finanzForm.firstName,
+          lastName: finanzForm.lastName,
           email: finanzForm.email || user.email,
           phone: finanzForm.phone,
           message: finanzForm.message,
+          propertyAddress: `${form.street}, ${form.city}`,
+          purchasePrice: Number(form.price),
+          monthlyRent: Number(form.rent),
+          score: result.totalScore,
         }),
       });
       setFinanzSent(true);
@@ -347,7 +355,10 @@ function AnalysisContent() {
     setSaveChoice("none");
     setShowFinanzierung(false);
     setFinanzSent(false);
-    setFinanzForm({ name: "", email: "", phone: "", message: "" });
+    setFinanzForm({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
+    sessionStorage.removeItem("immoscorer_analysis");
+    sessionStorage.removeItem("immoscorer_step");
+    sessionStorage.removeItem("immoscorer_result");
   }
 
   /* ── Global checkout toast ── */
@@ -835,6 +846,15 @@ function AnalysisContent() {
                               </li>
                             ))}
                           </ul>
+                          {sub.key === "financing" && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setShowFinanzierung(true); }}
+                              className="mt-3 rounded-lg px-4 py-2 text-xs font-semibold transition-all hover:opacity-90"
+                              style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                            >
+                              Jetzt kostenlose Finanzierungsberatung anfragen →
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
@@ -896,207 +916,219 @@ function AnalysisContent() {
               </ul>
             </Card>
 
-            {/* ── Finanzierungsanfrage ── */}
-            <Card className="p-5 space-y-4 mt-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.5" strokeLinecap="round">
-                    <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3" />
-                  </svg>
-                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
+            {/* ── Finanzierungs-CTA Box ── */}
+            <div
+              className="rounded-2xl p-6 mt-6"
+              style={{
+                background: C.surface2,
+                border: `1px solid transparent`,
+                backgroundClip: "padding-box",
+                boxShadow: `inset 0 0 0 1px ${C.border}`,
+                backgroundImage: `linear-gradient(${C.surface2}, ${C.surface2}), linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+                backgroundOrigin: "border-box",
+              }}
+            >
+              <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+                <div className="flex-1 space-y-3">
+                  <h3 className="text-base font-bold" style={{ color: C.text }}>Kostenlose Finanzierungsanfrage</h3>
+                  <p className="text-sm leading-relaxed" style={{ color: C.sub }}>
+                    Unsere Experten prüfen Ihre Finanzierungsmöglichkeiten — persönlich, unverbindlich, innerhalb von 24 Stunden.
+                  </p>
+                  <ul className="space-y-1.5">
+                    <li className="flex gap-2 text-sm" style={{ color: C.sub }}>
+                      <span style={{ color: C.green }}>✓</span> Über 500 Bankpartner im Vergleich
+                    </li>
+                    <li className="flex gap-2 text-sm" style={{ color: C.sub }}>
+                      <span style={{ color: C.green }}>✓</span> Persönliche Beratung statt Algorithmus
+                    </li>
+                    <li className="flex gap-2 text-sm" style={{ color: C.sub }}>
+                      <span style={{ color: C.green }}>✓</span> Auch für Objekte mit Sanierungsbedarf
+                    </li>
+                  </ul>
                 </div>
-                {!showFinanzierung && !finanzSent && (
+                <div className="flex flex-col items-center gap-2 shrink-0">
                   <button
                     onClick={() => setShowFinanzierung(true)}
-                    className="rounded-xl px-4 py-2 text-xs font-semibold transition-all hover:opacity-90"
-                    style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
-                  >
-                    Anfrage starten
-                  </button>
-                )}
-              </div>
-
-              {finanzSent ? (
-                <div className="rounded-xl p-4 text-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
-                  <p className="text-sm font-bold" style={{ color: C.green }}>Anfrage gesendet!</p>
-                  <p className="text-xs mt-1" style={{ color: C.sub }}>Wir melden uns innerhalb von 24 Stunden bei Ihnen.</p>
-                </div>
-              ) : !showFinanzierung ? (
-                <p className="text-xs" style={{ color: C.dim }}>
-                  Lassen Sie sich ein unverbindliches Finanzierungsangebot für dieses Objekt erstellen.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Name</label>
-                      <input
-                        type="text"
-                        value={finanzForm.name}
-                        onChange={(e) => setFinanzForm((f) => ({ ...f, name: e.target.value }))}
-                        placeholder="Max Mustermann"
-                        className="w-full rounded-xl px-3 py-2 text-sm"
-                        style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>E-Mail</label>
-                      <input
-                        type="email"
-                        value={finanzForm.email}
-                        onChange={(e) => setFinanzForm((f) => ({ ...f, email: e.target.value }))}
-                        placeholder={user?.email || "email@beispiel.de"}
-                        className="w-full rounded-xl px-3 py-2 text-sm"
-                        style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon (optional)</label>
-                    <input
-                      type="tel"
-                      value={finanzForm.phone}
-                      onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))}
-                      placeholder="+49 170 1234567"
-                      className="w-full rounded-xl px-3 py-2 text-sm"
-                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht (optional)</label>
-                    <textarea
-                      value={finanzForm.message}
-                      onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))}
-                      placeholder="Besondere Wünsche oder Fragen..."
-                      rows={2}
-                      className="w-full rounded-xl px-3 py-2 text-sm resize-none"
-                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setShowFinanzierung(false)}
-                      className="rounded-xl px-4 py-2 text-xs font-semibold"
-                      style={{ border: `1px solid ${C.border}`, color: C.sub }}
-                    >
-                      Abbrechen
-                    </button>
-                    <button
-                      onClick={handleFinanzierung}
-                      disabled={finanzSending || !finanzForm.name}
-                      className="flex-1 rounded-xl px-4 py-2 text-xs font-bold transition-all disabled:opacity-40"
-                      style={{ background: `linear-gradient(135deg, ${C.green}, ${C.blue})`, color: "#fff" }}
-                    >
-                      {finanzSending ? "Wird gesendet..." : "Unverbindlich anfragen"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            {/* ── Save Choice Section ── */}
-            <div className="border-t pt-6 mt-6 space-y-4" style={{ borderColor: C.border }}>
-              <h3 className="text-base font-bold" style={{ color: C.text }}>Was möchten Sie mit diesem Objekt tun?</h3>
-              <div className="grid md:grid-cols-2 gap-4">
-                {/* Portfolio Card */}
-                <button
-                  onClick={handleSavePortfolio}
-                  disabled={saving || saveChoice !== "none"}
-                  className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
-                  style={{
-                    background: saveChoice === "portfolio" ? C.greenDim : C.surface2,
-                    border: `1px solid ${saveChoice === "portfolio" ? C.greenBorder : C.border}`,
-                    cursor: saveChoice !== "none" ? "default" : "pointer",
-                  }}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
-                      {saveChoice === "portfolio" ? (
-                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-                          <polyline points="9 22 9 12 15 12 15 22" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold" style={{ color: saveChoice === "portfolio" ? C.green : C.text }}>
-                        {saveChoice === "portfolio" ? "Im Portfolio gespeichert" : "Meine Immobilie"}
-                      </p>
-                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich bereits besitze</p>
-                    </div>
-                  </div>
-                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
-                    Speichern Sie sie in Ihrem Portfolio für Trends, Wertentwicklung und Empfehlungen.
-                  </p>
-                </button>
-
-                {/* Compare Card */}
-                <button
-                  onClick={handleSaveCompare}
-                  disabled={saving || saveChoice !== "none"}
-                  className="rounded-2xl p-5 text-left transition-all disabled:opacity-50"
-                  style={{
-                    background: saveChoice === "compare" ? C.greenDim : C.surface2,
-                    border: `1px solid ${saveChoice === "compare" ? C.greenBorder : C.border}`,
-                    cursor: saveChoice !== "none" ? "default" : "pointer",
-                  }}
-                >
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, rgba(76,154,255,0.12), ${C.accentDim})` }}>
-                      {saveChoice === "compare" ? (
-                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="3" width="8" height="18" rx="1" />
-                          <rect x="14" y="3" width="8" height="18" rx="1" />
-                        </svg>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold" style={{ color: saveChoice === "compare" ? C.green : C.text }}>
-                        {saveChoice === "compare" ? "Im Vergleich gespeichert" : "Zum Vergleich"}
-                      </p>
-                      <p className="text-xs" style={{ color: C.sub }}>Das ist eine Immobilie die ich in Erwägung ziehe</p>
-                    </div>
-                  </div>
-                  <p className="text-[11px] leading-relaxed" style={{ color: C.dim }}>
-                    Speichern Sie sie für den direkten Vergleich mit anderen Objekten.
-                  </p>
-                </button>
-              </div>
-
-              {/* KI-Empfehlung */}
-              <AIComment variant={result.totalScore >= 75 ? "good" : result.totalScore >= 60 ? "info" : result.totalScore >= 40 ? "warn" : "bad"}>
-                {result.totalScore >= 75
-                  ? "Klare Kaufempfehlung. Objekt favorisieren und Finanzierung prüfen."
-                  : result.totalScore >= 60
-                    ? "Solides Objekt. Speichern und mit anderen Objekten vergleichen."
-                    : result.totalScore >= 40
-                      ? "Erhöhte Vorsicht. Nur bei Verhandlungsspielraum weiterverfolgen."
-                      : "Andere Objekte bieten ein besseres Rendite-Risiko-Profil."}
-              </AIComment>
-
-              {/* Navigation after save */}
-              {saveChoice !== "none" && (
-                <div className="flex gap-3 animate-fade-up">
-                  <button
-                    onClick={() => router.push(saveChoice === "portfolio" ? "/portfolio" : "/compare")}
-                    className="rounded-xl px-5 py-2.5 text-sm font-semibold transition-all"
+                    className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90"
                     style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
                   >
-                    {saveChoice === "portfolio" ? "Zum Portfolio" : "Zum Vergleich"}
+                    Finanzierung anfragen
                   </button>
-                  <button onClick={reset} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>
-                    Neue Analyse
-                  </button>
+                  <span className="text-[11px]" style={{ color: C.dim }}>100% kostenlos · Antwort in 24h</span>
                 </div>
+              </div>
+            </div>
+
+            {/* ── Finanzierungs-Modal Overlay ── */}
+            {showFinanzierung && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+                <div
+                  className="relative w-full max-w-lg rounded-2xl p-6 space-y-5 animate-fade-up"
+                  style={{ background: C.bg2, border: `1px solid ${C.border}` }}
+                >
+                  {/* Close button */}
+                  <button
+                    onClick={() => setShowFinanzierung(false)}
+                    className="absolute top-4 right-4 rounded-lg p-1 transition-all hover:opacity-70"
+                    style={{ color: C.dim }}
+                  >
+                    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+
+                  {finanzSent ? (
+                    <div className="py-8 text-center space-y-3">
+                      <div className="w-16 h-16 rounded-full mx-auto flex items-center justify-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
+                        <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      </div>
+                      <h3 className="text-lg font-bold" style={{ color: C.text }}>Vielen Dank!</h3>
+                      <p className="text-sm" style={{ color: C.sub }}>Wir melden uns innerhalb von 24 Stunden bei Ihnen.</p>
+                      <button
+                        onClick={() => setShowFinanzierung(false)}
+                        className="mt-4 rounded-xl px-6 py-2.5 text-sm font-semibold"
+                        style={{ border: `1px solid ${C.border}`, color: C.sub }}
+                      >
+                        Schließen
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <h3 className="text-lg font-bold" style={{ color: C.text }}>Finanzierungsanfrage</h3>
+                        <p className="text-xs mt-1" style={{ color: C.dim }}>
+                          Objekt: {form.street}, {form.city} — {Number(form.price).toLocaleString("de-DE")} €
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Vorname *</label>
+                          <input
+                            type="text"
+                            value={finanzForm.firstName}
+                            onChange={(e) => setFinanzForm((f) => ({ ...f, firstName: e.target.value }))}
+                            placeholder="Max"
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none focus:ring-1"
+                            style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachname *</label>
+                          <input
+                            type="text"
+                            value={finanzForm.lastName}
+                            onChange={(e) => setFinanzForm((f) => ({ ...f, lastName: e.target.value }))}
+                            placeholder="Mustermann"
+                            className="w-full rounded-xl px-3 py-2 text-sm outline-none focus:ring-1"
+                            style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>E-Mail</label>
+                        <input
+                          type="email"
+                          value={finanzForm.email || user?.email || ""}
+                          onChange={(e) => setFinanzForm((f) => ({ ...f, email: e.target.value }))}
+                          placeholder="email@beispiel.de"
+                          className="w-full rounded-xl px-3 py-2 text-sm outline-none focus:ring-1"
+                          style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon *</label>
+                        <input
+                          type="tel"
+                          value={finanzForm.phone}
+                          onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))}
+                          placeholder="+49 170 1234567"
+                          className="w-full rounded-xl px-3 py-2 text-sm outline-none focus:ring-1"
+                          style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht (optional)</label>
+                        <textarea
+                          value={finanzForm.message}
+                          onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))}
+                          placeholder="Besondere Wünsche oder Fragen..."
+                          rows={2}
+                          className="w-full rounded-xl px-3 py-2 text-sm resize-none outline-none focus:ring-1"
+                          style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                        />
+                      </div>
+
+                      <label className="flex items-start gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={finanzForm.consent}
+                          onChange={(e) => setFinanzForm((f) => ({ ...f, consent: e.target.checked }))}
+                          className="mt-0.5 rounded"
+                        />
+                        <span className="text-xs leading-relaxed" style={{ color: C.sub }}>
+                          Ich stimme der Kontaktaufnahme per Telefon/E-Mail zu. *
+                        </span>
+                      </label>
+
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={() => setShowFinanzierung(false)}
+                          className="rounded-xl px-5 py-2.5 text-sm font-semibold"
+                          style={{ border: `1px solid ${C.border}`, color: C.sub }}
+                        >
+                          Abbrechen
+                        </button>
+                        <button
+                          onClick={handleFinanzierung}
+                          disabled={finanzSending || !finanzForm.firstName || !finanzForm.lastName || !finanzForm.phone || !finanzForm.consent}
+                          className="flex-1 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-40"
+                          style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                        >
+                          {finanzSending ? "Wird gesendet..." : "Anfrage absenden"}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── Action Buttons ── */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
+              {saveChoice === "none" ? (
+                <button
+                  onClick={handleSaveCompare}
+                  disabled={saving}
+                  className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                >
+                  {saving ? "Wird gespeichert..." : "Im Vergleich speichern"}
+                </button>
+              ) : (
+                <button
+                  onClick={() => router.push("/compare")}
+                  className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90 flex items-center gap-2"
+                  style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                >
+                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  Zum Vergleich →
+                </button>
               )}
+              <button
+                onClick={reset}
+                className="rounded-xl px-6 py-3 text-sm font-semibold transition-all"
+                style={{ border: `1px solid ${C.border}`, color: C.sub }}
+              >
+                Neue Analyse starten
+              </button>
             </div>
           </>
       </div>

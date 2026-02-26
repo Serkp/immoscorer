@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
+import { getAnalyses } from "@/lib/db";
 import { C } from "@/lib/theme";
 
 const NAV = [
@@ -21,6 +22,7 @@ export function Navbar() {
   const { user, signOut } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [compareCount, setCompareCount] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const displayName =
@@ -41,6 +43,14 @@ export function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Load compare count
+  useEffect(() => {
+    if (!user) { setCompareCount(0); return; }
+    getAnalyses(user.id, { status: "saved", saveType: "comparison" })
+      .then((data) => setCompareCount(data?.length || 0))
+      .catch(() => {});
+  }, [user, pathname]);
 
   return (
     <nav
@@ -70,13 +80,21 @@ export function Navbar() {
               <Link
                 key={n.href}
                 href={n.href}
-                className="rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
+                className="relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
                 style={{
                   background: active ? C.surface3 : "transparent",
                   color: active ? C.text : C.sub,
                 }}
               >
                 {n.label}
+                {n.href === "/compare" && compareCount > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 min-w-[16px] h-4 rounded-full flex items-center justify-center text-[10px] font-bold px-1"
+                    style={{ background: C.accent, color: "#fff" }}
+                  >
+                    {compareCount}
+                  </span>
+                )}
               </Link>
             );
           })}

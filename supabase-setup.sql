@@ -68,19 +68,24 @@ CREATE POLICY "Users manage own portfolio" ON portfolio_properties FOR ALL USING
 CREATE TABLE IF NOT EXISTS financing_leads (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-  property_address text,
-  property_price numeric,
-  score integer,
-  contact_name text,
+  first_name text,
+  last_name text,
   contact_email text,
   contact_phone text,
   message text,
+  property_address text,
+  property_price numeric,
+  monthly_rent numeric,
+  score integer,
   source text DEFAULT 'analysis',
   status text DEFAULT 'new',
   created_at timestamptz DEFAULT now()
 );
--- Add source column if table already exists
+-- Add new columns if table already exists (idempotent)
 ALTER TABLE financing_leads ADD COLUMN IF NOT EXISTS source text DEFAULT 'analysis';
+ALTER TABLE financing_leads ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE financing_leads ADD COLUMN IF NOT EXISTS last_name text;
+ALTER TABLE financing_leads ADD COLUMN IF NOT EXISTS monthly_rent numeric;
 
 ALTER TABLE financing_leads ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users manage own financing leads" ON financing_leads;
