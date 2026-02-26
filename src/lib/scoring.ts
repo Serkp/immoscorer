@@ -7,8 +7,8 @@ export interface PropertyInput {
   street: string;
   city: string;
   price: number;
-  rent: number;
-  hausgeld: number;
+  rent: number;       // Always Kaltmiete (already adjusted if user entered Warmmiete)
+  hausgeld: number;   // Total Hausgeld (WEG payment)
   area: number;
   year: number;
   energyClass: string;
@@ -17,6 +17,9 @@ export interface PropertyInput {
   /* Optional: echte Lage-Daten von Google Places */
   walkScore?: number;
   transitScore?: number;
+  /* Optional: Hausgeld-Aufschlüsselung */
+  hausgeldNichtUmlagefaehig?: number; // Owner's actual cost (non-apportionable)
+  hasHGBreakdown?: boolean;           // User provided detailed breakdown
 }
 
 export interface SubscoreEntry {
@@ -40,6 +43,9 @@ export interface ScoringResult {
     sqmPrice: number;
     hausgeldRatio: number;
     netCashflow: number;
+    hausgeldGesamt: number;
+    hausgeldNichtUmlagefaehig: number;
+    hasHGBreakdown: boolean;
   };
   strengths: string[];
   risks: string[];
@@ -90,17 +96,19 @@ function deriveKPIs(p: PropertyInput) {
   const effectivePrice = p.price + renovationCosts;
   const grossYield = annualRent / p.price;
   const effectiveGrossYield = annualRent / effectivePrice;
-  const netCashflow = p.rent - p.hausgeld;
+  // Use nicht-umlagefähig portion for cashflow (default: 40% of total hausgeld)
+  const ownerHausgeld = p.hausgeldNichtUmlagefaehig ?? (p.hausgeld * 0.40);
+  const netCashflow = p.rent - ownerHausgeld;
   const netYield = (netCashflow * 12) / p.price;
   const factor = p.price / annualRent;
   const effectiveFactor = effectivePrice / annualRent;
   const sqmPrice = p.price / p.area;
-  const hausgeldRatio = p.hausgeld / p.rent;
+  const hausgeldRatio = p.rent > 0 ? ownerHausgeld / p.rent : 0;
   const age = new Date().getFullYear() - p.year;
   return {
     annualRent, grossYield, effectiveGrossYield, netCashflow, netYield,
     factor, effectiveFactor, sqmPrice, hausgeldRatio, age,
-    renovationCosts, effectivePrice,
+    renovationCosts, effectivePrice, ownerHausgeld,
   };
 }
 
@@ -276,14 +284,20 @@ function calcRisk(p: PropertyInput, k: KPIs): { value: number; reasons: string[]
   else if (k.age <= 100) { agePts = 20; reasons.push(`${k.age} Jahre — erhöhtes Risiko für verdeckte Mängel.`); actions.push("Unabhängiges Baugutachten beauftragen. Schadstoffprüfung (Asbest, PCB) empfohlen."); }
   else { agePts = 10; reasons.push(`${k.age} Jahre — Altbau-Substanz, umfassende Prüfung zwingend erforderlich.`); actions.push("Vollgutachten inkl. Schadstoffanalyse vor Kaufvertrag zwingend empfohlen."); }
 
-  // ─── Component C: Hausgeld ratio (20%) ───
+  // ─── Component C: Hausgeld ratio (20%) — uses nicht-umlagefähig portion ───
   let hgPts: number;
   const hgPct = k.hausgeldRatio * 100;
-  if (hgPct < 15) { hgPts = 100; reasons.push(`Hausgeld-Quote nur ${hgPct.toFixed(0)} % der Miete — sehr gesunder Cashflow-Puffer.`); }
-  else if (hgPct <= 25) { hgPts = 80; reasons.push(`Hausgeld-Quote ${hgPct.toFixed(0)} % — im normalen Bereich.`); }
-  else if (hgPct <= 35) { hgPts = 50; reasons.push(`Hausgeld-Quote ${hgPct.toFixed(0)} % — erhöht, WEG-Kosten prüfen.`); }
-  else if (hgPct <= 50) { hgPts = 25; reasons.push(`Hausgeld-Quote ${hgPct.toFixed(0)} % — kritisch hoch, deutet auf hohe WEG-Kosten oder aufgestaute Rücklagen hin.`); actions.push("WEG-Wirtschaftsplan und Hausgeldabrechnung der letzten 3 Jahre anfordern (§28 WEG)."); }
-  else { hgPts = 5; reasons.push(`Hausgeld absorbiert ${hgPct.toFixed(0)} % der Bruttomiete — Cashflow-Killer.`); actions.push("WEG-Wirtschaftsplan prüfen. Sonderumlagen und Instandhaltungsrückstellung analysieren."); }
+  const hgLabel = p.hasHGBreakdown
+    ? `Bereinigte HG-Quote ${hgPct.toFixed(0)} % (${Math.round(k.ownerHausgeld)} € nicht-umlagefähig von ${Math.round(p.hausgeld)} € gesamt)`
+    : `Geschätzte HG-Quote ${hgPct.toFixed(0)} % (ca. ${Math.round(k.ownerHausgeld)} € nicht-umlagefähig)`;
+  if (hgPct < 15) { hgPts = 100; reasons.push(`${hgLabel} — sehr gesunder Cashflow-Puffer.`); }
+  else if (hgPct <= 25) { hgPts = 80; reasons.push(`${hgLabel} — im normalen Bereich.`); }
+  else if (hgPct <= 35) { hgPts = 50; reasons.push(`${hgLabel} — erhöht, WEG-Kosten prüfen.`); }
+  else if (hgPct <= 50) { hgPts = 25; reasons.push(`${hgLabel} — kritisch hoch, deutet auf hohe WEG-Kosten oder aufgestaute Rücklagen hin.`); actions.push("WEG-Wirtschaftsplan und Hausgeldabrechnung der letzten 3 Jahre anfordern (§28 WEG)."); }
+  else { hgPts = 5; reasons.push(`${hgLabel} — Hausgeld-Belastung ist ein Cashflow-Killer.`); actions.push("WEG-Wirtschaftsplan prüfen. Sonderumlagen und Instandhaltungsrückstellung analysieren."); }
+  if (!p.hasHGBreakdown) {
+    actions.push("Hausgeld aufschlüsseln für genauere Analyse — umlagefähige Kosten (Heizung, Wasser, Müll) werden vom Mieter getragen.");
+  }
 
   // ─── Component D: Energy class risk (15%) ───
   let energyPts: number;
@@ -483,7 +497,7 @@ function generateStrengths(p: PropertyInput, k: KPIs): string[] {
   const l: string[] = [];
   if (k.effectiveGrossYield >= 0.06) l.push(`Effektive Bruttorendite ${(k.effectiveGrossYield * 100).toFixed(1)} % (inkl. Sanierungskosten) deutlich über Marktdurchschnitt.`);
   else if (k.effectiveGrossYield >= 0.05) l.push(`Effektive Bruttorendite ${(k.effectiveGrossYield * 100).toFixed(1)} % übertrifft den Bundesdurchschnitt.`);
-  if (k.hausgeldRatio <= 0.25) l.push(`Hausgeld nur ${(k.hausgeldRatio * 100).toFixed(0)} % der Bruttomiete — innerhalb der 30 %-Schwelle.`);
+  if (k.hausgeldRatio <= 0.25) l.push(`${p.hasHGBreakdown ? "Bereinigte" : "Geschätzte"} HG-Quote nur ${(k.hausgeldRatio * 100).toFixed(0)} % — innerhalb der 30 %-Schwelle.`);
   if (p.renovations.length === 0) l.push("Kein Sanierungsbedarf — stabilisiertes Objekt, ab Tag 1 cashflow-fähig.");
   if ((ENERGY_RANK[p.energyClass] || 50) >= 76) l.push(`Energieklasse ${p.energyClass} — zukunftssicher gegenüber GEG-Verschärfungen.`);
   if ((LOCATION_RANK[p.locationGrade] || 45) >= 72) l.push(`${LOCATION_LABEL[p.locationGrade]} — geringe Leerstandsquote, günstige Bankkonditionen.`);
@@ -497,7 +511,7 @@ function generateRisks(p: PropertyInput, k: KPIs): string[] {
   const l: string[] = [];
   if (k.effectiveGrossYield < 0.03) l.push(`Effektive Bruttorendite ${(k.effectiveGrossYield * 100).toFixed(1)} % unter Break-even-Schwelle für fremdfinanzierte Akquisitionen.`);
   else if (k.effectiveGrossYield < 0.04) l.push(`Effektive Bruttorendite ${(k.effectiveGrossYield * 100).toFixed(1)} % — minimaler Spielraum bei Zinsanstieg.`);
-  if (k.hausgeldRatio >= 0.5) l.push(`Hausgeld absorbiert ${(k.hausgeldRatio * 100).toFixed(0)} % der Miete — hohe WEG-Kosten.`);
+  if (k.hausgeldRatio >= 0.5) l.push(`${p.hasHGBreakdown ? "Bereinigte" : "Geschätzte"} HG-Quote ${(k.hausgeldRatio * 100).toFixed(0)} % — hohe nicht-umlagefähige WEG-Kosten.`);
   if (p.renovations.length >= 4) l.push(`${p.renovations.length} Gewerke sanierungsbedürftig — geschätzte Sanierungskosten ${Math.round(k.renovationCosts).toLocaleString("de-DE")} €.`);
   else if (p.renovations.length >= 2) l.push(`${p.renovations.length} Sanierungen mit Ausführungsrisiken und Kapitalbedarf.`);
   if ((ENERGY_RANK[p.energyClass] || 50) < 35) l.push(`Energieklasse ${p.energyClass} — regulatorischer Druck durch GEG 2024, Sanierungspflicht möglich.`);
@@ -525,7 +539,7 @@ export function computeScore(p: PropertyInput): ScoringResult {
   const subscores: SubscoreEntry[] = [
     { key: "investment", label: "Investitions-Score", value: inv.value, weight: 30, oneLiner: `Eff. Rendite ${(k.effectiveGrossYield * 100).toFixed(1)} %, Faktor ${k.effectiveFactor.toFixed(1)}x, ${Math.round(k.sqmPrice).toLocaleString("de-DE")} €/m²`, reasons: inv.reasons, actions: inv.actions },
     { key: "rentability", label: "Vermietbarkeits-Score", value: rent.value, weight: 15, oneLiner: `Lageklasse ${p.locationGrade}, ${p.area} m², Baujahr ${p.year}`, reasons: rent.reasons, actions: rent.actions },
-    { key: "risk", label: "Risiko-Score", value: risk.value, weight: 15, oneLiner: `${p.renovations.length} Sanierungen, ${(k.hausgeldRatio * 100).toFixed(0)} % HG-Quote, ${k.age} J. alt`, reasons: risk.reasons, actions: risk.actions },
+    { key: "risk", label: "Risiko-Score", value: risk.value, weight: 15, oneLiner: `${p.renovations.length} Sanierungen, ${(k.hausgeldRatio * 100).toFixed(0)} % ${p.hasHGBreakdown ? "bereinigte" : "gesch."} HG-Quote, ${k.age} J. alt`, reasons: risk.reasons, actions: risk.actions },
     { key: "financing", label: "Finanzierungs-Score", value: fin.value, weight: 15, oneLiner: `LTV-Potenzial: Lage ${p.locationGrade}, Rendite ${(k.effectiveGrossYield * 100).toFixed(1)} %`, reasons: fin.reasons, actions: fin.actions },
     { key: "projection", label: "Zukunfts-Score", value: proj.value, weight: 15, oneLiner: "Wachstumspotenzial, Energiekonformität, Mietentwicklung", reasons: proj.reasons, actions: proj.actions },
     { key: "energy", label: "Energie-Score", value: energy.value, weight: 10, oneLiner: `Klasse ${p.energyClass}, Gebäudehülle ${!p.renovations.includes("fenster") && !p.renovations.includes("fassade") ? "intakt" : "sanierungsbedürftig"}`, reasons: energy.reasons, actions: energy.actions },
@@ -542,7 +556,7 @@ export function computeScore(p: PropertyInput): ScoringResult {
     totalScore: clamp(totalScore),
     confidence: calcConfidence(p, k),
     subscores,
-    kpis: { netYield: k.netYield, grossYield: k.grossYield, factor: k.factor, sqmPrice: k.sqmPrice, hausgeldRatio: k.hausgeldRatio, netCashflow: k.netCashflow },
+    kpis: { netYield: k.netYield, grossYield: k.grossYield, factor: k.factor, sqmPrice: k.sqmPrice, hausgeldRatio: k.hausgeldRatio, netCashflow: k.netCashflow, hausgeldGesamt: p.hausgeld, hausgeldNichtUmlagefaehig: k.ownerHausgeld, hasHGBreakdown: !!p.hasHGBreakdown },
     strengths: generateStrengths(p, k),
     risks: generateRisks(p, k),
   };

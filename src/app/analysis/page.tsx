@@ -31,6 +31,19 @@ const RENO_ITEMS = [
   { key: "heizung", label: "Heizung", desc: "Kessel, Rohre, Heizkörper", cost: "12.000–35.000 €" },
 ] as const;
 
+const HG_ITEMS = [
+  { key: "heizung", label: "Heizkosten / Fernwärme", umlagefaehig: true },
+  { key: "warmwasser", label: "Warmwasser", umlagefaehig: true },
+  { key: "kaltwasser", label: "Kaltwasser / Abwasser", umlagefaehig: true },
+  { key: "muell", label: "Müllabfuhr", umlagefaehig: true },
+  { key: "hausmeister", label: "Hausmeister / Treppenhausreinigung", umlagefaehig: true },
+  { key: "aufzug", label: "Aufzug", umlagefaehig: true },
+  { key: "versicherung", label: "Gebäudeversicherung", umlagefaehig: true },
+  { key: "grundsteuer", label: "Grundsteuer", umlagefaehig: true },
+  { key: "ruecklage", label: "Instandhaltungsrücklage", umlagefaehig: false },
+  { key: "verwaltung", label: "Verwaltungskosten", umlagefaehig: false },
+] as const;
+
 const LOADING_STEPS = [
   { title: "Adresse verifizieren", sub: "Standort und Marktdaten abrufen" },
   { title: "Vergleichspreise ermitteln", sub: "Transaktionen analysieren" },
@@ -46,7 +59,10 @@ interface FormData {
   city: string;
   price: string;
   rent: string;
+  rentType: "kalt" | "warm";
+  warmNK: string;
   hausgeld: string;
+  hgItems: Record<string, string>;
   area: string;
   year: string;
   energyClass: string;
@@ -64,9 +80,37 @@ interface LocationData {
 }
 
 const INIT: FormData = {
-  street: "", city: "", price: "", rent: "", hausgeld: "", area: "", year: "",
+  street: "", city: "", price: "", rent: "", rentType: "kalt", warmNK: "",
+  hausgeld: "", hgItems: {}, area: "", year: "",
   energyClass: "", locationGrade: "", renovations: [],
 };
+
+/** Derive Kaltmiete from form (adjusts for Warmmiete if selected) */
+function getKaltmiete(f: FormData): number {
+  const rent = Number(f.rent);
+  if (!rent) return 0;
+  if (f.rentType === "kalt") return rent;
+  const nk = Number(f.warmNK);
+  return nk > 0 ? rent - nk : rent * 0.70;
+}
+
+/** Compute HG breakdown: nicht-umlagefähig and umlagefähig portions */
+function computeHGSplit(hausgeld: number, hgItems: Record<string, string>) {
+  const entries = Object.entries(hgItems).filter(([, v]) => v && Number(v) > 0);
+  const hasBreakdown = entries.length > 0;
+  if (!hasBreakdown) {
+    return { umlagefaehig: hausgeld * 0.60, nichtUmlagefaehig: hausgeld * 0.40, hasBreakdown: false };
+  }
+  let umlagefaehig = 0;
+  let nichtUmlagefaehig = 0;
+  for (const [key, val] of entries) {
+    const amount = Number(val) || 0;
+    const item = HG_ITEMS.find((i) => i.key === key);
+    if (item?.umlagefaehig) umlagefaehig += amount;
+    else nichtUmlagefaehig += amount;
+  }
+  return { umlagefaehig, nichtUmlagefaehig, hasBreakdown: true };
+}
 
 export default function AnalysisPage() {
   return (
@@ -99,6 +143,7 @@ function AnalysisContent() {
   const [finanzForm, setFinanzForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
   const [finanzSending, setFinanzSending] = useState(false);
   const [finanzSent, setFinanzSent] = useState(false);
+  const [hgExpanded, setHgExpanded] = useState(false);
 
   /* ── Restore from sessionStorage (Feature 2: Zwischenspeicher) ── */
   useEffect(() => {
@@ -164,27 +209,37 @@ function AnalysisContent() {
   }, []);
 
   /* ── Live-Metriken ── */
+  const kaltmiete = getKaltmiete(form);
+
   const liveKPIs = useMemo(() => {
     const price = Number(form.price);
-    const rent = Number(form.rent);
+    const rent = getKaltmiete(form);
     if (!price || !rent) return null;
     const grossYield = (rent * 12) / price;
     const factor = price / (rent * 12);
     const annualRent = rent * 12;
-    return { grossYield, factor, annualRent };
-  }, [form.price, form.rent]);
+    const isWarm = form.rentType === "warm";
+    return { grossYield, factor, annualRent, isWarm };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.price, form.rent, form.rentType, form.warmNK]);
+
+  const hgSplit = useMemo(
+    () => computeHGSplit(Number(form.hausgeld), form.hgItems),
+    [form.hausgeld, form.hgItems],
+  );
 
   const liveKPIs2 = useMemo(() => {
     const price = Number(form.price);
-    const rent = Number(form.rent);
-    const hg = Number(form.hausgeld);
+    const rent = getKaltmiete(form);
     const area = Number(form.area);
     if (!price || !rent) return null;
-    const netCashflow = rent - (hg || 0);
-    const hausgeldRatio = hg && rent ? hg / rent : 0;
+    const ownerHG = hgSplit.nichtUmlagefaehig;
+    const netCashflow = rent - ownerHG;
+    const hausgeldRatio = ownerHG > 0 && rent ? ownerHG / rent : 0;
     const sqmPrice = area ? price / area : 0;
-    return { netCashflow, hausgeldRatio, sqmPrice };
-  }, [form.price, form.rent, form.hausgeld, form.area]);
+    return { netCashflow, hausgeldRatio, sqmPrice, ownerHG, hasBreakdown: hgSplit.hasBreakdown };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.price, form.rent, form.rentType, form.warmNK, form.hausgeld, form.area, hgSplit]);
 
   /* ── Echte Lage-Analyse via Google Places ── */
   async function analyzeLocation(placeLat: number, placeLng: number, city: string) {
@@ -263,18 +318,22 @@ function AnalysisContent() {
       if (step >= 5) {
         clearInterval(interval);
         setTimeout(() => {
+          const rent = getKaltmiete(form);
+          const hg = Number(form.hausgeld);
+          const split = computeHGSplit(hg, form.hgItems);
           const input: PropertyInput = {
             street: form.street,
             city: form.city,
             price: Number(form.price),
-            rent: Number(form.rent),
-            hausgeld: Number(form.hausgeld),
+            rent,
+            hausgeld: hg,
             area: Number(form.area),
             year: Number(form.year),
             energyClass: form.energyClass,
             locationGrade: form.locationGrade || "B",
             renovations: form.renovations,
             ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
+            ...(split.hasBreakdown ? { hausgeldNichtUmlagefaehig: split.nichtUmlagefaehig, hasHGBreakdown: true } : {}),
           };
           const sr = computeScore(input);
           setResult(sr);
@@ -291,9 +350,11 @@ function AnalysisContent() {
     setSaving(true);
     try {
       const price = Number(form.price);
-      const rent = Number(form.rent);
+      const rent = getKaltmiete(form);
       const hausgeld = Number(form.hausgeld);
       const area = Number(form.area);
+      const split = computeHGSplit(hausgeld, form.hgItems);
+      const ownerHG = split.nichtUmlagefaehig;
 
       const getSub = (key: string) => result.subscores.find((s) => s.key === key)?.value || 0;
 
@@ -320,7 +381,7 @@ function AnalysisContent() {
           projectionScore: getSub("projection"),
           energyScore: getSub("energy"),
           grossYield: price > 0 ? ((rent * 12) / price) * 100 : 0,
-          netYield: price > 0 ? (((rent - hausgeld) * 12) / price) * 100 : 0,
+          netYield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
           priceFactor: rent > 0 ? price / (rent * 12) : 0,
           sqmPrice: area > 0 ? price / area : 0,
         },
@@ -378,6 +439,7 @@ function AnalysisContent() {
     setShowFinanzierung(false);
     setFinanzSent(false);
     setFinanzForm({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
+    setHgExpanded(false);
     sessionStorage.removeItem("immoscorer_analysis");
     sessionStorage.removeItem("immoscorer_step");
     sessionStorage.removeItem("immoscorer_result");
@@ -572,9 +634,51 @@ function AnalysisContent() {
                 {form.price && !priceValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Kaufpreis zwischen 10.000 und 50.000.000 € eingeben</p>}
               </div>
               <div>
-                <Input label="Monatliche Kaltmiete" value={form.rent} onChange={(v) => set("rent", v)} placeholder="950" type="number" suffix="€" large explain="Nettokaltmiete ohne Nebenkosten." />
-                {form.rent && !rentValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Kaltmiete zwischen 50 und 50.000 € eingeben</p>}
+                <Input label={form.rentType === "warm" ? "Monatliche Warmmiete" : "Monatliche Kaltmiete"} value={form.rent} onChange={(v) => set("rent", v)} placeholder="950" type="number" suffix="€" large explain={form.rentType === "warm" ? "Warmmiete inkl. Nebenkosten." : "Nettokaltmiete ohne Nebenkosten."} />
+                {form.rent && !rentValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Miete zwischen 50 und 50.000 € eingeben</p>}
               </div>
+            </div>
+
+            {/* Rent type selector */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium" style={{ color: C.sub }}>Mietart</label>
+              <div className="flex rounded-xl p-1" style={{ background: C.surface }}>
+                {(["kalt", "warm"] as const).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, rentType: t }))}
+                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all"
+                    style={{
+                      background: form.rentType === t ? C.surface3 : "transparent",
+                      color: form.rentType === t ? C.text : C.sub,
+                    }}
+                  >
+                    {t === "kalt" ? "Kaltmiete" : "Warmmiete"}
+                  </button>
+                ))}
+              </div>
+              {form.rentType === "warm" && (
+                <div className="space-y-2 animate-fade-up">
+                  <p className="text-xs" style={{ color: C.dim }}>
+                    Bei Warmmiete sind Nebenkosten bereits enthalten. Die Kaltmiete wird geschätzt (~70 % der Warmmiete).
+                  </p>
+                  <Input
+                    label="Geschätzte Nebenkosten (optional)"
+                    value={form.warmNK}
+                    onChange={(v) => setForm((f) => ({ ...f, warmNK: v }))}
+                    placeholder={form.rent ? String(Math.round(Number(form.rent) * 0.30)) : ""}
+                    type="number"
+                    suffix="€/Mon."
+                    explain="Falls bekannt, für genauere Berechnung eingeben."
+                  />
+                  {form.rent && (
+                    <p className="text-xs" style={{ color: C.blue }}>
+                      Geschätzte Kaltmiete: {Math.round(kaltmiete).toLocaleString("de-DE")} €/Mon.
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Live-Metriken */}
@@ -619,7 +723,7 @@ function AnalysisContent() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Input label="Hausgeld" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="350" type="number" suffix="€/Mon." explain="Monatliches Hausgeld (Verwaltung + Instandhaltungsrücklage)." />
+                <Input label="Hausgeld gesamt" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="225" type="number" suffix="€/Mon." explain="Monatliches Hausgeld lt. WEG-Abrechnung." />
                 {form.hausgeld && !hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Hausgeld zwischen 0 und 5.000 € eingeben</p>}
                 {hausgeldWarn && hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.amber }}>Hausgeld ist höher als Kaltmiete — Cashflow negativ!</p>}
               </div>
@@ -628,6 +732,148 @@ function AnalysisContent() {
                 {form.area && !areaValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Wohnfläche zwischen 10 und 10.000 m² eingeben</p>}
               </div>
             </div>
+
+            {/* ── Hausgeld-Aufschlüsselung (optional) ── */}
+            {form.hausgeld && hausgeldValid && (
+              <div className="space-y-3 animate-fade-up">
+                <button
+                  type="button"
+                  onClick={() => setHgExpanded((e) => !e)}
+                  className="flex items-center gap-2 text-xs font-medium transition-all hover:opacity-80"
+                  style={{ color: C.accent }}
+                >
+                  <svg width={12} height={12} viewBox="0 0 16 16" className={`transition-transform ${hgExpanded ? "rotate-180" : ""}`}>
+                    <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+                  </svg>
+                  {hgExpanded ? "Aufschlüsselung ausblenden" : "Hausgeld aufschlüsseln (für genauere Berechnung)"}
+                </button>
+
+                {hgExpanded && (
+                  <div className="rounded-xl p-4 space-y-4 animate-fade-up" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+                    <div>
+                      <p className="text-xs font-bold" style={{ color: C.text }}>Was ist im Hausgeld enthalten?</p>
+                      <p className="text-[11px] mt-1" style={{ color: C.dim }}>
+                        Je genauer Sie aufschlüsseln, desto präziser wird Ihre Analyse. Die Daten finden Sie in der letzten Hausgeldabrechnung.
+                      </p>
+                    </div>
+
+                    {/* Umlagefähig section */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold tracking-wide" style={{ color: C.green }}>UMLAGEFÄHIG (zahlt Mieter über NK)</p>
+                      {HG_ITEMS.filter((i) => i.umlagefaehig).map((item) => {
+                        const val = form.hgItems[item.key] || "";
+                        const isActive = val !== "" && Number(val) > 0;
+                        return (
+                          <div key={item.key} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isActive}
+                              onChange={(e) => {
+                                setForm((f) => ({
+                                  ...f,
+                                  hgItems: { ...f.hgItems, [item.key]: e.target.checked ? (val || "0") : "" },
+                                }));
+                              }}
+                              className="rounded accent-[#34D399] shrink-0"
+                            />
+                            <span className="text-xs flex-1 min-w-0 truncate" style={{ color: isActive ? C.text : C.sub }}>
+                              {item.label}
+                            </span>
+                            {isActive && (
+                              <input
+                                type="number"
+                                value={val}
+                                onChange={(e) => {
+                                  setForm((f) => ({ ...f, hgItems: { ...f.hgItems, [item.key]: e.target.value } }));
+                                }}
+                                placeholder="0"
+                                className="w-20 rounded-lg px-2 py-1 text-xs text-right outline-none"
+                                style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                              />
+                            )}
+                            {isActive && <span className="text-[10px] shrink-0" style={{ color: C.dim }}>€</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Divider */}
+                    <div className="h-px" style={{ background: `linear-gradient(90deg, ${C.border}, transparent)` }} />
+
+                    {/* Nicht-umlagefähig section */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-bold tracking-wide" style={{ color: C.amber }}>NICHT UMLAGEFÄHIG (Ihre Kosten)</p>
+                      {HG_ITEMS.filter((i) => !i.umlagefaehig).map((item) => {
+                        const val = form.hgItems[item.key] || "";
+                        const isActive = val !== "" && Number(val) > 0;
+                        return (
+                          <div key={item.key} className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={isActive}
+                              onChange={(e) => {
+                                setForm((f) => ({
+                                  ...f,
+                                  hgItems: { ...f.hgItems, [item.key]: e.target.checked ? (val || "0") : "" },
+                                }));
+                              }}
+                              className="rounded accent-[#FBBF24] shrink-0"
+                            />
+                            <span className="text-xs flex-1 min-w-0 truncate" style={{ color: isActive ? C.text : C.sub }}>
+                              {item.label}
+                            </span>
+                            {isActive && (
+                              <input
+                                type="number"
+                                value={val}
+                                onChange={(e) => {
+                                  setForm((f) => ({ ...f, hgItems: { ...f.hgItems, [item.key]: e.target.value } }));
+                                }}
+                                placeholder="0"
+                                className="w-20 rounded-lg px-2 py-1 text-xs text-right outline-none"
+                                style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                              />
+                            )}
+                            {isActive && <span className="text-[10px] shrink-0" style={{ color: C.dim }}>€</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary */}
+                    {hgSplit.hasBreakdown && (
+                      <div className="rounded-lg p-3 space-y-1.5" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
+                        <div className="flex items-center justify-between text-xs">
+                          <span style={{ color: C.green }}>Umlagefähig (zahlt Mieter)</span>
+                          <span className="font-bold" style={{ color: C.green }}>{Math.round(hgSplit.umlagefaehig)} €/Mon.</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span style={{ color: C.amber }}>Nicht umlagefähig (Ihre Kosten)</span>
+                          <span className="font-bold" style={{ color: C.amber }}>{Math.round(hgSplit.nichtUmlagefaehig)} €/Mon.</span>
+                        </div>
+                        <div className="h-px" style={{ background: C.border }} />
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-bold" style={{ color: C.text }}>Ihre tatsächliche Belastung</span>
+                          <span className="font-bold" style={{ color: C.text }}>{Math.round(hgSplit.nichtUmlagefaehig)} €/Mon.</span>
+                        </div>
+                        {(hgSplit.umlagefaehig + hgSplit.nichtUmlagefaehig) > hausgeldNum && (
+                          <p className="text-[11px] mt-1" style={{ color: C.red }}>
+                            Summe der Einzelposten ({Math.round(hgSplit.umlagefaehig + hgSplit.nichtUmlagefaehig)} €) übersteigt Gesamt-Hausgeld ({hausgeldNum} €).
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Estimation hint when no breakdown */}
+                {!hgSplit.hasBreakdown && !hgExpanded && (
+                  <p className="text-[11px]" style={{ color: C.dim }}>
+                    Ohne Aufschlüsselung wird geschätzt: ~{Math.round(hausgeldNum * 0.40)} € nicht-umlagefähig (40 %), ~{Math.round(hausgeldNum * 0.60)} € umlagefähig (60 %).
+                  </p>
+                )}
+              </div>
+            )}
 
             <div>
               <Input label="Baujahr" value={form.year} onChange={(v) => set("year", v)} placeholder="1985" type="number" explain="Baujahr des Gebäudes — relevant für Substanzbewertung und GEG-Pflichten." />
@@ -643,17 +889,17 @@ function AnalysisContent() {
             {/* Live-Metriken Sektion 1 */}
             {liveKPIs2 && (form.hausgeld || form.area) && (
               <div className="grid grid-cols-3 gap-2 animate-fade-up">
-                <MetricBox label="Netto-Cashflow" value={`${Math.round(liveKPIs2.netCashflow)} €/Mon.`} good={liveKPIs2.netCashflow > 0} />
-                {liveKPIs2.hausgeldRatio > 0 && <MetricBox label="Hausgeld-Quote" value={`${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} %`} good={liveKPIs2.hausgeldRatio <= 0.3} />}
+                <MetricBox label={liveKPIs2.hasBreakdown ? "Netto-Cashflow (bereinigt)" : "Netto-Cashflow (gesch.)"} value={`${Math.round(liveKPIs2.netCashflow)} €/Mon.`} good={liveKPIs2.netCashflow > 0} />
+                {liveKPIs2.hausgeldRatio > 0 && <MetricBox label={liveKPIs2.hasBreakdown ? "Bereinigte HG-Quote" : "HG-Quote (gesch.)"} value={`${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} %`} good={liveKPIs2.hausgeldRatio <= 0.3} />}
                 {liveKPIs2.sqmPrice > 0 && <MetricBox label="€/m²" value={`${Math.round(liveKPIs2.sqmPrice).toLocaleString("de-DE")} €`} good={liveKPIs2.sqmPrice <= 3500} />}
               </div>
             )}
 
             {liveKPIs2 && liveKPIs2.hausgeldRatio > 0 && (
               <AIComment variant={liveKPIs2.hausgeldRatio <= 0.25 ? "good" : liveKPIs2.hausgeldRatio <= 0.35 ? "info" : "warn"}>
-                {liveKPIs2.hausgeldRatio <= 0.25 ? `Hausgeld-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % — innerhalb institutioneller Standards. Gesunder Cashflow-Puffer.` :
-                 liveKPIs2.hausgeldRatio <= 0.35 ? `Hausgeld-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % — akzeptabel, aber WEG-Wirtschaftsplan prüfen.` :
-                 `Hausgeld-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % — erhöht. Rücklagenstand und geplante Sonderumlagen hinterfragen.`}
+                {liveKPIs2.hausgeldRatio <= 0.25 ? `${liveKPIs2.hasBreakdown ? "Bereinigte" : "Geschätzte"} HG-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % (${Math.round(liveKPIs2.ownerHG)} € nicht-umlagefähig) — innerhalb institutioneller Standards.` :
+                 liveKPIs2.hausgeldRatio <= 0.35 ? `${liveKPIs2.hasBreakdown ? "Bereinigte" : "Geschätzte"} HG-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % — akzeptabel, aber WEG-Wirtschaftsplan prüfen.` :
+                 `${liveKPIs2.hasBreakdown ? "Bereinigte" : "Geschätzte"} HG-Quote ${(liveKPIs2.hausgeldRatio * 100).toFixed(0)} % — erhöht. Rücklagenstand und geplante Sonderumlagen hinterfragen.`}
               </AIComment>
             )}
 
@@ -789,7 +1035,19 @@ function AnalysisContent() {
                 {result.confidence}
               </span>
             </div>
-            <p className="text-sm mt-1" style={{ color: C.sub }}>{form.street}, {form.city} — {form.area} m², Bj. {form.year}, Klasse {form.energyClass}</p>
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
+              <p className="text-sm" style={{ color: C.sub }}>{form.street}, {form.city} — {form.area} m², Bj. {form.year}, Klasse {form.energyClass}</p>
+              {result.kpis.hasHGBreakdown && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}>
+                  Detaillierte Hausgeld-Analyse
+                </span>
+              )}
+              {form.rentType === "warm" && (
+                <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: C.accentDim, color: C.accent, border: `1px solid rgba(124,106,255,0.2)` }}>
+                  Warmmiete-Korrektur
+                </span>
+              )}
+            </div>
           </div>
           <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
         </div>
@@ -813,7 +1071,7 @@ function AnalysisContent() {
                 </ResponsiveContainer>
               </Card>
               <div className="space-y-3">
-                <KPIRow label="Nettorendite" value={`${(result.kpis.netYield * 100).toFixed(2)} %`} color={result.kpis.netYield >= 0.03 ? C.green : result.kpis.netYield >= 0.01 ? C.amber : C.red} />
+                <KPIRow label={result.kpis.hasHGBreakdown ? "Nettorendite (bereinigt)" : "Nettorendite"} value={`${(result.kpis.netYield * 100).toFixed(2)} %`} color={result.kpis.netYield >= 0.03 ? C.green : result.kpis.netYield >= 0.01 ? C.amber : C.red} />
                 <KPIRow label="Kaufpreisfaktor" value={`${result.kpis.factor.toFixed(1)}x`} color={result.kpis.factor <= 25 ? C.green : result.kpis.factor <= 30 ? C.amber : C.red} />
                 <KPIRow label="Finanzierbarkeit" value={`${result.subscores.find(s => s.key === "financing")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "financing")?.value || 0)} />
                 <KPIRow label="Risiko-Score" value={`${result.subscores.find(s => s.key === "risk")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "risk")?.value || 0)} />
