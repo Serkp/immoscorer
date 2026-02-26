@@ -117,6 +117,8 @@ export async function saveComparisonFlat(
     net_yield: scores.netYield,
     price_factor: scores.priceFactor,
     save_type: "comparison",
+    // JSONB column — required NOT NULL
+    inputs: inp,
   };
   console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(row, null, 2));
   const { data, error } = await getSupabase()
