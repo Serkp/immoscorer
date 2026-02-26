@@ -93,37 +93,49 @@ export async function saveComparisonFlat(
     grossYield: number; netYield: number; priceFactor: number; sqmPrice: number;
   },
 ) {
+  const row = {
+    user_id: userId,
+    address: inp.address,
+    city: inp.city,
+    purchase_price: inp.purchasePrice,
+    monthly_rent: inp.monthlyRent,
+    area_sqm: inp.areaSqm,
+    building_year: inp.buildingYear,
+    energy_class: inp.energyClass,
+    location_grade: inp.locationGrade,
+    management_fee: inp.managementFee,
+    renovation_count: inp.renovationCount,
+    total_score: scores.totalScore,
+    investment_score: scores.investmentScore,
+    rentability_score: scores.rentabilityScore,
+    risk_score: scores.riskScore,
+    financing_score: scores.financingScore,
+    projection_score: scores.projectionScore,
+    energy_score: scores.energyScore,
+    gross_yield: scores.grossYield,
+    net_yield: scores.netYield,
+    price_factor: scores.priceFactor,
+    sqm_price: scores.sqmPrice,
+    status: "saved",
+    save_type: "comparison",
+  };
+  console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(row, null, 2));
   const { data, error } = await getSupabase()
     .from("analyses")
-    .insert({
-      user_id: userId,
-      address: inp.address,
-      city: inp.city,
-      purchase_price: inp.purchasePrice,
-      monthly_rent: inp.monthlyRent,
-      area_sqm: inp.areaSqm,
-      building_year: inp.buildingYear,
-      energy_class: inp.energyClass,
-      location_grade: inp.locationGrade,
-      management_fee: inp.managementFee,
-      renovation_count: inp.renovationCount,
-      total_score: scores.totalScore,
-      investment_score: scores.investmentScore,
-      rentability_score: scores.rentabilityScore,
-      risk_score: scores.riskScore,
-      financing_score: scores.financingScore,
-      projection_score: scores.projectionScore,
-      energy_score: scores.energyScore,
-      gross_yield: scores.grossYield,
-      net_yield: scores.netYield,
-      price_factor: scores.priceFactor,
-      sqm_price: scores.sqmPrice,
-      status: "saved",
-      save_type: "comparison",
-    })
+    .insert(row)
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error("[saveComparisonFlat] Supabase error:", {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+    });
+    const dbError = new Error(`DB: ${error.message} (code: ${error.code})`);
+    (dbError as unknown as Record<string, unknown>).supabaseError = error;
+    throw dbError;
+  }
   return data;
 }
 

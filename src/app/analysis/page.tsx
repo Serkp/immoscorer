@@ -389,9 +389,11 @@ function AnalysisContent() {
       setSaveChoice("compare");
       setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
       setTimeout(() => setToast(null), 3000);
-    } catch {
-      setToast({ text: "Fehler beim Speichern. Bitte versuchen Sie es erneut.", type: "neutral" });
-      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[handleSaveCompare] error:", err);
+      setToast({ text: `Fehler: ${msg}`, type: "neutral" });
+      setTimeout(() => setToast(null), 8000);
     } finally {
       setSaving(false);
     }
@@ -1049,7 +1051,30 @@ function AnalysisContent() {
               )}
             </div>
           </div>
-          <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
+          <div className="flex gap-2 shrink-0">
+            {saveChoice === "none" ? (
+              <button
+                onClick={handleSaveCompare}
+                disabled={saving}
+                className="rounded-xl px-4 py-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
+                style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+              >
+                {saving ? "Speichert..." : "Im Vergleich speichern"}
+              </button>
+            ) : (
+              <button
+                onClick={() => router.push("/compare")}
+                className="rounded-xl px-4 py-2 text-sm font-bold transition-all hover:opacity-90 flex items-center gap-1.5"
+                style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+              >
+                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                Zum Vergleich
+              </button>
+            )}
+            <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
+          </div>
         </div>
 
         {/* ── Full Result View ── */}
