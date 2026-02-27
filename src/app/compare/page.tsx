@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
-import { ScoreRing } from "@/components/ui/ScoreRing";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getAnalyses, deleteAnalysis } from "@/lib/db";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
@@ -291,20 +290,27 @@ export default function ComparePage() {
               </p>
             </div>
 
-            {/* ── Score Ring ── */}
-            <div className="flex flex-col items-center py-2.5 border-t border-b" style={{ borderColor: C.border }}>
-              <ScoreRing value={d.score} size={50} />
-              <p className="text-[10px] font-bold mt-1.5" style={{ color: scoreColor(d.score) }}>
-                {scoreLabel(d.score)}
-              </p>
-              {isBest(d.score, bestScore) && (
-                <span
-                  className="text-[9px] font-bold mt-1 rounded-full px-1.5 py-0.5"
-                  style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
-                >
-                  Bester Score
+            {/* ── Score ── */}
+            <div className="flex items-center justify-between px-3 py-2 border-t border-b" style={{ borderColor: C.border }}>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-extrabold" style={{ color: scoreColor(d.score) }}>
+                  {d.score}
                 </span>
-              )}
+                <span className="text-[10px] font-medium" style={{ color: C.dim }}>/100</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold" style={{ color: scoreColor(d.score) }}>
+                  {scoreLabel(d.score)}
+                </span>
+                {isBest(d.score, bestScore) && (
+                  <span
+                    className="text-[9px] font-bold rounded-full px-1.5 py-0.5"
+                    style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                  >
+                    ★
+                  </span>
+                )}
+              </div>
             </div>
 
             {/* ── KPI Rows ── */}
