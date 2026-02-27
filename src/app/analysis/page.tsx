@@ -1214,7 +1214,7 @@ function AnalysisContent() {
             ← Zurück zum Vergleich
           </Link>
         ) : (
-          <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
             ← Dashboard
           </Link>
         )}
@@ -1284,6 +1284,26 @@ function AnalysisContent() {
             <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
           </div>
         </div>
+
+        {/* ── Plausibility Warnings ── */}
+        {result.plausibility && result.plausibility.length > 0 && (
+          <div className="space-y-2">
+            {result.plausibility.some(c => c.level === "error") && (
+              <div className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}>
+                Achtung: Die eingegebenen Daten erscheinen nicht plausibel. Bitte Kaufpreis und Mieteinnahmen prüfen.
+              </div>
+            )}
+            {result.plausibility.map((c, i) => (
+              <div key={i} className="rounded-xl px-4 py-2.5 text-xs font-medium flex items-center gap-2" style={{
+                background: c.level === "error" ? C.redDim : c.level === "warning" ? C.orangeDim : C.greenDim,
+                color: c.level === "error" ? C.red : c.level === "warning" ? C.orange : C.green,
+                border: `1px solid ${c.level === "error" ? "rgba(248,113,113,0.2)" : c.level === "warning" ? C.orangeBorder : C.greenBorder}`,
+              }}>
+                {c.level === "error" ? "Fehler" : "Warnung"}: {c.message}
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Full Result View ── */}
           <>
@@ -1408,6 +1428,78 @@ function AnalysisContent() {
                 </ul>
               </Card>
             </div>
+
+            {/* ── Geschätzte Sanierungskosten (TEIL 2) ── */}
+            {result.renovationEstimate && result.renovationEstimate.total > 0 && (
+              <Card className="p-5 space-y-4 mt-6">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Geschätzte Sanierungskosten</h3>
+                  {form.propertyType && (
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: C.surface3, color: C.dim }}>
+                      {form.propertyType === "etw" ? "ETW" : form.propertyType === "efh" ? "EFH" : form.propertyType === "mfh" ? "MFH" : form.propertyType === "dhh" ? "DHH" : ""}-Kalkulation
+                    </span>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  {Object.entries(result.renovationEstimate.breakdown).map(([key, cost]) => (
+                    <div key={key} className="flex items-center justify-between text-xs">
+                      <span style={{ color: C.sub }}>{key.charAt(0).toUpperCase() + key.slice(1)}</span>
+                      <span className="font-bold" style={{ color: C.text }}>~{Math.round(cost).toLocaleString("de-DE")} €</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-sm font-bold pt-2 border-t" style={{ borderColor: C.border }}>
+                    <span style={{ color: C.text }}>Geschätzte Gesamtkosten</span>
+                    <span style={{ color: C.amber }}>~{Math.round(result.renovationEstimate.total).toLocaleString("de-DE")} €</span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span style={{ color: C.sub }}>Effektiver Kaufpreis (inkl. Sanierung)</span>
+                    <span className="font-bold" style={{ color: C.text }}>{Math.round(Number(form.price) + result.renovationEstimate.total).toLocaleString("de-DE")} €</span>
+                  </div>
+                </div>
+                {result.renovationEstimate.hints.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    {result.renovationEstimate.hints.map((h, i) => (
+                      <p key={i} className="text-[11px] italic" style={{ color: C.dim }}>{h}</p>
+                    ))}
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {/* ── Wertschöpfungspotenzial (TEIL 3) ── */}
+            {result.valuePotential && (
+              <Card className="p-5 space-y-3 mt-6">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: result.valuePotential.scoreBonus > 0 ? C.green : result.valuePotential.scoreBonus < 0 ? C.red : C.blue }} />
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Wertschöpfungspotenzial</h3>
+                  {result.valuePotential.scoreBonus !== 0 && (
+                    <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{
+                      background: result.valuePotential.scoreBonus > 0 ? C.greenDim : C.redDim,
+                      color: result.valuePotential.scoreBonus > 0 ? C.green : C.red,
+                      border: `1px solid ${result.valuePotential.scoreBonus > 0 ? C.greenBorder : "rgba(248,113,113,0.2)"}`,
+                    }}>
+                      {result.valuePotential.scoreBonus > 0 ? "+" : ""}{result.valuePotential.scoreBonus} Punkte
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{result.valuePotential.message}</p>
+              </Card>
+            )}
+
+            {/* ── Energieklasse Erklärung (TEIL 4) ── */}
+            {result.energyExplanation && (
+              <Card className="p-5 space-y-3 mt-6">
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full" style={{ background: scoreColor(result.subscores.find(s => s.key === "energy")?.value || 0) }} />
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>Energieklasse {form.energyClass}</h3>
+                  <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: C.surface3, color: C.dim }}>
+                    {result.subscores.find(s => s.key === "energy")?.value || 0}/100
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{result.energyExplanation}</p>
+              </Card>
+            )}
 
             {/* ── Verhandlungsguide ── */}
             <Card className="p-5 space-y-4 mt-6">

@@ -23,6 +23,8 @@ export const C = {
   red: "#F87171",
   redDim: "rgba(248,113,113,0.12)",
   orange: "#FB923C",
+  orangeDim: "rgba(251,146,60,0.12)",
+  orangeBorder: "rgba(251,146,60,0.2)",
   darkRed: "#DC2626",
 };
 

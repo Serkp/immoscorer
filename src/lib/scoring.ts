@@ -38,6 +38,29 @@ export interface SubscoreEntry {
   actions: string[];
 }
 
+export type PlausibilityLevel = "ok" | "warning" | "error";
+
+export interface PlausibilityCheck {
+  level: PlausibilityLevel;
+  message: string;
+}
+
+export interface RenovationEstimate {
+  breakdown: Record<string, number>;
+  total: number;
+  hints: string[];
+}
+
+export interface ValuePotential {
+  effectivePrice: number;
+  effectiveSqmPrice: number;
+  estimatedMarketValue: number;
+  marketSqmPrice: number;
+  delta: number;           // positive = undervalued
+  scoreBonus: number;
+  message: string;
+}
+
 export interface ScoringResult {
   totalScore: number;
   confidence: "Hohe Bewertungssicherheit" | "Mittlere Bewertungssicherheit" | "Geringe Bewertungssicherheit";
@@ -55,12 +78,28 @@ export interface ScoringResult {
   };
   strengths: string[];
   risks: string[];
+  plausibility: PlausibilityCheck[];
+  renovationEstimate: RenovationEstimate | null;
+  valuePotential: ValuePotential | null;
+  energyExplanation: string;
 }
 
 /* ─── Lookup-Tabellen ─── */
 
 const ENERGY_RANK: Record<string, number> = {
-  "A+": 100, A: 88, B: 76, C: 62, D: 48, E: 35, F: 22, G: 12, H: 5,
+  "A+": 100, A: 95, B: 85, C: 70, D: 55, E: 35, F: 20, G: 10, H: 5,
+};
+
+const ENERGY_EXPLANATION: Record<string, string> = {
+  "A+": "Passivhaus/KfW40-Standard — niedrigste Energiekosten, keine regulatorischen Pflichten. Ca. < 30 kWh/m²/Jahr.",
+  A: "Sehr effizient — sehr niedrige Energiekosten (ca. 30–50 kWh/m²/Jahr). Keine Sanierungspflicht.",
+  B: "Gut — moderate Energiekosten (ca. 50–75 kWh/m²/Jahr). Keine Sanierungspflicht.",
+  C: "Durchschnitt — ca. 75–100 kWh/m²/Jahr. Akzeptabel, mittelfristig Optimierung sinnvoll.",
+  D: "Unterdurchschnitt — ca. 100–130 kWh/m²/Jahr. Heizkosten überdurchschnittlich (~10–12 €/m²/Jahr). Mittelfristig empfehlenswert: Fenster und/oder Dämmung. GEG-Pflichten aktuell nicht akut, aber bei Heizungstausch gelten neue Anforderungen.",
+  E: "Schlecht — ca. 130–160 kWh/m²/Jahr. Hohe Heizkosten (~12–15 €/m²/Jahr). GEG-Sanierungspflicht bei Eigentümerwechsel möglich.",
+  F: "Sehr schlecht — ca. 160–200 kWh/m²/Jahr. Sanierungspflicht wahrscheinlich, Mieter beschweren sich über Nebenkosten.",
+  G: "Katastrophal — ca. 200–250 kWh/m²/Jahr. Sofortige Sanierung nötig. GEG-Pflichten greifen.",
+  H: "Nicht tragbar — > 250 kWh/m²/Jahr. In heutigem Markt schwer vermietbar. Sofortiger Handlungsbedarf.",
 };
 
 const LOCATION_RANK: Record<string, number> = { A: 100, B: 72, C: 45, D: 20 };
@@ -72,12 +111,6 @@ const LOCATION_LABEL: Record<string, string> = {
 const RENO_LABEL: Record<string, string> = {
   dach: "Dach", fassade: "Fassade", fenster: "Fenster",
   bad: "Bad", elektrik: "Elektrik", heizung: "Heizung",
-};
-
-/** Renovation cost per m² for effective price calculation */
-const RENO_COST_PER_SQM: Record<string, number> = {
-  dach: 150, fassade: 120, fenster: 80,
-  heizung: 100, elektrik: 60, bad: 90,
 };
 
 const RENO_COST_RANGE: Record<string, string> = {
@@ -101,14 +134,148 @@ function clamp(n: number): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-/** Calculate estimated renovation costs (total) */
-function calcRenovationCosts(renovations: string[], area: number): number {
-  return renovations.reduce((sum, r) => sum + (RENO_COST_PER_SQM[r] || 0) * area, 0);
+/** TEIL 2: Differentiated renovation costs by property type */
+export function estimateRenovationCosts(
+  propertyType: string | undefined,
+  areaSqm: number,
+  renovations: string[],
+  unitCount = 1,
+): RenovationEstimate {
+  const breakdown: Record<string, number> = {};
+  const hints: string[] = [];
+  const isETW = propertyType === "etw";
+  const isEFH = propertyType === "efh" || propertyType === "dhh";
+  const isMFH = propertyType === "mfh";
+  const units = Math.max(unitCount, 1);
+
+  if (renovations.includes("fenster")) {
+    if (isETW) { breakdown.fenster = Math.ceil(areaSqm / 15) * 1200; }
+    else if (isEFH) { breakdown.fenster = Math.ceil(areaSqm / 12) * 1300; }
+    else if (isMFH) { breakdown.fenster = units * 4500; }
+    else { breakdown.fenster = Math.ceil(areaSqm / 15) * 1200; }
+  }
+  if (renovations.includes("dach")) {
+    if (isETW) {
+      breakdown.dach = Math.round((areaSqm * 2 * 130) / Math.max(units, 6));
+      hints.push("Dachsanierung wird über Eigentümergemeinschaft geteilt. Prüfen Sie die Instandhaltungsrücklage.");
+    } else if (isEFH) { breakdown.dach = Math.round(areaSqm * 0.7 * 150); }
+    else if (isMFH) { breakdown.dach = Math.round(areaSqm * 0.4 * 140); }
+    else { breakdown.dach = Math.round(areaSqm * 0.7 * 150); }
+  }
+  if (renovations.includes("fassade")) {
+    if (isETW) {
+      breakdown.fassade = Math.round((areaSqm * 3 * 120) / Math.max(units, 6));
+      if (!hints.some(h => h.includes("Eigentümergemeinschaft"))) {
+        hints.push("Fassadensanierung wird über Eigentümergemeinschaft geteilt. Prüfen Sie die Instandhaltungsrücklage.");
+      }
+    } else { breakdown.fassade = Math.round(areaSqm * 3.5 * 120); }
+  }
+  if (renovations.includes("heizung")) {
+    if (isETW) { breakdown.heizung = 4500; }
+    else if (isEFH) { breakdown.heizung = 12000; }
+    else if (isMFH) { breakdown.heizung = units * 4000; }
+    else { breakdown.heizung = 4500; }
+  }
+  if (renovations.includes("elektrik")) {
+    if (isETW) { breakdown.elektrik = 3500; }
+    else if (isEFH) { breakdown.elektrik = 12000; }
+    else if (isMFH) { breakdown.elektrik = units * 4000; }
+    else { breakdown.elektrik = 3500; }
+  }
+  if (renovations.includes("bad")) {
+    if (isETW) { breakdown.bad = 8000; }
+    else if (isEFH) { breakdown.bad = 15000; }
+    else if (isMFH) { breakdown.bad = units * 7000; }
+    else { breakdown.bad = 8000; }
+  }
+
+  if (isETW && (renovations.includes("dach") || renovations.includes("fassade"))) {
+    hints.push("Bei Gemeinschaftssanierungen (Dach, Fassade) wird Ihr Eigentümeranteil geschätzt.");
+  }
+
+  const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
+  return { breakdown, total, hints };
+}
+
+/** TEIL 1: Plausibility checks on input data */
+function runPlausibilityChecks(p: PropertyInput): PlausibilityCheck[] {
+  const checks: PlausibilityCheck[] = [];
+  const grossYieldPct = p.price > 0 ? ((p.rent * 12) / p.price) * 100 : 0;
+  const sqmPrice = p.area > 0 ? p.price / p.area : 0;
+  const mieteSqm = p.area > 0 ? p.rent / p.area : 0;
+  const factor = p.rent > 0 ? p.price / (p.rent * 12) : 0;
+
+  // Bruttorendite
+  if (grossYieldPct > 50) {
+    checks.push({ level: "error", message: `Bruttorendite von ${grossYieldPct.toFixed(1)} % ist nicht plausibel. Bitte Kaufpreis und Miete prüfen.` });
+  } else if (grossYieldPct > 30) {
+    checks.push({ level: "error", message: `Eingaben prüfen — Bruttorendite über 30 % (${grossYieldPct.toFixed(1)} %) ist unrealistisch.` });
+  } else if (grossYieldPct > 20) {
+    checks.push({ level: "warning", message: `Ungewöhnlich hohe Rendite (${grossYieldPct.toFixed(1)} %). Bitte Eingaben prüfen.` });
+  }
+
+  // Miete/m²
+  if (mieteSqm > 25) {
+    checks.push({ level: "warning", message: `Kaltmiete ${mieteSqm.toFixed(1)} €/m² ist ungewöhnlich hoch (nur München Innenstadt erreicht das).` });
+  } else if (mieteSqm > 0 && mieteSqm < 3) {
+    checks.push({ level: "warning", message: `Kaltmiete ${mieteSqm.toFixed(1)} €/m² ist unrealistisch niedrig (selbst in D-Lagen unüblich).` });
+  }
+
+  // Kaufpreis/m²
+  if (sqmPrice > 0 && sqmPrice < 200) {
+    checks.push({ level: "warning", message: `Kaufpreis ${Math.round(sqmPrice)} €/m² ist extrem günstig. Bitte prüfen.` });
+  } else if (sqmPrice > 15000) {
+    checks.push({ level: "warning", message: `Kaufpreis ${Math.round(sqmPrice).toLocaleString("de-DE")} €/m² liegt im Luxus-Segment.` });
+  }
+
+  // Kaufpreisfaktor
+  if (factor > 0 && factor < 5) {
+    checks.push({ level: "warning", message: `Ungewöhnlich niedriger Kaufpreisfaktor (${factor.toFixed(1)}x). Stimmen die Daten?` });
+  } else if (factor > 50) {
+    checks.push({ level: "warning", message: `Extrem hoher Kaufpreisfaktor (${factor.toFixed(1)}x).` });
+  }
+
+  return checks;
+}
+
+/** TEIL 3: Value creation potential after renovation */
+function calcValuePotential(p: PropertyInput, renovationTotal: number): ValuePotential | null {
+  if (renovationTotal <= 0 || p.renovations.length === 0) return null;
+
+  const effectivePrice = p.price + renovationTotal;
+  const effectiveSqmPrice = p.area > 0 ? effectivePrice / p.area : 0;
+
+  // Conservative market value estimate based on location
+  const locationMultiplier: Record<string, number> = { A: 1.15, B: 1.0, C: 0.85, D: 0.7 };
+  const locMult = locationMultiplier[p.locationGrade] || 0.85;
+  const sqmPrice = p.area > 0 ? p.price / p.area : 0;
+  // Estimate post-renovation market value: current sqm price * location factor * improvement factor
+  const marketSqmPrice = Math.round(sqmPrice * locMult * 1.15); // 15% uplift from renovation
+  const estimatedMarketValue = marketSqmPrice * p.area;
+  const delta = estimatedMarketValue - effectivePrice;
+
+  let scoreBonus = 0;
+  let message = "";
+  if (effectivePrice < estimatedMarketValue * 0.70) {
+    scoreBonus = 10;
+    message = `Nach Sanierung (~${Math.round(renovationTotal).toLocaleString("de-DE")} €) liegt der effektive Kaufpreis bei ${Math.round(effectiveSqmPrice).toLocaleString("de-DE")} €/m², deutlich unter dem geschätzten Marktwert von ${marketSqmPrice.toLocaleString("de-DE")} €/m². Mögliche Wertsteigerung: ~${Math.round(delta).toLocaleString("de-DE")} €.`;
+  } else if (effectivePrice < estimatedMarketValue * 0.85) {
+    scoreBonus = 5;
+    message = `Nach Sanierung (~${Math.round(renovationTotal).toLocaleString("de-DE")} €) liegt der effektive Kaufpreis bei ${Math.round(effectiveSqmPrice).toLocaleString("de-DE")} €/m², unter dem Marktdurchschnitt von ${marketSqmPrice.toLocaleString("de-DE")} €/m². Mögliche Wertsteigerung: ~${Math.round(delta).toLocaleString("de-DE")} €.`;
+  } else if (effectivePrice > estimatedMarketValue) {
+    scoreBonus = -5;
+    message = `Nach Sanierung (~${Math.round(renovationTotal).toLocaleString("de-DE")} €) liegt der effektive Kaufpreis bei ${Math.round(effectiveSqmPrice).toLocaleString("de-DE")} €/m² — über dem geschätzten Marktwert von ${marketSqmPrice.toLocaleString("de-DE")} €/m². Überteuert trotz Sanierung.`;
+  } else {
+    message = `Nach Sanierung (~${Math.round(renovationTotal).toLocaleString("de-DE")} €) liegt der effektive Kaufpreis bei ${Math.round(effectiveSqmPrice).toLocaleString("de-DE")} €/m², nahe am Marktwert von ${marketSqmPrice.toLocaleString("de-DE")} €/m².`;
+  }
+
+  return { effectivePrice, effectiveSqmPrice, estimatedMarketValue, marketSqmPrice, delta, scoreBonus, message };
 }
 
 function deriveKPIs(p: PropertyInput) {
   const annualRent = p.rent * 12;
-  const renovationCosts = calcRenovationCosts(p.renovations, p.area);
+  const renoEst = estimateRenovationCosts(p.propertyType, p.area, p.renovations, p.unitCount);
+  const renovationCosts = renoEst.total;
   const effectivePrice = p.price + renovationCosts;
   const grossYield = annualRent / p.price;
   const effectiveGrossYield = annualRent / effectivePrice;
@@ -553,16 +720,23 @@ function calcEnergy(p: PropertyInput, k: KPIs): { value: number; reasons: string
    Confidence-Berechnung
    ═══════════════════════════════════════════════════════════ */
 
-function calcConfidence(p: PropertyInput, k: KPIs): ScoringResult["confidence"] {
-  let d = 0;
-  if (p.renovations.length >= 4) d += 2; else if (p.renovations.length >= 2) d += 1;
-  if (k.age >= 60) d += 2; else if (k.age >= 40) d += 1;
-  if (p.locationGrade === "D") d += 1;
-  if (k.netCashflow < 0) d += 1;
-  if (p.year < 1960) d += 1;
-  if (d <= 1) return "Hohe Bewertungssicherheit";
-  if (d <= 3) return "Mittlere Bewertungssicherheit";
-  return "Geringe Bewertungssicherheit";
+function calcConfidence(p: PropertyInput, k: KPIs, plausibility: PlausibilityCheck[]): ScoringResult["confidence"] {
+  const warnings = plausibility.filter(c => c.level === "warning").length;
+  const errors = plausibility.filter(c => c.level === "error").length;
+  const grossYieldPct = p.price > 0 ? ((p.rent * 12) / p.price) * 100 : 0;
+  const sqmPrice = p.area > 0 ? p.price / p.area : 0;
+
+  // Errors → always low
+  if (errors > 0) return "Geringe Bewertungssicherheit";
+
+  // 2+ warnings OR extreme values → low
+  if (warnings >= 2 || grossYieldPct > 20 || sqmPrice < 300) return "Geringe Bewertungssicherheit";
+
+  // 1 warning OR no HG breakdown OR no location data → medium
+  if (warnings === 1 || !p.hasHGBreakdown || !p.walkScore) return "Mittlere Bewertungssicherheit";
+
+  // All checks passed + HG breakdown + location data → high
+  return "Hohe Bewertungssicherheit";
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -605,6 +779,20 @@ function generateRisks(p: PropertyInput, k: KPIs): string[] {
 export function computeScore(p: PropertyInput): ScoringResult {
   const k = deriveKPIs(p);
 
+  // TEIL 1: Plausibility checks
+  const plausibility = runPlausibilityChecks(p);
+
+  // TEIL 2: Differentiated renovation costs
+  const renoEst = p.renovations.length > 0
+    ? estimateRenovationCosts(p.propertyType, p.area, p.renovations, p.unitCount)
+    : null;
+
+  // TEIL 3: Value potential
+  const valuePotential = calcValuePotential(p, renoEst?.total ?? 0);
+
+  // TEIL 4: Energy explanation
+  const energyExplanation = ENERGY_EXPLANATION[p.energyClass] || `Energieklasse ${p.energyClass} — keine detaillierten Informationen verfügbar.`;
+
   const inv = calcInvestment(p, k);
   const rent = calcRentability(p, k);
   const risk = calcRisk(p, k);
@@ -628,12 +816,21 @@ export function computeScore(p: PropertyInput): ScoringResult {
     totalScore -= 15;
   }
 
+  // TEIL 3: Apply value potential bonus/malus
+  if (valuePotential) {
+    totalScore += valuePotential.scoreBonus;
+  }
+
   return {
     totalScore: clamp(totalScore),
-    confidence: calcConfidence(p, k),
+    confidence: calcConfidence(p, k, plausibility),
     subscores,
     kpis: { netYield: k.netYield, grossYield: k.grossYield, factor: k.factor, sqmPrice: k.sqmPrice, hausgeldRatio: k.hausgeldRatio, netCashflow: k.netCashflow, hausgeldGesamt: p.hausgeld, hausgeldNichtUmlagefaehig: k.ownerHausgeld, hasHGBreakdown: !!p.hasHGBreakdown },
     strengths: generateStrengths(p, k),
     risks: generateRisks(p, k),
+    plausibility,
+    renovationEstimate: renoEst,
+    valuePotential,
+    energyExplanation,
   };
 }
