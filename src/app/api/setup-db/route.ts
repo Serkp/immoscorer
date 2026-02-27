@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS portfolio_properties (
   is_rented TEXT, monthly_rent NUMERIC, rental_since TEXT,
   unit_count INTEGER, total_rent NUMERIC, units_rented INTEGER,
   estimated_market_value NUMERIC,
+  inputs JSONB,
   created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -90,6 +91,7 @@ const ALTER_PORTFOLIO_SQL = [
   "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS total_rent NUMERIC;",
   "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS units_rented INTEGER;",
   "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS estimated_market_value NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS inputs JSONB;",
   "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();",
 ];
 

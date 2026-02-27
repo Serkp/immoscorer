@@ -147,9 +147,10 @@ export default function PortfolioAddPage() {
       });
 
       router.push("/portfolio");
-    } catch (err) {
-      console.error("[PortfolioAdd] save error:", err);
-      setError("Fehler beim Speichern. Bitte versuchen Sie es erneut.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[PortfolioAdd] save error:", msg, err);
+      setError("Fehler: " + msg);
       setSaving(false);
     }
   }

@@ -205,7 +205,25 @@ export async function savePortfolioProperty(userId: string, data: {
   unitCount?: number; totalRent?: number; unitsRented?: number;
   estimatedMarketValue?: number;
 }) {
-  const row: Record<string, unknown> = {
+  const allData = {
+    address: data.address, city: data.city,
+    purchasePrice: data.purchasePrice, currentRent: data.currentRent,
+    area: data.area, buildYear: data.buildYear, energyClass: data.energyClass,
+    houseMoney: data.houseMoney, locationGrade: data.locationGrade,
+    renovations: data.renovations, score: data.score, scoreData: data.scoreData,
+    locationData: data.locationData, lat: data.lat, lng: data.lng,
+    propertyType: data.propertyType, apartmentType: data.apartmentType, rooms: data.rooms,
+    purchaseDate: data.purchaseDate, loanAmount: data.loanAmount, interestRate: data.interestRate,
+    fixedRateUntil: data.fixedRateUntil, monthlyPayment: data.monthlyPayment,
+    repaymentRate: data.repaymentRate, specialRepaymentAllowed: data.specialRepaymentAllowed,
+    specialRepaymentAmount: data.specialRepaymentAmount, isRented: data.isRented,
+    monthlyRent: data.monthlyRent, rentalSince: data.rentalSince,
+    unitCount: data.unitCount, totalRent: data.totalRent, unitsRented: data.unitsRented,
+    estimatedMarketValue: data.estimatedMarketValue,
+  };
+
+  // Full row with all columns
+  const fullRow: Record<string, unknown> = {
     user_id: userId,
     address: data.address,
     city: data.city,
@@ -241,17 +259,78 @@ export async function savePortfolioProperty(userId: string, data: {
     units_rented: data.unitsRented || null,
     estimated_market_value: data.estimatedMarketValue || null,
   };
-  console.log("[savePortfolioProperty] inserting:", JSON.stringify(row, null, 2));
+
+  console.log("[savePortfolioProperty] trying full insert...");
   const { data: prop, error } = await getSupabase()
     .from("portfolio_properties")
-    .insert(row)
+    .insert(fullRow)
     .select()
     .single();
-  if (error) {
-    console.error("[savePortfolioProperty] error:", { message: error.message, code: error.code, details: error.details, hint: error.hint });
-    throw error;
+
+  if (!error) return prop;
+
+  // Full insert failed — log and try minimal fallback with JSONB inputs column
+  console.error("[savePortfolioProperty] full insert failed:", JSON.stringify({
+    message: error.message, code: error.code, details: error.details, hint: error.hint,
+  }));
+
+  console.log("[savePortfolioProperty] trying minimal fallback with inputs JSONB...");
+  const minimalRow: Record<string, unknown> = {
+    user_id: userId,
+    address: data.address,
+    city: data.city,
+    purchase_price: data.purchasePrice,
+    current_rent: data.currentRent,
+    inputs: allData,
+  };
+
+  const { data: prop2, error: err2 } = await getSupabase()
+    .from("portfolio_properties")
+    .insert(minimalRow)
+    .select()
+    .single();
+
+  if (!err2) {
+    console.log("[savePortfolioProperty] minimal fallback succeeded (data stored in inputs JSONB)");
+    return prop2;
   }
-  return prop;
+
+  // Even minimal failed — try absolute minimum
+  console.error("[savePortfolioProperty] minimal fallback failed:", JSON.stringify({
+    message: err2.message, code: err2.code, details: err2.details, hint: err2.hint,
+  }));
+
+  console.log("[savePortfolioProperty] trying absolute minimum insert...");
+  const minRow = {
+    user_id: userId,
+    address: data.address,
+    city: data.city,
+    purchase_price: data.purchasePrice,
+    current_rent: data.currentRent,
+  };
+
+  const { data: prop3, error: err3 } = await getSupabase()
+    .from("portfolio_properties")
+    .insert(minRow)
+    .select()
+    .single();
+
+  if (!err3) {
+    console.log("[savePortfolioProperty] absolute minimum insert succeeded");
+    return prop3;
+  }
+
+  console.error("[savePortfolioProperty] all insert attempts failed:", JSON.stringify({
+    message: err3.message, code: err3.code, details: err3.details, hint: err3.hint,
+  }));
+
+  const dbError = new Error(
+    `Portfolio speichern fehlgeschlagen: ${error.message} (code: ${error.code})` +
+    (error.hint ? ` | Hinweis: ${error.hint}` : "") +
+    (error.details ? ` | Details: ${error.details}` : "")
+  );
+  (dbError as unknown as Record<string, unknown>).supabaseError = error;
+  throw dbError;
 }
 
 export async function updatePortfolioProperty(id: string, data: Record<string, unknown>) {
