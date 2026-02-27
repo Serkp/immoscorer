@@ -148,8 +148,10 @@ export default function AnalysisPage() {
 function AnalysisContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const analysisId = searchParams.get("id");
   const { user } = useAuth();
   const { refresh: refreshSub } = useSubscription();
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(!!analysisId);
   const [view, setView] = useState<View>("input");
   const [section, setSection] = useState(0);
   const [form, setForm] = useState<FormData>(INIT);
@@ -180,13 +182,13 @@ function AnalysisContent() {
 
   /* ── Load saved analysis from DB when ?id= is present ── */
   useEffect(() => {
-    const id = searchParams.get("id");
-    if (!id || !user) return;
+    if (!analysisId || !user) { setIsLoadingAnalysis(false); return; }
+    setIsLoadingAnalysis(true);
     setLoadError(null);
     (async () => {
       try {
-        const row = await getAnalysisById(id, user.id);
-        if (!row) { setLoadError("Analyse nicht gefunden."); return; }
+        const row = await getAnalysisById(analysisId, user.id);
+        if (!row) { setLoadError("Analyse nicht gefunden."); setIsLoadingAnalysis(false); return; }
         const inp = (row.inputs || {}) as Record<string, string | number | string[]>;
 
         // Reconstruct form from saved inputs
@@ -242,14 +244,16 @@ function AnalysisContent() {
       } catch (err) {
         console.error("[loadAnalysis] error:", err);
         setLoadError("Analyse konnte nicht geladen werden.");
+      } finally {
+        setIsLoadingAnalysis(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, user]);
+  }, [analysisId, user]);
 
   /* ── Restore from sessionStorage (Feature 2: Zwischenspeicher) ── */
   useEffect(() => {
-    if (searchParams.get("id")) return; // Skip restore when loading from DB
+    if (analysisId) return; // Skip restore when loading from DB
     // ?new=1 → fresh analysis (from "Objekt hinzufügen" on compare page)
     if (searchParams.get("new")) {
       sessionStorage.removeItem("immoscorer_analysis");
@@ -279,7 +283,8 @@ function AnalysisContent() {
         setView("result");
       }
     } catch { /* ignore parse errors */ }
-  }, [searchParams]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [analysisId, searchParams]);
 
   /* ── Persist form to sessionStorage on change ── */
   useEffect(() => {
@@ -729,6 +734,16 @@ function AnalysisContent() {
       text: `Von diesem Investment wird abgeraten (${score}/100). Die Risiken überwiegen deutlich. Suchen Sie nach Objekten mit besserem Rendite-Risiko-Profil.`,
       variant: "bad",
     };
+  }
+
+  /* ── Loading analysis from DB ── */
+  if (isLoadingAnalysis) {
+    return (
+      <div className="flex flex-col items-center justify-center py-32 gap-4">
+        <AIOrb size={48} active />
+        <p className="text-sm font-medium" style={{ color: C.sub }}>Analyse wird geladen…</p>
+      </div>
+    );
   }
 
   /* ── Error loading analysis ── */
