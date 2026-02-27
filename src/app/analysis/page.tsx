@@ -172,6 +172,12 @@ function AnalysisContent() {
   const [fromCompare, setFromCompare] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // KI-Berater state
+  const [aiMessages, setAiMessages] = useState<{ role: "user" | "ai"; text: string }[]>([]);
+  const [aiQuestion, setAiQuestion] = useState("");
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiSuggestionsUsed, setAiSuggestionsUsed] = useState(false);
+
   /* ── Load saved analysis from DB when ?id= is present ── */
   useEffect(() => {
     const id = searchParams.get("id");
@@ -582,10 +588,51 @@ function AnalysisContent() {
     setFinanzForm({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
     setHgExpanded(false);
     setFromCompare(false);
+    setAiMessages([]);
+    setAiQuestion("");
+    setAiSuggestionsUsed(false);
     sessionStorage.removeItem("immoscorer_analysis");
     sessionStorage.removeItem("immoscorer_step");
     sessionStorage.removeItem("immoscorer_result");
     window.history.replaceState({}, "", "/analysis");
+  }
+
+  async function askAiAdvisor(question: string) {
+    if (!question.trim() || aiLoading || !result) return;
+    setAiLoading(true);
+    setAiSuggestionsUsed(true);
+    const newMessages = [...aiMessages, { role: "user" as const, text: question }].slice(-10);
+    setAiMessages(newMessages);
+    setAiQuestion("");
+    try {
+      const res = await fetch("/api/ai-advisor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          question,
+          analysisData: {
+            address: `${form.street}, ${form.city}`,
+            propertyType: form.propertyType || "etw",
+            purchasePrice: Number(form.price),
+            monthlyRent: getKaltmiete(form),
+            area: Number(form.area),
+            buildingYear: Number(form.year),
+            energyClass: form.energyClass,
+            totalScore: result.totalScore,
+            grossYield: (result.kpis.grossYield * 100).toFixed(1),
+            netYield: (result.kpis.netYield * 100).toFixed(1),
+            priceFactor: result.kpis.factor.toFixed(1),
+            locationGrade: form.locationGrade,
+            renovations: form.renovations.join(", ") || "Keiner",
+          },
+        }),
+      });
+      const data = await res.json();
+      setAiMessages((prev) => [...prev, { role: "ai", text: data.answer || "Keine Antwort." }]);
+    } catch {
+      setAiMessages((prev) => [...prev, { role: "ai", text: "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut." }]);
+    }
+    setAiLoading(false);
   }
 
   /* ── Global checkout toast ── */
@@ -1736,6 +1783,93 @@ function AnalysisContent() {
                 Neue Analyse starten
               </button>
             </div>
+
+            {/* ── KI-Investitionsberater ── */}
+            <Card className="mt-8 p-0 overflow-hidden" style={{ border: `1px solid ${C.border}` }}>
+              {/* Header */}
+              <div className="px-5 py-4 flex items-center gap-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <div className="flex items-center justify-center w-8 h-8 rounded-lg" style={{ background: C.accentDim }}>
+                  <AIOrb size={18} active />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: C.text }}>KI-Investitionsberater</h3>
+                  <p className="text-[11px]" style={{ color: C.dim }}>Stelle Fragen zu diesem Objekt — basierend auf deiner Analyse</p>
+                </div>
+              </div>
+
+              {/* Suggested Questions */}
+              {!aiSuggestionsUsed && (
+                <div className="px-5 py-3 flex flex-wrap gap-2" style={{ borderBottom: `1px solid ${C.border}` }}>
+                  {[
+                    result.totalScore < 50 ? "Warum ist der Score so niedrig?" : result.totalScore >= 75 ? "Was macht dieses Objekt besonders gut?" : "Wie kann ich den Score verbessern?",
+                    form.renovations.length > 0 ? "Lohnt sich die Sanierung finanziell?" : "Welche Renovierungen wären sinnvoll?",
+                    result.kpis.grossYield < 0.04 ? "Ist die Rendite zu niedrig?" : "Wie realistisch ist die Rendite?",
+                    "Sollte ich dieses Objekt kaufen?",
+                  ].map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => askAiAdvisor(q)}
+                      disabled={aiLoading}
+                      className="rounded-full px-3 py-1.5 text-[11px] font-medium transition-all hover:opacity-80 disabled:opacity-40"
+                      style={{ background: C.surface2, color: C.sub, border: `1px solid ${C.border}` }}
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Messages */}
+              {aiMessages.length > 0 && (
+                <div className="px-5 py-3 space-y-3 max-h-[400px] overflow-y-auto" style={{ borderBottom: `1px solid ${C.border}` }}>
+                  {aiMessages.map((msg, i) => (
+                    <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                      <div
+                        className="rounded-xl px-3.5 py-2.5 text-xs leading-relaxed max-w-[85%]"
+                        style={{
+                          background: msg.role === "user" ? C.accentDim : C.surface2,
+                          color: msg.role === "user" ? C.accent : C.text,
+                          border: `1px solid ${msg.role === "user" ? "rgba(124,106,255,0.2)" : C.border}`,
+                        }}
+                      >
+                        {msg.text}
+                      </div>
+                    </div>
+                  ))}
+                  {aiLoading && (
+                    <div className="flex justify-start">
+                      <div className="rounded-xl px-4 py-3 flex items-center gap-1" style={{ background: C.surface2, border: `1px solid ${C.border}` }}>
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: C.dim, animationDelay: "0ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: C.dim, animationDelay: "150ms" }} />
+                        <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: C.dim, animationDelay: "300ms" }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Input */}
+              <div className="px-5 py-3 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={aiQuestion}
+                  onChange={(e) => setAiQuestion(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); askAiAdvisor(aiQuestion); } }}
+                  placeholder="Stelle eine Frage zu diesem Objekt..."
+                  disabled={aiLoading}
+                  className="flex-1 rounded-xl px-3 py-2 text-sm outline-none focus:ring-1 disabled:opacity-50"
+                  style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                />
+                <button
+                  onClick={() => askAiAdvisor(aiQuestion)}
+                  disabled={aiLoading || !aiQuestion.trim()}
+                  className="rounded-xl px-4 py-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-30"
+                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                >
+                  Fragen
+                </button>
+              </div>
+            </Card>
           </>
       </div>
     );
