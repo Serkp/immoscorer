@@ -27,12 +27,11 @@ interface AnalysisRow {
   rentability_score: number;
   risk_score: number;
   financing_score: number;
-  projection_score: number;
+  future_score: number;
   energy_score: number;
   gross_yield: number;
   net_yield: number;
   price_factor: number;
-  sqm_price: number;
   created_at: string;
   /* legacy JSONB (fallback) */
   inputs?: Record<string, unknown>;
@@ -43,13 +42,15 @@ interface AnalysisRow {
 function normalize(a: AnalysisRow) {
   // If flat columns are populated, use them
   if (a.total_score != null && a.total_score > 0) {
+    const price = a.purchase_price || 0;
+    const area = a.area_sqm || 0;
     return {
       id: a.id,
       address: a.address || "—",
       city: a.city || "",
-      price: a.purchase_price || 0,
+      price,
       rent: a.monthly_rent || 0,
-      area: a.area_sqm || 0,
+      area,
       year: a.building_year || 0,
       energyClass: a.energy_class || "—",
       locationGrade: a.location_grade || "—",
@@ -60,49 +61,43 @@ function normalize(a: AnalysisRow) {
       rentabilityScore: a.rentability_score || 0,
       riskScore: a.risk_score || 0,
       financingScore: a.financing_score || 0,
-      projectionScore: a.projection_score || 0,
+      projectionScore: a.future_score || 0,
       energyScore: a.energy_score || 0,
       grossYield: a.gross_yield || 0,
       netYield: a.net_yield || 0,
       factor: a.price_factor || 0,
-      sqmPrice: a.sqm_price || 0,
+      sqmPrice: area > 0 ? price / area : 0,
     };
   }
-  // Legacy JSONB fallback
+  // Legacy JSONB fallback — inp may use camelCase keys (new format) or snake_case
   const inp = (a.inputs || {}) as Record<string, number | string | string[]>;
-  const res = (a.result || {}) as {
-    totalScore?: number;
-    subscores?: Array<{ key: string; value: number }>;
-    kpis?: { netYield?: number; grossYield?: number; factor?: number; sqmPrice?: number };
-  };
-  const price = Number(inp.price) || 0;
-  const rent = Number(inp.rent) || 0;
-  const hausgeld = Number(inp.hausgeld) || 0;
-  const area = Number(inp.area) || 0;
-  const subs = res.subscores || [];
-  const getSub = (key: string) => subs.find((s) => s.key === key)?.value || 0;
+  const res = (a.result || {}) as Record<string, number>;
+  const price = Number(inp.purchasePrice ?? inp.price) || 0;
+  const rent = Number(inp.monthlyRent ?? inp.rent) || 0;
+  const hausgeld = Number(inp.managementFee ?? inp.hausgeld) || 0;
+  const area = Number(inp.areaSqm ?? inp.area) || 0;
   return {
     id: a.id,
-    address: inp.street ? `${inp.street}, ${inp.city}` : String(inp.city || "—"),
+    address: String(inp.address || inp.street || "—"),
     city: String(inp.city || ""),
     price,
     rent,
     area,
-    year: Number(inp.year) || 0,
+    year: Number(inp.buildingYear ?? inp.year) || 0,
     energyClass: String(inp.energyClass || "—"),
     locationGrade: String(inp.locationGrade || "—"),
     hausgeld,
-    renoCount: Array.isArray(inp.renovations) ? inp.renovations.length : 0,
+    renoCount: Number(inp.renovationCount) || (Array.isArray(inp.renovations) ? inp.renovations.length : 0),
     score: res.totalScore || 0,
-    investmentScore: getSub("investment"),
-    rentabilityScore: getSub("rentability"),
-    riskScore: getSub("risk"),
-    financingScore: getSub("financing"),
-    projectionScore: getSub("projection"),
-    energyScore: getSub("energy"),
-    grossYield: price > 0 ? ((rent * 12) / price) * 100 : 0,
-    netYield: price > 0 ? (((rent - hausgeld) * 12) / price) * 100 : 0,
-    factor: rent > 0 ? price / (rent * 12) : 0,
+    investmentScore: res.investmentScore || 0,
+    rentabilityScore: res.rentabilityScore || 0,
+    riskScore: res.riskScore || 0,
+    financingScore: res.financingScore || 0,
+    projectionScore: res.futureScore || 0,
+    energyScore: res.energyScore || 0,
+    grossYield: res.grossYield || (price > 0 ? ((rent * 12) / price) * 100 : 0),
+    netYield: res.netYield || (price > 0 ? (((rent - hausgeld) * 12) / price) * 100 : 0),
+    factor: res.priceFactor || (rent > 0 ? price / (rent * 12) : 0),
     sqmPrice: area > 0 ? price / area : 0,
   };
 }

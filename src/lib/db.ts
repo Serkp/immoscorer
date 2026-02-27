@@ -117,6 +117,7 @@ export async function saveComparisonFlat(
     net_yield: scores.netYield,
     price_factor: scores.priceFactor,
     save_type: "comparison",
+    status: "saved",
     // JSONB columns — required NOT NULL
     inputs: inp,
     result: scores,
