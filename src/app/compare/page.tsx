@@ -155,7 +155,7 @@ export default function ComparePage() {
   if (cards.length === 0) {
     return (
       <div className="mx-auto max-w-[1100px]">
-        <Link href="/" className="inline-flex items-center gap-1 text-xs mb-4 transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs mb-4 transition-opacity hover:opacity-80" style={{ color: C.dim }}>
           ← Dashboard
         </Link>
         <div className="mb-8">
@@ -199,7 +199,7 @@ export default function ComparePage() {
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
-      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
         ← Dashboard
       </Link>
 

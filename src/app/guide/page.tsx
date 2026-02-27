@@ -77,7 +77,7 @@ export default function GuidePage() {
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-10">
-      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
         ← Dashboard
       </Link>
 

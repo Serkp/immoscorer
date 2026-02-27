@@ -244,7 +244,7 @@ export default function PortfolioPage() {
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
-      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+      <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
         ← Dashboard
       </Link>
 
