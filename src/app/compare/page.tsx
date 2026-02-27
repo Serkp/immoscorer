@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -102,6 +103,7 @@ function normalize(a: AnalysisRow) {
 }
 
 export default function ComparePage() {
+  const router = useRouter();
   const { user } = useAuth();
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,7 +281,13 @@ export default function ComparePage() {
         }}
       >
         {cards.map((d) => (
-          <Card key={d.id} className="p-0 overflow-hidden" style={{ maxWidth: 240 }}>
+          <Card
+            key={d.id}
+            className="p-0 overflow-hidden cursor-pointer transition-all"
+            style={{ maxWidth: 240 }}
+            hover
+            onClick={() => router.push(`/analysis?id=${d.id}`)}
+          >
             {/* ── Card Header: Address + Details ── */}
             <div className="px-3 pt-3 pb-2">
               <p className="text-xs font-bold truncate" style={{ color: C.text }}>
@@ -373,7 +381,7 @@ export default function ComparePage() {
             {/* ── Delete Button ── */}
             <div className="border-t px-3 py-2" style={{ borderColor: C.border }}>
               <button
-                onClick={() => setDeleteConfirm(d.id)}
+                onClick={(e) => { e.stopPropagation(); setDeleteConfirm(d.id); }}
                 className="w-full text-center text-[10px] font-medium py-0.5 transition-all hover:opacity-80 rounded-lg"
                 style={{ color: C.dim }}
               >

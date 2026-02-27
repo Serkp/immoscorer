@@ -86,6 +86,8 @@ export async function saveComparisonFlat(
     address: string; city: string; purchasePrice: number; monthlyRent: number;
     areaSqm: number; buildingYear: number; energyClass: string; locationGrade: string;
     managementFee: number; renovationCount: number;
+    propertyType?: string; apartmentType?: string; rooms?: number;
+    estimatedUtilities?: number; unitCount?: number;
   },
   scores: {
     totalScore: number; investmentScore: number; rentabilityScore: number;
@@ -139,6 +141,17 @@ export async function saveComparisonFlat(
     (dbError as unknown as Record<string, unknown>).supabaseError = error;
     throw dbError;
   }
+  return data;
+}
+
+export async function getAnalysisById(id: string, userId: string) {
+  const { data, error } = await getSupabase()
+    .from("analyses")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .single();
+  if (error) throw error;
   return data;
 }
 

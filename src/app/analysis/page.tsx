@@ -17,7 +17,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { saveComparisonFlat } from "@/lib/db";
+import { saveComparisonFlat, getAnalysisById } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -55,6 +55,9 @@ const LOADING_STEPS = [
 
 type View = "input" | "loading" | "result";
 
+type PropertyType = "" | "etw" | "efh" | "mfh" | "dhh";
+type ApartmentType = "" | "erdgeschoss" | "obergeschoss" | "dachgeschoss" | "penthouse" | "souterrain";
+
 interface FormData {
   street: string;
   city: string;
@@ -69,6 +72,11 @@ interface FormData {
   energyClass: string;
   locationGrade: string;
   renovations: string[];
+  propertyType: PropertyType;
+  apartmentType: ApartmentType;
+  rooms: string;
+  estimatedUtilities: string;
+  unitCount: string;
 }
 
 interface LocationData {
@@ -84,7 +92,23 @@ const INIT: FormData = {
   street: "", city: "", price: "", rent: "", rentType: "kalt", warmNK: "",
   hausgeld: "", hgItems: {}, area: "", year: "",
   energyClass: "", locationGrade: "", renovations: [],
+  propertyType: "", apartmentType: "", rooms: "", estimatedUtilities: "", unitCount: "",
 };
+
+const PROPERTY_TYPES = [
+  { key: "etw", label: "Eigentumswohnung (ETW)" },
+  { key: "efh", label: "Einfamilienhaus (EFH)" },
+  { key: "mfh", label: "Mehrfamilienhaus (MFH)" },
+  { key: "dhh", label: "Doppelhaushälfte (DHH)" },
+] as const;
+
+const APARTMENT_TYPES = [
+  { key: "erdgeschoss", label: "Erdgeschoss" },
+  { key: "obergeschoss", label: "Obergeschoss" },
+  { key: "dachgeschoss", label: "Dachgeschoss" },
+  { key: "penthouse", label: "Penthouse" },
+  { key: "souterrain", label: "Souterrain" },
+] as const;
 
 /** Derive Kaltmiete from form (adjusts for Warmmiete if selected) */
 function getKaltmiete(f: FormData): number {
@@ -145,9 +169,78 @@ function AnalysisContent() {
   const [finanzSending, setFinanzSending] = useState(false);
   const [finanzSent, setFinanzSent] = useState(false);
   const [hgExpanded, setHgExpanded] = useState(false);
+  const [fromCompare, setFromCompare] = useState(false);
+
+  /* ── Load saved analysis from DB when ?id= is present ── */
+  useEffect(() => {
+    const id = searchParams.get("id");
+    if (!id || !user) return;
+    (async () => {
+      try {
+        const row = await getAnalysisById(id, user.id);
+        if (!row) return;
+        const inp = (row.inputs || {}) as Record<string, string | number | string[]>;
+        const res = (row.result || {}) as Record<string, unknown>;
+
+        // Reconstruct form from saved inputs
+        const addr = String(inp.address || "");
+        const parts = addr.split(",").map((s: string) => s.trim());
+        setForm({
+          street: parts[0] || String(inp.street || ""),
+          city: parts[1] || String(inp.city || row.city || ""),
+          price: String(inp.purchasePrice || inp.price || row.purchase_price || ""),
+          rent: String(inp.monthlyRent || inp.rent || row.monthly_rent || ""),
+          rentType: "kalt",
+          warmNK: "",
+          hausgeld: String(inp.managementFee || inp.hausgeld || row.management_fee || ""),
+          hgItems: {},
+          area: String(inp.areaSqm || inp.area || row.area_sqm || ""),
+          year: String(inp.buildingYear || inp.year || row.building_year || ""),
+          energyClass: String(inp.energyClass || row.energy_class || ""),
+          locationGrade: String(inp.locationGrade || row.location_grade || ""),
+          renovations: Array.isArray(inp.renovations) ? inp.renovations as string[] : [],
+          propertyType: String(inp.propertyType || "") as FormData["propertyType"],
+          apartmentType: String(inp.apartmentType || "") as FormData["apartmentType"],
+          rooms: String(inp.rooms || ""),
+          estimatedUtilities: String(inp.estimatedUtilities || ""),
+          unitCount: String(inp.unitCount || ""),
+        });
+
+        // Reconstruct result
+        if (res.totalScore != null) {
+          setResult(res as unknown as ScoringResult);
+        } else {
+          // Re-run scoring from flat columns
+          const rent = Number(inp.monthlyRent || inp.rent || row.monthly_rent) || 0;
+          const hausgeld = Number(inp.managementFee || inp.hausgeld || row.management_fee) || 0;
+          const input: PropertyInput = {
+            street: parts[0] || "",
+            city: parts[1] || String(row.city || ""),
+            price: Number(inp.purchasePrice || inp.price || row.purchase_price) || 0,
+            rent,
+            hausgeld,
+            area: Number(inp.areaSqm || inp.area || row.area_sqm) || 0,
+            year: Number(inp.buildingYear || inp.year || row.building_year) || 0,
+            energyClass: String(inp.energyClass || row.energy_class || "C"),
+            locationGrade: String(inp.locationGrade || row.location_grade || "B"),
+            renovations: Array.isArray(inp.renovations) ? inp.renovations as string[] : [],
+          };
+          setResult(computeScore(input));
+        }
+
+        setFromCompare(true);
+        setSaveChoice("compare"); // Already saved
+        setView("result");
+      } catch (err) {
+        console.error("[loadAnalysis] error:", err);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, user]);
 
   /* ── Restore from sessionStorage (Feature 2: Zwischenspeicher) ── */
   useEffect(() => {
+    if (searchParams.get("id")) return; // Skip restore when loading from DB
     try {
       const savedForm = sessionStorage.getItem("immoscorer_analysis");
       if (savedForm) {
@@ -165,7 +258,7 @@ function AnalysisContent() {
         setView("result");
       }
     } catch { /* ignore parse errors */ }
-  }, []);
+  }, [searchParams]);
 
   /* ── Persist form to sessionStorage on change ── */
   useEffect(() => {
@@ -290,6 +383,8 @@ function AnalysisContent() {
   const hausgeldNum = Number(form.hausgeld);
   const areaNum = Number(form.area);
   const yearNum = Number(form.year);
+  const roomsNum = Number(form.rooms);
+  const unitCountNum = Number(form.unitCount);
 
   const priceValid = !form.price || (priceNum >= 10000 && priceNum <= 50000000);
   const rentValid = !form.rent || (rentNum >= 50 && rentNum <= 50000);
@@ -297,9 +392,28 @@ function AnalysisContent() {
   const areaValid = !form.area || (areaNum >= 10 && areaNum <= 10000);
   const yearValid = !form.year || (yearNum >= 1800 && yearNum <= 2026 && form.year.length === 4);
   const hausgeldWarn = form.hausgeld && form.rent && hausgeldNum > rentNum;
+  const roomsValid = !form.rooms || (roomsNum >= 1 && roomsNum <= 20 && Number.isInteger(roomsNum));
+  const unitCountValid = !form.unitCount || (unitCountNum >= 2 && unitCountNum <= 100);
 
-  const canNext0 = !!(form.street && form.city && form.price && form.rent && priceValid && rentValid);
-  const canNext1 = !!(form.hausgeld && form.area && form.year && form.energyClass && hausgeldValid && areaValid && yearValid);
+  const etwNeedsApartmentType = form.propertyType === "etw" && !form.apartmentType;
+  const mfhNeedsUnits = form.propertyType === "mfh" && !form.unitCount;
+
+  const canNext0 = !!(
+    form.street && form.city && form.price && form.rent && form.propertyType &&
+    priceValid && rentValid &&
+    !etwNeedsApartmentType &&
+    (!form.rooms || roomsValid)
+  );
+  const canNext1 = !!(
+    (form.propertyType === "efh" || form.propertyType === "dhh" || form.hausgeld) &&
+    form.area && form.year && form.energyClass &&
+    hausgeldValid && areaValid && yearValid &&
+    (!mfhNeedsUnits)
+  );
+
+  // NK auto-suggestion
+  const nkSuggestion = areaNum > 0 ? Math.round(areaNum * 2.80) : 0;
+  const warmmiete = kaltmiete + (Number(form.estimatedUtilities) || nkSuggestion);
 
   /* ── Analyse starten ── */
   function startAnalysis() {
@@ -335,6 +449,11 @@ function AnalysisContent() {
             renovations: form.renovations,
             ...(locationData ? { walkScore: locationData.walkScore, transitScore: locationData.transitScore } : {}),
             ...(split.hasBreakdown ? { hausgeldNichtUmlagefaehig: split.nichtUmlagefaehig, hasHGBreakdown: true } : {}),
+            ...(form.propertyType ? { propertyType: form.propertyType } : {}),
+            ...(form.apartmentType ? { apartmentType: form.apartmentType } : {}),
+            ...(form.rooms ? { rooms: Number(form.rooms) } : {}),
+            ...(form.unitCount ? { unitCount: Number(form.unitCount) } : {}),
+            ...(form.estimatedUtilities ? { estimatedUtilities: Number(form.estimatedUtilities) } : {}),
           };
           const sr = computeScore(input);
           setResult(sr);
@@ -372,6 +491,11 @@ function AnalysisContent() {
           locationGrade: form.locationGrade || "B",
           managementFee: hausgeld,
           renovationCount: form.renovations.length,
+          propertyType: form.propertyType || undefined,
+          apartmentType: form.apartmentType || undefined,
+          rooms: form.rooms ? Number(form.rooms) : undefined,
+          estimatedUtilities: form.estimatedUtilities ? Number(form.estimatedUtilities) : undefined,
+          unitCount: form.unitCount ? Number(form.unitCount) : undefined,
         },
         {
           totalScore: result.totalScore,
@@ -442,9 +566,11 @@ function AnalysisContent() {
     setFinanzSent(false);
     setFinanzForm({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
     setHgExpanded(false);
+    setFromCompare(false);
     sessionStorage.removeItem("immoscorer_analysis");
     sessionStorage.removeItem("immoscorer_step");
     sessionStorage.removeItem("immoscorer_result");
+    window.history.replaceState({}, "", "/analysis");
   }
 
   /* ── Global checkout toast ── */
@@ -573,34 +699,25 @@ function AnalysisContent() {
           <div className="space-y-5 animate-fade-up">
             <div className="flex items-center gap-3">
               <AIOrb size={32} active />
-              <h2 className="text-lg font-bold">Welche Immobilie möchten Sie bewerten?</h2>
+              <h2 className="text-lg font-bold">Was möchten Sie analysieren?</h2>
             </div>
 
+            {/* GRUPPE 1 — Adresse */}
             <AddressAutocomplete
               onSelect={handleAddressSelect}
               defaultValue={form.street ? `${form.street}, ${form.city}` : ""}
             />
 
-            {/* Loading-State für Lage-Analyse */}
             {locationLoading && (
               <div className="flex items-center gap-3 rounded-xl p-4 animate-fade-up" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
                 <AIOrb size={24} active />
                 <span className="text-sm" style={{ color: C.sub }}>Lage wird analysiert...</span>
               </div>
             )}
-
-            {/* Lage-Card mit echten Daten */}
             {locationDone && locationData && (
               <Card className="p-4 space-y-3 animate-fade-up">
                 <div className="flex items-center gap-2">
-                  <span
-                    className="rounded-lg px-2.5 py-1 text-xs font-bold"
-                    style={{
-                      background: gradeBg(locationData.locationGrade),
-                      color: gradeColor(locationData.locationGrade),
-                      border: `1px solid ${gradeBorder(locationData.locationGrade)}`,
-                    }}
-                  >
+                  <span className="rounded-lg px-2.5 py-1 text-xs font-bold" style={{ background: gradeBg(locationData.locationGrade), color: gradeColor(locationData.locationGrade), border: `1px solid ${gradeBorder(locationData.locationGrade)}` }}>
                     Lageklasse {locationData.locationGrade}
                   </span>
                   <span className="text-xs" style={{ color: C.sub }}>{form.city}</span>
@@ -610,81 +727,125 @@ function AnalysisContent() {
                   <MiniMetric label="ÖPNV-Score" value={String(locationData.transitScore)} />
                   <MiniMetric label="Mietwachstum" value={locationData.rentGrowth} />
                 </div>
-                <p className="text-xs leading-relaxed" style={{ color: C.dim }}>
-                  {locationData.description}
-                </p>
+                <p className="text-xs leading-relaxed" style={{ color: C.dim }}>{locationData.description}</p>
                 {locationData.nearbyHighlights.length > 0 && (
                   <div className="space-y-1 pt-1">
                     <p className="text-[10px] font-semibold" style={{ color: C.sub }}>Umgebung (1 km Radius)</p>
                     {locationData.nearbyHighlights.map((h, i) => (
-                      <p key={i} className="text-xs" style={{ color: C.dim }}>
-                        <span style={{ color: C.accent }}>·</span> {h}
-                      </p>
+                      <p key={i} className="text-xs" style={{ color: C.dim }}><span style={{ color: C.accent }}>·</span> {h}</p>
                     ))}
                   </div>
                 )}
               </Card>
             )}
-
-            {/* Hinweis wenn keine Google-Adresse gewählt */}
             {!locationDone && !locationLoading && (form.street || form.city) && !lat && (
-              <p className="text-xs" style={{ color: C.dim }}>
-                Für eine automatische Lage-Analyse wählen Sie eine Adresse aus den Vorschlägen.
-              </p>
+              <p className="text-xs" style={{ color: C.dim }}>Für eine automatische Lage-Analyse wählen Sie eine Adresse aus den Vorschlägen.</p>
             )}
 
+            {/* GRUPPE 2 — Objektart */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium" style={{ color: C.sub }}>Objektart *</label>
+              <div className="grid grid-cols-2 gap-2">
+                {PROPERTY_TYPES.map((pt) => (
+                  <button
+                    key={pt.key}
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, propertyType: pt.key as PropertyType, ...(pt.key !== "etw" ? { apartmentType: "" as ApartmentType } : {}), ...(pt.key !== "mfh" ? { unitCount: "" } : {}) }))}
+                    className="rounded-xl px-3 py-2.5 text-xs font-semibold text-left transition-all"
+                    style={{
+                      background: form.propertyType === pt.key ? C.accentDim : C.surface,
+                      border: `1px solid ${form.propertyType === pt.key ? C.accent : C.border}`,
+                      color: form.propertyType === pt.key ? C.accent : C.sub,
+                    }}
+                  >
+                    {pt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Wohnungstyp (nur bei ETW) */}
+            {form.propertyType === "etw" && (
+              <div className="space-y-2 animate-fade-up">
+                <label className="text-xs font-medium" style={{ color: C.sub }}>Wohnungstyp *</label>
+                <div className="flex flex-wrap gap-2">
+                  {APARTMENT_TYPES.map((at) => (
+                    <button
+                      key={at.key}
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, apartmentType: at.key as ApartmentType }))}
+                      className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all"
+                      style={{
+                        background: form.apartmentType === at.key ? C.accentDim : C.surface,
+                        border: `1px solid ${form.apartmentType === at.key ? C.accent : C.border}`,
+                        color: form.apartmentType === at.key ? C.accent : C.sub,
+                      }}
+                    >
+                      {at.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* GRUPPE 3 — Eckdaten */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Input label="Kaufpreis" value={form.price} onChange={(v) => set("price", v)} placeholder="250000" type="number" suffix="€" large explain="Gesamtangebotspreis inkl. ausgewiesener Nebenkosten." />
                 {form.price && !priceValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Kaufpreis zwischen 10.000 und 50.000.000 € eingeben</p>}
               </div>
               <div>
-                <Input label={form.rentType === "warm" ? "Monatliche Warmmiete" : "Monatliche Kaltmiete"} value={form.rent} onChange={(v) => set("rent", v)} placeholder="950" type="number" suffix="€" large explain={form.rentType === "warm" ? "Warmmiete inkl. Nebenkosten." : "Nettokaltmiete ohne Nebenkosten."} />
-                {form.rent && !rentValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Miete zwischen 50 und 50.000 € eingeben</p>}
+                <Input label="Wohnfläche" value={form.area} onChange={(v) => set("area", v)} placeholder="72" type="number" suffix="m²" explain="Wohnfläche laut Grundriss oder Teilungserklärung." />
+                {form.area && !areaValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Wohnfläche zwischen 10 und 10.000 m² eingeben</p>}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Input label="Zimmer" value={form.rooms} onChange={(v) => set("rooms", v)} placeholder="3" type="number" explain="Anzahl Zimmer (ohne Küche/Bad)." />
+                {form.rooms && !roomsValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte 1–20 Zimmer eingeben</p>}
+              </div>
+              <div>
+                <Input label="Baujahr" value={form.year} onChange={(v) => set("year", v)} placeholder="1985" type="number" explain="Baujahr des Gebäudes." />
+                {form.year && !yearValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte gültiges Baujahr eingeben (1800–2026)</p>}
               </div>
             </div>
 
-            {/* Rent type selector */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium" style={{ color: C.sub }}>Mietart</label>
-              <div className="flex rounded-xl p-1" style={{ background: C.surface }}>
-                {(["kalt", "warm"] as const).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setForm((f) => ({ ...f, rentType: t }))}
-                    className="flex-1 rounded-lg py-1.5 text-xs font-semibold transition-all"
-                    style={{
-                      background: form.rentType === t ? C.surface3 : "transparent",
-                      color: form.rentType === t ? C.text : C.sub,
-                    }}
-                  >
-                    {t === "kalt" ? "Kaltmiete" : "Warmmiete"}
-                  </button>
-                ))}
+            {/* GRUPPE 4 — Miete + NK */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Input
+                  label={form.propertyType === "mfh" ? "Gesamte Mieteinnahmen" : "Kaltmiete"}
+                  value={form.rent}
+                  onChange={(v) => set("rent", v)}
+                  placeholder={form.propertyType === "mfh" ? "2800" : "950"}
+                  type="number"
+                  suffix="€/Mon."
+                  large
+                  explain={form.propertyType === "mfh" ? "Gesamtmiete aller Einheiten." : "Nettokaltmiete ohne Nebenkosten."}
+                />
+                {form.rent && !rentValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Miete zwischen 50 und 50.000 € eingeben</p>}
               </div>
-              {form.rentType === "warm" && (
-                <div className="space-y-2 animate-fade-up">
-                  <p className="text-xs" style={{ color: C.dim }}>
-                    Bei Warmmiete sind Nebenkosten bereits enthalten. Die Kaltmiete wird geschätzt (~70 % der Warmmiete).
-                  </p>
-                  <Input
-                    label="Geschätzte Nebenkosten (optional)"
-                    value={form.warmNK}
-                    onChange={(v) => setForm((f) => ({ ...f, warmNK: v }))}
-                    placeholder={form.rent ? String(Math.round(Number(form.rent) * 0.30)) : ""}
-                    type="number"
-                    suffix="€/Mon."
-                    explain="Falls bekannt, für genauere Berechnung eingeben."
-                  />
-                  {form.rent && (
-                    <p className="text-xs" style={{ color: C.blue }}>
-                      Geschätzte Kaltmiete: {Math.round(kaltmiete).toLocaleString("de-DE")} €/Mon.
-                    </p>
-                  )}
-                </div>
-              )}
+              <div>
+                <Input
+                  label="Nebenkosten (geschätzt)"
+                  value={form.estimatedUtilities}
+                  onChange={(v) => setForm((f) => ({ ...f, estimatedUtilities: v }))}
+                  placeholder={nkSuggestion > 0 ? String(nkSuggestion) : "200"}
+                  type="number"
+                  suffix="€/Mon."
+                  explain="Ca. 2,50–3,50 €/m² üblich."
+                />
+              </div>
             </div>
+            {form.propertyType === "mfh" && (
+              <p className="text-[11px]" style={{ color: C.dim }}>Bei MFH wird die Gesamtmiete aller Einheiten berücksichtigt.</p>
+            )}
+            {/* Live Warmmiete display */}
+            {kaltmiete > 0 && (
+              <p className="text-xs font-medium" style={{ color: C.blue }}>
+                Warmmiete: {warmmiete.toLocaleString("de-DE")} €/Mon. ({Math.round(kaltmiete).toLocaleString("de-DE")} € Kalt + {(Number(form.estimatedUtilities) || nkSuggestion).toLocaleString("de-DE")} € NK)
+              </p>
+            )}
 
             {/* Live-Metriken */}
             {liveKPIs && (
@@ -695,7 +856,6 @@ function AnalysisContent() {
               </div>
             )}
 
-            {/* AI Comment auf Rendite */}
             {liveKPIs && (
               <AIComment variant={liveKPIs.grossYield >= 0.05 ? "good" : liveKPIs.grossYield >= 0.04 ? "info" : liveKPIs.grossYield >= 0.03 ? "warn" : "bad"}>
                 {liveKPIs.grossYield >= 0.05 ? "Starke Bruttorendite — ein solides Fundament für fremdfinanzierte Kapitalanlagen mit positivem Leverage." :
@@ -726,17 +886,27 @@ function AnalysisContent() {
               <h2 className="text-lg font-bold">Wie sieht das Objekt im Detail aus?</h2>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            {/* MFH: Anzahl Wohneinheiten */}
+            {form.propertyType === "mfh" && (
               <div>
-                <Input label="Hausgeld gesamt" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="225" type="number" suffix="€/Mon." explain="Monatliches Hausgeld lt. WEG-Abrechnung." />
+                <Input label="Anzahl Wohneinheiten *" value={form.unitCount} onChange={(v) => setForm((f) => ({ ...f, unitCount: v }))} placeholder="6" type="number" explain="Gesamtzahl der vermieteten Einheiten." />
+                {form.unitCount && !unitCountValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Mindestens 2 Einheiten</p>}
+              </div>
+            )}
+
+            {/* Hausgeld (ETW/MFH) or Rücklagen (EFH/DHH) */}
+            {(form.propertyType === "etw" || form.propertyType === "mfh") ? (
+              <div>
+                <Input label="Hausgeld gesamt *" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder="225" type="number" suffix="€/Mon." explain="Monatliches Hausgeld lt. WEG-Abrechnung." />
                 {form.hausgeld && !hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Hausgeld zwischen 0 und 5.000 € eingeben</p>}
                 {hausgeldWarn && hausgeldValid && <p className="text-[11px] mt-1" style={{ color: C.amber }}>Hausgeld ist höher als Kaltmiete — Cashflow negativ!</p>}
               </div>
+            ) : (
               <div>
-                <Input label="Wohnfläche" value={form.area} onChange={(v) => set("area", v)} placeholder="72" type="number" suffix="m²" explain="Wohnfläche laut Grundriss oder Teilungserklärung." />
-                {form.area && !areaValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte Wohnfläche zwischen 10 und 10.000 m² eingeben</p>}
+                <Input label="Geschätzte monatliche Rücklagen" value={form.hausgeld} onChange={(v) => set("hausgeld", v)} placeholder={areaNum > 0 ? String(Math.round(areaNum * 1.5)) : "150"} type="number" suffix="€/Mon." explain="Empfehlung: 1–2 €/m² für Instandhaltung." />
+                <p className="text-[11px] mt-1" style={{ color: C.dim }}>Bei EFH/DHH gibt es kein WEG-Hausgeld. Planen Sie eigene Rücklagen.</p>
               </div>
-            </div>
+            )}
 
             {/* ── Hausgeld-Aufschlüsselung (optional) ── */}
             {form.hausgeld && hausgeldValid && (
@@ -880,11 +1050,6 @@ function AnalysisContent() {
               </div>
             )}
 
-            <div>
-              <Input label="Baujahr" value={form.year} onChange={(v) => set("year", v)} placeholder="1985" type="number" explain="Baujahr des Gebäudes — relevant für Substanzbewertung und GEG-Pflichten." />
-              {form.year && !yearValid && <p className="text-[11px] mt-1" style={{ color: C.red }}>Bitte gültiges Baujahr eingeben (1800–2026)</p>}
-            </div>
-
             <PillSelect label="Energieeffizienzklasse" options={ENERGY_OPTIONS} value={form.energyClass} onChange={(v) => set("energyClass", v)} explain="Laut Energieausweis. A+ ist die beste, H die schlechteste Klasse." />
 
             {!locationDone && (
@@ -1017,9 +1182,15 @@ function AnalysisContent() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
-        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
-          ← Dashboard
-        </Link>
+        {fromCompare ? (
+          <Link href="/compare" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+            ← Zurück zum Vergleich
+          </Link>
+        ) : (
+          <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+            ← Dashboard
+          </Link>
+        )}
         {/* Toast */}
         {toast && (
           <div
@@ -1044,7 +1215,11 @@ function AnalysisContent() {
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1 flex-wrap">
-              <p className="text-sm" style={{ color: C.sub }}>{form.street}, {form.city} — {form.area} m², Bj. {form.year}, Klasse {form.energyClass}</p>
+              <p className="text-sm" style={{ color: C.sub }}>
+                {form.street}, {form.city} —{" "}
+                {form.propertyType === "etw" ? `ETW ${form.apartmentType ? (form.apartmentType.charAt(0).toUpperCase() + form.apartmentType.slice(1)) : ""}` : form.propertyType === "efh" ? "EFH" : form.propertyType === "mfh" ? "MFH" : form.propertyType === "dhh" ? "DHH" : ""}
+                {form.rooms ? `, ${form.rooms} Zi.` : ""}, {form.area} m², Bj. {form.year}, Klasse {form.energyClass}
+              </p>
               {result.kpis.hasHGBreakdown && (
                 <span className="rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}>
                   Detaillierte Hausgeld-Analyse
@@ -1102,6 +1277,7 @@ function AnalysisContent() {
                 </ResponsiveContainer>
               </Card>
               <div className="space-y-3">
+                <KPIRow label="Warmmiete" value={`${warmmiete.toLocaleString("de-DE")} €/Mon.`} color={C.blue} />
                 <KPIRow label={result.kpis.hasHGBreakdown ? "Nettorendite (bereinigt)" : "Nettorendite"} value={`${(result.kpis.netYield * 100).toFixed(2)} %`} color={result.kpis.netYield >= 0.03 ? C.green : result.kpis.netYield >= 0.01 ? C.amber : C.red} />
                 <KPIRow label="Kaufpreisfaktor" value={`${result.kpis.factor.toFixed(1)}x`} color={result.kpis.factor <= 25 ? C.green : result.kpis.factor <= 30 ? C.amber : C.red} />
                 <KPIRow label="Finanzierbarkeit" value={`${result.subscores.find(s => s.key === "financing")?.value || 0}/100`} color={scoreColor(result.subscores.find(s => s.key === "financing")?.value || 0)} />

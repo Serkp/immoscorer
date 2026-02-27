@@ -20,6 +20,12 @@ export interface PropertyInput {
   /* Optional: Hausgeld-Aufschlüsselung */
   hausgeldNichtUmlagefaehig?: number; // Owner's actual cost (non-apportionable)
   hasHGBreakdown?: boolean;           // User provided detailed breakdown
+  /* Optional: Extended property info */
+  propertyType?: string;    // etw, efh, mfh, dhh
+  apartmentType?: string;   // erdgeschoss, obergeschoss, dachgeschoss, penthouse, souterrain
+  rooms?: number;           // 1-20
+  unitCount?: number;       // MFH: Anzahl Wohneinheiten
+  estimatedUtilities?: number; // Geschätzte NK
 }
 
 export interface SubscoreEntry {
@@ -78,6 +84,16 @@ const RENO_COST_RANGE: Record<string, string> = {
   dach: "15.000–40.000 €", fassade: "20.000–50.000 €", fenster: "8.000–20.000 €",
   bad: "10.000–25.000 €", elektrik: "8.000–18.000 €", heizung: "12.000–35.000 €",
 };
+
+/* ─── Zimmer-Score für Vermietbarkeit ─── */
+const ROOM_SCORE: Record<number, number> = {
+  1: 70, 2: 95, 3: 100, 4: 80, 5: 60,
+};
+function getRoomScore(rooms?: number): number {
+  if (!rooms || rooms < 1) return 85; // Default when not provided
+  if (rooms >= 6) return 55;
+  return ROOM_SCORE[rooms] ?? 85;
+}
 
 /* ─── Hilfsfunktionen ─── */
 
@@ -163,7 +179,19 @@ function calcInvestment(p: PropertyInput, k: KPIs): { value: number; reasons: st
 
   if (useFactor >= 25) actions.push("Verhandeln Sie 10–15 % unter Angebotspreis, um den Faktor in den Zielkorridor von 20–22x zu senken.");
 
-  return { value: clamp(s), reasons, actions };
+  // ─── Objektart-Anpassung ───
+  let ptAdj = 0;
+  if (p.propertyType === "mfh" && useYield >= 0.06 && (p.unitCount ?? 0) >= 3) {
+    ptAdj = 10;
+    reasons.push(`MFH mit ${p.unitCount} Einheiten und ${(useYield * 100).toFixed(1)} % Rendite — Skalierungsbonus.`);
+  }
+  if (p.propertyType === "efh" && useYield >= 0.03) {
+    // EFH haben typisch niedrigere Renditen, 3-5% ist schon gut
+    ptAdj = 5;
+    reasons.push("EFH — Renditeerwartung angepasst (3–5 % ist für EFH überdurchschnittlich).");
+  }
+
+  return { value: clamp(s + ptAdj), reasons, actions };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -226,7 +254,31 @@ function calcRentability(p: PropertyInput, k: KPIs): { value: number; reasons: s
   else { energyPts = 25; reasons.push(`Energieklasse ${ec} — hohe Nebenkosten, eingeschränkte Vermietbarkeit an energiebewusste Mieter.`); }
 
   // ─── Weighted sum: 50/20/15/15 ───
-  const s = Math.round(locPts * 0.50 + areaPts * 0.20 + agePts * 0.15 + energyPts * 0.15);
+  let s = Math.round(locPts * 0.50 + areaPts * 0.20 + agePts * 0.15 + energyPts * 0.15);
+
+  // ─── Objektart-Anpassung ───
+  const pt = p.propertyType;
+  const at = p.apartmentType;
+  if (pt === "etw") {
+    if (at === "erdgeschoss") { s -= 5; reasons.push("ETW Erdgeschoss — weniger beliebt (Lärm, Sicherheit, Privatsphäre)."); }
+    else if (at === "dachgeschoss") { s += 3; reasons.push("ETW Dachgeschoss — beliebt, sofern kein Aufzug-Problem."); }
+    else if (at === "penthouse") { s += 8; reasons.push("Penthouse — Premium-Segment mit hoher Nachfrage."); }
+    else if (at === "souterrain") { s -= 15; reasons.push("Souterrain/Untergeschoss — schwer vermietbar, eingeschränkter Mieterkreis."); }
+  } else if (pt === "efh") {
+    s += 5; reasons.push("Einfamilienhaus — hohe Familien-Nachfrage, stabile Mietverhältnisse.");
+  }
+
+  // ─── Zimmer-Anpassung ───
+  if (p.rooms) {
+    const roomPts = getRoomScore(p.rooms);
+    const roomAdj = Math.round((roomPts - 85) * 0.10); // ±adjustment based on deviation from average
+    s += roomAdj;
+    if (p.rooms === 1) reasons.push("1 Zimmer — Nischensegment, begrenzte Zielgruppe.");
+    else if (p.rooms === 2) reasons.push("2 Zimmer — höchste Nachfrage in Städten.");
+    else if (p.rooms === 3) reasons.push("3 Zimmer — breiteste Zielgruppe.");
+    else if (p.rooms === 4) reasons.push("4 Zimmer — Familiensegment, etwas kleinerer Markt.");
+    else if (p.rooms >= 5) reasons.push(`${p.rooms} Zimmer — Luxus/Spezial-Segment.`);
+  }
 
   // ─── Actions ───
   if (p.locationGrade === "A" || p.locationGrade === "B") {
@@ -327,7 +379,21 @@ function calcRisk(p: PropertyInput, k: KPIs): { value: number; reasons: string[]
 
   if (k.netCashflow < 0) reasons.push(`Negativer Netto-Cashflow von ${Math.round(k.netCashflow)} €/Monat vor Finanzierung.`);
 
-  return { value: clamp(s), reasons, actions };
+  // ─── Objektart-Risiko ───
+  let ptAdj = 0;
+  if (p.propertyType === "efh" || p.propertyType === "dhh") {
+    ptAdj = -5;
+    reasons.push("EFH/DHH — kein Eigentümergemeinschafts-Puffer, alle Kosten selbst tragen.");
+  } else if (p.propertyType === "mfh") {
+    ptAdj = 5;
+    reasons.push("MFH — Risikodiversifikation über mehrere Mieter.");
+  }
+  if (p.apartmentType === "souterrain") {
+    ptAdj -= 8;
+    reasons.push("Souterrain — Feuchtigkeitsrisiko, erschwertes Vermieten.");
+  }
+
+  return { value: clamp(s + ptAdj), reasons, actions };
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -384,7 +450,17 @@ function calcFinancing(p: PropertyInput, k: KPIs): { value: number; reasons: str
   actions.push("Lassen Sie Ihre Finanzierung kostenlos von unseren Experten prüfen — unverbindlich, innerhalb von 24h.");
   if (dscr >= 1.0) actions.push("Stresstest bei 5,5 % Zinssatz durchführen.");
 
-  return { value: clamp(s), reasons, actions };
+  // ─── Objektart-Anpassung ───
+  let ptAdj = 0;
+  if (p.propertyType === "mfh" && p.price > 500000) {
+    ptAdj = -5;
+    reasons.push("MFH > 500k — Banken verlangen typisch mehr Eigenkapital.");
+  } else if (p.propertyType === "efh") {
+    ptAdj = 5;
+    reasons.push("EFH — Banken finanzieren einfacher (Eigennutzung möglich).");
+  }
+
+  return { value: clamp(s + ptAdj), reasons, actions };
 }
 
 /* ═══════════════════════════════════════════════════════════
