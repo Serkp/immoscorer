@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useMemo, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { AIOrb } from "@/components/ui/AIOrb";
@@ -548,6 +549,9 @@ function AnalysisContent() {
   if (view === "input") {
     return (
       <div className="mx-auto max-w-[640px] space-y-6">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Dashboard
+        </Link>
         {checkoutToast}
         {/* Progress bars */}
         <div className="flex gap-2">
@@ -1013,6 +1017,9 @@ function AnalysisContent() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Dashboard
+        </Link>
         {/* Toast */}
         {toast && (
           <div

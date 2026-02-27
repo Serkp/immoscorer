@@ -312,6 +312,10 @@ export default function StrategiesPage() {
 
   return (
     <div className="mx-auto max-w-[640px] space-y-6">
+      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+        ← Dashboard
+      </Link>
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <AIOrb size={32} active />

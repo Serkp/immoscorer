@@ -154,6 +154,9 @@ export default function ComparePage() {
   if (cards.length === 0) {
     return (
       <div className="mx-auto max-w-[1100px]">
+        <Link href="/" className="inline-flex items-center gap-1 text-xs mb-4 transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Dashboard
+        </Link>
         <div className="mb-8">
           <h1 className="text-xl font-bold" style={{ color: C.text }}>Immobilien-Vergleich</h1>
           <p className="text-sm mt-1" style={{ color: C.sub }}>Vergleichen Sie bis zu 4 Objekte nebeneinander.</p>
@@ -195,6 +198,10 @@ export default function ComparePage() {
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
+      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+        ← Dashboard
+      </Link>
+
       {/* Toast */}
       {toast && (
         <div
@@ -261,38 +268,38 @@ export default function ComparePage() {
 
       {/* Cards Grid */}
       <div
-        className="grid gap-5"
+        className="grid gap-3"
         style={{
           gridTemplateColumns: cards.length === 1
-            ? "1fr"
+            ? "max-content"
             : cards.length === 2
-            ? "repeat(2, 1fr)"
+            ? "repeat(2, minmax(0, 240px))"
             : cards.length === 3
-            ? "repeat(3, 1fr)"
-            : "repeat(2, 1fr)",
+            ? "repeat(3, minmax(0, 240px))"
+            : "repeat(2, minmax(0, 240px))",
         }}
       >
         {cards.map((d) => (
-          <Card key={d.id} className="p-0 overflow-hidden">
+          <Card key={d.id} className="p-0 overflow-hidden" style={{ maxWidth: 240 }}>
             {/* ── Card Header: Address + Details ── */}
-            <div className="p-5 pb-4">
-              <p className="text-sm font-bold truncate" style={{ color: C.text }}>
+            <div className="px-3 pt-3 pb-2">
+              <p className="text-xs font-bold truncate" style={{ color: C.text }}>
                 {d.address}
               </p>
-              <p className="text-xs mt-1" style={{ color: C.dim }}>
+              <p className="text-[10px] mt-0.5" style={{ color: C.dim }}>
                 {d.area > 0 ? `${d.area} m²` : ""}{d.area > 0 && d.year > 0 ? " · " : ""}{d.year > 0 ? `Bj. ${d.year}` : ""}{(d.area > 0 || d.year > 0) && d.energyClass !== "—" ? " · " : ""}{d.energyClass !== "—" ? `Klasse ${d.energyClass}` : ""}
               </p>
             </div>
 
             {/* ── Score Ring ── */}
-            <div className="flex flex-col items-center py-4 border-t border-b" style={{ borderColor: C.border }}>
-              <ScoreRing value={d.score} size={80} />
-              <p className="text-xs font-bold mt-2" style={{ color: scoreColor(d.score) }}>
+            <div className="flex flex-col items-center py-2.5 border-t border-b" style={{ borderColor: C.border }}>
+              <ScoreRing value={d.score} size={50} />
+              <p className="text-[10px] font-bold mt-1.5" style={{ color: scoreColor(d.score) }}>
                 {scoreLabel(d.score)}
               </p>
               {isBest(d.score, bestScore) && (
                 <span
-                  className="text-[10px] font-bold mt-1 rounded-full px-2 py-0.5"
+                  className="text-[9px] font-bold mt-1 rounded-full px-1.5 py-0.5"
                   style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
                 >
                   Bester Score
@@ -301,7 +308,7 @@ export default function ComparePage() {
             </div>
 
             {/* ── KPI Rows ── */}
-            <div className="p-4 space-y-2">
+            <div className="px-3 py-2 space-y-1">
               <KPILine
                 label="Kaufpreis"
                 value={`${d.price.toLocaleString("de-DE")} €`}
@@ -337,17 +344,17 @@ export default function ComparePage() {
             </div>
 
             {/* ── Subscores ── */}
-            <div className="px-4 pb-4 space-y-1.5 border-t pt-4" style={{ borderColor: C.border }}>
-              <p className="text-[10px] font-semibold mb-2" style={{ color: C.dim }}>TEILSCORES</p>
+            <div className="px-3 pb-2 space-y-1 border-t pt-2" style={{ borderColor: C.border }}>
+              <p className="text-[9px] font-semibold mb-1" style={{ color: C.dim }}>TEILSCORES</p>
               {subscoreRows.map((sr) => {
                 const val = Number(d[sr.key]) || 0;
                 const best = bestSubscore(sr.key);
                 const isHighlight = cards.length > 1 && val > 0 && val === best;
                 return (
                   <div key={sr.key} className="flex items-center justify-between">
-                    <span className="text-xs" style={{ color: C.sub }}>{sr.label}</span>
+                    <span className="text-[10px]" style={{ color: C.sub }}>{sr.label}</span>
                     <span
-                      className="text-xs font-bold"
+                      className="text-[10px] font-bold"
                       style={{ color: isHighlight ? C.green : scoreColor(val) }}
                     >
                       {val}/100
@@ -358,10 +365,10 @@ export default function ComparePage() {
             </div>
 
             {/* ── Delete Button ── */}
-            <div className="border-t px-4 py-3" style={{ borderColor: C.border }}>
+            <div className="border-t px-3 py-2" style={{ borderColor: C.border }}>
               <button
                 onClick={() => setDeleteConfirm(d.id)}
-                className="w-full text-center text-[11px] font-medium py-1 transition-all hover:opacity-80 rounded-lg"
+                className="w-full text-center text-[10px] font-medium py-0.5 transition-all hover:opacity-80 rounded-lg"
                 style={{ color: C.dim }}
               >
                 Entfernen
@@ -377,14 +384,14 @@ export default function ComparePage() {
 function KPILine({ label, value, highlight }: { label: string; value: string; highlight: boolean }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-xs" style={{ color: C.sub }}>{label}</span>
+      <span className="text-[10px]" style={{ color: C.sub }}>{label}</span>
       <span
-        className="text-xs font-bold"
+        className="text-[10px] font-bold"
         style={{ color: highlight ? C.green : C.text }}
       >
         {value}
         {highlight && (
-          <span className="ml-1 text-[10px]" style={{ color: C.green }}>
+          <span className="ml-1 text-[9px]" style={{ color: C.green }}>
             ★
           </span>
         )}

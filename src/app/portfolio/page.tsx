@@ -244,6 +244,10 @@ export default function PortfolioPage() {
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-6">
+      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+        ← Dashboard
+      </Link>
+
       {/* Toast */}
       {toast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 rounded-xl px-5 py-2.5 text-sm font-semibold shadow-lg animate-fade-up" style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}>

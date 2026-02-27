@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Card } from "@/components/ui/Card";
 import { C } from "@/lib/theme";
 
@@ -76,6 +77,10 @@ export default function GuidePage() {
 
   return (
     <div className="mx-auto max-w-[1000px] space-y-10">
+      <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+        ← Dashboard
+      </Link>
+
       {/* Header */}
       <div>
         <h1 className="text-xl font-bold">Wissensbereich</h1>
