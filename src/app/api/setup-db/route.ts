@@ -36,7 +36,15 @@ CREATE TABLE IF NOT EXISTS portfolio_properties (
   location_grade TEXT, renovations JSONB DEFAULT '[]',
   score INTEGER, score_data JSONB, location_data JSONB,
   lat NUMERIC, lng NUMERIC,
-  is_favorite BOOLEAN DEFAULT false, created_at TIMESTAMPTZ DEFAULT now()
+  is_favorite BOOLEAN DEFAULT false,
+  property_type TEXT, apartment_type TEXT, rooms NUMERIC,
+  purchase_date TEXT, loan_amount NUMERIC, interest_rate NUMERIC,
+  fixed_rate_until TEXT, monthly_payment NUMERIC, repayment_rate NUMERIC,
+  special_repayment_allowed BOOLEAN DEFAULT false, special_repayment_amount NUMERIC,
+  is_rented TEXT, monthly_rent NUMERIC, rental_since TEXT,
+  unit_count INTEGER, total_rent NUMERIC, units_rented INTEGER,
+  estimated_market_value NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS properties (
@@ -62,7 +70,29 @@ ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
 ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 `;
 
-// Columns to add if they're missing from an existing analyses table
+// Columns to add if they're missing from existing tables
+const ALTER_PORTFOLIO_SQL = [
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS property_type TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS apartment_type TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS rooms NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS purchase_date TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS loan_amount NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS interest_rate NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS fixed_rate_until TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS monthly_payment NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS repayment_rate NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS special_repayment_allowed BOOLEAN DEFAULT false;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS special_repayment_amount NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS is_rented TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS monthly_rent NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS rental_since TEXT;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS unit_count INTEGER;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS total_rent NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS units_rented INTEGER;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS estimated_market_value NUMERIC;",
+  "ALTER TABLE portfolio_properties ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();",
+];
+
 const ALTER_COLUMNS_SQL = [
   "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS future_score INTEGER;",
   "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS investment_score INTEGER;",
@@ -166,6 +196,7 @@ export async function GET() {
       ok: allOk,
       results,
       safe_columns: SAFE_ANALYSES_COLUMNS,
+      portfolio_alter_sql: ALTER_PORTFOLIO_SQL,
     });
   } catch (err) {
     return NextResponse.json({ ok: false, error: String(err), results }, { status: 500 });

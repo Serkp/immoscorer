@@ -4,13 +4,16 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
-import { MiniRing } from "@/components/ui/ScoreRing";
-import { PropertyCard } from "@/components/PropertyCard";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getPortfolioProperties, deletePortfolioProperty, togglePortfolioFavorite } from "@/lib/db";
-import { C, scoreColor, scoreLabel } from "@/lib/theme";
+import { getPortfolioProperties, deletePortfolioProperty } from "@/lib/db";
+import { estimateMarketValue, monthsUntilFixedRateExpiry, getZinsbindungWarning, getStrategyRecommendations } from "@/lib/portfolio-utils";
+import { findCityData } from "@/data/german-cities";
+import { C } from "@/lib/theme";
 
-interface PortfolioProp {
+const PT_LABEL: Record<string, string> = { etw: "ETW", efh: "EFH", mfh: "MFH", dhh: "DHH" };
+
+/* ─── Type for DB rows ─── */
+interface PP {
   id: string;
   address: string;
   city: string;
@@ -21,78 +24,153 @@ interface PortfolioProp {
   energy_class: string | null;
   house_money: number | null;
   location_grade: string | null;
-  renovations: string[];
-  score: number | null;
-  score_data: Record<string, unknown> | null;
-  location_data: Record<string, unknown> | null;
-  work_done: string | null;
-  work_needed: string | null;
+  property_type: string | null;
+  rooms: number | null;
+  purchase_date: string | null;
+  loan_amount: number | null;
+  interest_rate: number | null;
+  fixed_rate_until: string | null;
+  monthly_payment: number | null;
+  repayment_rate: number | null;
+  special_repayment_allowed: boolean;
+  special_repayment_amount: number | null;
+  is_rented: string | null;
+  monthly_rent: number | null;
+  rental_since: string | null;
+  unit_count: number | null;
+  total_rent: number | null;
+  units_rented: number | null;
+  estimated_market_value: number | null;
   is_favorite: boolean;
   created_at: string;
 }
 
+function getRent(p: PP): number {
+  return p.monthly_rent || p.total_rent || p.current_rent || 0;
+}
+
+function getMarketValue(p: PP): number {
+  if (p.estimated_market_value && p.estimated_market_value > 0) return p.estimated_market_value;
+  return estimateMarketValue({
+    city: p.city || "",
+    area: p.area || 50,
+    buildYear: p.build_year || 1990,
+    energyClass: p.energy_class || "C",
+    locationGrade: p.location_grade || "B",
+  });
+}
+
+function formatPurchaseDate(d: string | null): string {
+  if (!d) return "—";
+  const [m, y] = d.split("/");
+  const monthNames = ["", "Jan.", "Feb.", "März", "Apr.", "Mai", "Juni", "Juli", "Aug.", "Sep.", "Okt.", "Nov.", "Dez."];
+  return `${monthNames[Number(m)] || m} ${y}`;
+}
+
+/* ══════════════════════════════════════ */
+
 export default function PortfolioPage() {
   const { user } = useAuth();
-  const [properties, setProperties] = useState<PortfolioProp[]>([]);
+  const [properties, setProperties] = useState<PP[]>([]);
   const [loading, setLoading] = useState(true);
-  const [detail, setDetail] = useState<PortfolioProp | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "favorites">("all");
-  const [sort, setSort] = useState<"date" | "score" | "yield">("date");
+  const [detail, setDetail] = useState<PP | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [showFinanzierung, setShowFinanzierung] = useState(false);
+  const [finanzProp, setFinanzProp] = useState<PP | null>(null);
+  const [finanzForm, setFinanzForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
+  const [finanzSending, setFinanzSending] = useState(false);
+  const [finanzSent, setFinanzSent] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
-    async function load() {
+    (async () => {
       try {
-        const data = await getPortfolioProperties(user!.id);
-        setProperties((data || []) as PortfolioProp[]);
+        const data = await getPortfolioProperties(user.id);
+        setProperties((data || []) as PP[]);
       } catch { /* silent */ }
       finally { setLoading(false); }
-    }
-    load();
+    })();
   }, [user]);
-
-  async function handleToggleFav(id: string, current: boolean) {
-    try {
-      await togglePortfolioFavorite(id, current);
-      setProperties((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, is_favorite: !current } : p))
-      );
-    } catch { /* silent */ }
-  }
 
   async function handleDelete(id: string) {
     try {
       await deletePortfolioProperty(id);
       setProperties((prev) => prev.filter((p) => p.id !== id));
-      setConfirmDelete(null);
-      setDetail(null);
+      setDeleteConfirm(null);
+      if (detail?.id === id) setDetail(null);
       setToast("Immobilie entfernt");
       setTimeout(() => setToast(null), 3000);
     } catch { /* silent */ }
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-32">
-        <AIOrb size={48} active />
-      </div>
-    );
+  function openFinanzierung(p: PP) {
+    setFinanzProp(p);
+    setFinanzForm({ firstName: "", lastName: "", email: "", phone: "", message: `Anschlussfinanzierung für ${p.address}, ${p.city}. Restschuld ca. ${(p.loan_amount || 0).toLocaleString("de-DE")} €. Zinsbindung bis ${p.fixed_rate_until || "k.A."}.`, consent: false });
+    setFinanzSent(false);
+    setShowFinanzierung(true);
   }
 
-  // Detail view
+  async function handleFinanzierung() {
+    if (!user || finanzSending) return;
+    if (!finanzForm.firstName || !finanzForm.lastName || !finanzForm.phone || !finanzForm.consent) return;
+    setFinanzSending(true);
+    try {
+      await fetch("/api/financing/lead", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          firstName: finanzForm.firstName,
+          lastName: finanzForm.lastName,
+          email: finanzForm.email || user.email,
+          phone: finanzForm.phone,
+          message: finanzForm.message,
+          propertyAddress: finanzProp ? `${finanzProp.address}, ${finanzProp.city}` : "",
+          purchasePrice: finanzProp?.purchase_price || 0,
+          monthlyRent: getRent(finanzProp!),
+          score: 0,
+        }),
+      });
+      setFinanzSent(true);
+    } catch { /* silent */ }
+    finally { setFinanzSending(false); }
+  }
+
+  if (loading) return <div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>;
+
+  /* ══════════════════════════════════════
+     DETAIL VIEW
+     ══════════════════════════════════════ */
   if (detail) {
-    const sd = detail.score_data as Record<string, unknown> | null;
-    const subscores = (sd?.subscores as Array<Record<string, unknown>>) || [];
-    const strengths = (sd?.strengths as string[]) || [];
-    const risks = (sd?.risks as string[]) || [];
-    const grossYield = detail.purchase_price > 0 ? ((detail.current_rent * 12) / detail.purchase_price) * 100 : 0;
-    const factor = detail.current_rent > 0 ? detail.purchase_price / (detail.current_rent * 12) : 0;
+    const d = detail;
+    const mv = getMarketValue(d);
+    const rent = getRent(d);
+    const hausgeld = d.house_money || 0;
+    const rate = d.monthly_payment || 0;
+    const cashflow = rent - rate - hausgeld;
+    const yearCf = cashflow * 12;
+    const valueChange = d.purchase_price > 0 ? ((mv - d.purchase_price) / d.purchase_price * 100) : 0;
+    const monthsLeft = monthsUntilFixedRateExpiry(d.fixed_rate_until);
+    const warning = getZinsbindungWarning(monthsLeft);
+    const cityData = findCityData(d.city || "");
+    const rentPerSqm = (d.area && d.area > 0 && rent > 0) ? rent / d.area : 0;
+
+    const recs = getStrategyRecommendations({
+      fixedRateUntil: d.fixed_rate_until,
+      cashflow,
+      marketValue: mv,
+      purchasePrice: d.purchase_price,
+      rentPerSqm,
+      avgRentPerSqm: cityData?.avgRentPerSqm || null,
+      energyClass: d.energy_class || "C",
+      repaymentRate: d.repayment_rate || 0,
+      loanAmount: d.loan_amount || 0,
+    });
 
     return (
       <div className="mx-auto max-w-[800px] space-y-6 animate-fade-up">
-        {/* Back */}
         <button onClick={() => setDetail(null)} className="flex items-center gap-2 text-xs font-semibold" style={{ color: C.sub }}>
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M19 12H5M12 19l-7-7 7-7" /></svg>
           Zurück zum Portfolio
@@ -101,149 +179,127 @@ export default function PortfolioPage() {
         {/* Header */}
         <div className="flex items-start gap-4">
           <div className="w-14 h-14 rounded-xl flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${C.accentDim}, rgba(76,154,255,0.08))` }}>
-            <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
+            <svg width={28} height={28} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
           </div>
           <div>
-            <h1 className="text-lg font-bold" style={{ color: C.text }}>{detail.address}</h1>
-            <p className="text-sm" style={{ color: C.sub }}>{detail.city}</p>
+            <h1 className="text-lg font-bold" style={{ color: C.text }}>{d.address}</h1>
+            <p className="text-sm" style={{ color: C.sub }}>{d.city}</p>
           </div>
         </div>
 
-        {/* Score + Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <Card className="p-4 flex flex-col items-center justify-center" glow>
-            <MiniRing value={detail.score || 0} size={56} />
-            <p className="text-xs font-bold mt-1" style={{ color: scoreColor(detail.score || 0) }}>{scoreLabel(detail.score || 0)}</p>
-          </Card>
-          <StatCard label="Kaufpreis" value={`${detail.purchase_price.toLocaleString("de-DE")} €`} />
-          <StatCard label="Miete" value={`${detail.current_rent.toLocaleString("de-DE")} €/Mon.`} />
-          <StatCard label="Rendite" value={`${grossYield.toFixed(2)} %`} color={grossYield >= 4 ? C.green : grossYield >= 3 ? C.amber : C.red} />
-        </div>
+        {/* Market Value + Value Change */}
+        <Card className="p-5 space-y-2" glow>
+          <p className="text-xs font-medium" style={{ color: C.dim }}>Geschätzter Marktwert</p>
+          <p className="text-2xl font-bold" style={{ color: mv >= d.purchase_price ? C.green : C.red }}>
+            {mv.toLocaleString("de-DE")} €
+          </p>
+          <p className="text-xs font-semibold" style={{ color: valueChange >= 0 ? C.green : C.red }}>
+            {valueChange >= 0 ? "+" : ""}{valueChange.toFixed(1)} % seit Kauf
+            <span style={{ color: C.dim }}> ({(mv - d.purchase_price) >= 0 ? "+" : ""}{(mv - d.purchase_price).toLocaleString("de-DE")} €)</span>
+          </p>
+          <p className="text-[10px]" style={{ color: C.dim }}>Schätzung basierend auf regionalen Durchschnittspreisen. Kein Gutachten.</p>
+        </Card>
 
-        {/* Detail Grid */}
+        {/* Objektdaten */}
         <Card className="p-5">
           <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Objektdaten</h3>
           <div className="grid grid-cols-2 gap-2">
-            <DetailRow label="Fläche" value={detail.area ? `${detail.area} m²` : "—"} />
-            <DetailRow label="Baujahr" value={detail.build_year ? String(detail.build_year) : "—"} />
-            <DetailRow label="Energie" value={detail.energy_class || "—"} />
-            <DetailRow label="Hausgeld" value={detail.house_money ? `${detail.house_money} €/Mon.` : "—"} />
-            <DetailRow label="Lageklasse" value={detail.location_grade ? `Klasse ${detail.location_grade}` : "—"} />
-            <DetailRow label="Faktor" value={`${factor.toFixed(1)}x`} />
+            <DRow label="Objektart" value={PT_LABEL[d.property_type || ""] || "—"} />
+            <DRow label="Zimmer" value={d.rooms ? String(d.rooms) : "—"} />
+            <DRow label="Fläche" value={d.area ? `${d.area} m²` : "—"} />
+            <DRow label="Baujahr" value={d.build_year ? String(d.build_year) : "—"} />
+            <DRow label="Energieklasse" value={d.energy_class || "—"} />
+            <DRow label="Kaufdatum" value={formatPurchaseDate(d.purchase_date)} />
+            <DRow label="Kaufpreis" value={d.purchase_price > 0 ? `${d.purchase_price.toLocaleString("de-DE")} €` : "—"} />
+            <DRow label="Lageklasse" value={d.location_grade ? `Klasse ${d.location_grade}` : "—"} />
           </div>
         </Card>
 
-        {/* Teilscores */}
-        {subscores.length > 0 && (
-          <Card className="p-5 space-y-3">
-            <h3 className="text-sm font-bold" style={{ color: C.text }}>Teilscores</h3>
-            {subscores.map((s) => (
-              <div key={s.key as string} className="flex items-center gap-3">
-                <MiniRing value={s.value as number} size={32} />
-                <div className="flex-1">
-                  <span className="text-xs font-semibold" style={{ color: C.text }}>{s.label as string}</span>
-                  {(s.oneLiner as string) ? <p className="text-[10px]" style={{ color: C.dim }}>{s.oneLiner as string}</p> : null}
-                </div>
-                <span className="text-xs font-bold" style={{ color: scoreColor(s.value as number) }}>{s.value as number}/100</span>
+        {/* Finanzierung */}
+        {(d.loan_amount || d.interest_rate || d.monthly_payment) && (
+          <Card className="p-5">
+            <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Finanzierung</h3>
+            <div className="grid grid-cols-2 gap-2">
+              <DRow label="Darlehen" value={d.loan_amount ? `${d.loan_amount.toLocaleString("de-DE")} €` : "—"} />
+              <DRow label="Zinssatz" value={d.interest_rate ? `${d.interest_rate} %` : "—"} />
+              <DRow label="Monatl. Rate" value={d.monthly_payment ? `${d.monthly_payment.toLocaleString("de-DE")} €` : "—"} />
+              <DRow label="Tilgung" value={d.repayment_rate ? `${d.repayment_rate} %` : "—"} />
+              <DRow label="Zinsbindung bis" value={d.fixed_rate_until || "—"} />
+              <DRow label="Sondertilgung" value={d.special_repayment_allowed ? `${(d.special_repayment_amount || 0).toLocaleString("de-DE")} €/J.` : "Nein"} />
+            </div>
+            {warning && (
+              <div className="mt-3 rounded-xl px-4 py-3" style={{ background: warnBg(warning.level), border: `1px solid ${warnBorder(warning.level)}` }}>
+                <p className="text-xs font-semibold" style={{ color: warnColor(warning.level) }}>{warning.text}</p>
+                <button onClick={() => openFinanzierung(d)} className="mt-2 text-xs font-bold transition-opacity hover:opacity-80" style={{ color: warnColor(warning.level) }}>
+                  {warning.cta} →
+                </button>
               </div>
-            ))}
+            )}
           </Card>
         )}
 
-        {/* Strengths + Risks */}
-        {(strengths.length > 0 || risks.length > 0) && (
-          <div className="grid md:grid-cols-2 gap-4">
-            {strengths.length > 0 && (
-              <Card className="p-5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ background: C.green }} />
-                  <h4 className="text-xs font-bold">Stärken</h4>
-                </div>
-                {strengths.map((s, i) => (
-                  <p key={i} className="text-xs leading-relaxed" style={{ color: C.sub }}>
-                    <span style={{ color: C.green }}>·</span> {s}
-                  </p>
-                ))}
-              </Card>
-            )}
-            {risks.length > 0 && (
-              <Card className="p-5 space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ background: C.amber }} />
-                  <h4 className="text-xs font-bold">Risiken</h4>
-                </div>
-                {risks.map((r, i) => (
-                  <p key={i} className="text-xs leading-relaxed" style={{ color: C.sub }}>
-                    <span style={{ color: C.amber }}>·</span> {r}
-                  </p>
-                ))}
-              </Card>
-            )}
+        {/* Cashflow */}
+        <Card className="p-5">
+          <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>Cashflow</h3>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs"><span style={{ color: C.sub }}>Mieteinnahmen</span><span className="font-semibold" style={{ color: C.text }}>{rent.toLocaleString("de-DE")} €/Mon.</span></div>
+            {rate > 0 && <div className="flex justify-between text-xs"><span style={{ color: C.sub }}>Kreditrate</span><span className="font-semibold" style={{ color: C.red }}>-{rate.toLocaleString("de-DE")} €/Mon.</span></div>}
+            {hausgeld > 0 && <div className="flex justify-between text-xs"><span style={{ color: C.sub }}>Hausgeld</span><span className="font-semibold" style={{ color: C.red }}>-{hausgeld.toLocaleString("de-DE")} €/Mon.</span></div>}
+            <div className="h-px" style={{ background: C.border }} />
+            <div className="flex justify-between text-sm font-bold"><span style={{ color: C.text }}>Netto-Cashflow</span><span style={{ color: cashflow >= 0 ? C.green : C.red }}>{cashflow >= 0 ? "+" : ""}{cashflow.toLocaleString("de-DE")} €/Mon.</span></div>
+            <p className="text-[10px]" style={{ color: C.dim }}>Jahres-Cashflow: {yearCf >= 0 ? "+" : ""}{yearCf.toLocaleString("de-DE")} €</p>
           </div>
-        )}
+        </Card>
 
-        {/* Work done / needed */}
-        {(detail.work_done || detail.work_needed) && (
-          <div className="grid md:grid-cols-2 gap-4">
-            {detail.work_done && (
-              <Card className="p-5 space-y-2">
-                <h4 className="text-xs font-bold" style={{ color: C.green }}>Getätigte Maßnahmen</h4>
-                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{detail.work_done}</p>
-              </Card>
-            )}
-            {detail.work_needed && (
-              <Card className="p-5 space-y-2">
-                <h4 className="text-xs font-bold" style={{ color: C.amber }}>Ausstehende Maßnahmen</h4>
-                <p className="text-xs leading-relaxed" style={{ color: C.sub }}>{detail.work_needed}</p>
-              </Card>
-            )}
-          </div>
-        )}
-
-        {/* Recommendations */}
+        {/* Strategie-Empfehlungen */}
         <Card className="p-5 space-y-3">
-          <h3 className="text-sm font-bold" style={{ color: C.text }}>Nächste Schritte</h3>
-          <ul className="space-y-2">
-            {getNextSteps(detail).map((step, i) => (
-              <li key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
-                <span className="mt-0.5 shrink-0" style={{ color: C.green }}>{"\u2192"}</span>
-                {step}
-              </li>
-            ))}
-          </ul>
+          <h3 className="text-sm font-bold" style={{ color: C.text }}>Strategieempfehlung</h3>
+          {recs.map((r, i) => (
+            <div key={i} className="flex gap-2 text-xs leading-relaxed" style={{ color: C.sub }}>
+              <span className="mt-0.5 shrink-0" style={{ color: C.accent }}>→</span>
+              <div>
+                {r.text}
+                {r.action && (
+                  <button onClick={() => openFinanzierung(d)} className="block mt-1 text-xs font-bold transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+                    {r.action} →
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
         </Card>
       </div>
     );
   }
 
-  const filtered = filter === "favorites" ? properties.filter((p) => p.is_favorite) : properties;
+  /* ══════════════════════════════════════
+     PORTFOLIO LIST VIEW
+     ══════════════════════════════════════ */
+  // Aggregate stats
+  const rented = properties.filter((p) => p.is_rented === "ja" || (getRent(p) > 0 && p.is_rented !== "selbst")).length;
+  const totalMV = properties.reduce((s, p) => s + getMarketValue(p), 0);
+  const totalDebt = properties.reduce((s, p) => s + (p.loan_amount || 0), 0);
+  const equity = totalMV - totalDebt;
+  const totalRent = properties.reduce((s, p) => s + getRent(p), 0);
+  const totalRate = properties.reduce((s, p) => s + (p.monthly_payment || 0), 0);
+  const totalHG = properties.reduce((s, p) => s + (p.house_money || 0), 0);
+  const netCashflow = totalRent - totalRate - totalHG;
+  const avgInterest = properties.filter((p) => p.interest_rate).length > 0
+    ? properties.reduce((s, p) => s + (p.interest_rate || 0), 0) / properties.filter((p) => p.interest_rate).length
+    : 0;
+  const avgYield = properties.length > 0 && totalMV > 0 ? (totalRent * 12) / totalMV * 100 : 0;
 
-  const sorted = [...filtered].sort((a, b) => {
-    if (sort === "score") return (b.score || 0) - (a.score || 0);
-    if (sort === "yield") {
-      const yA = a.purchase_price > 0 ? (a.current_rent * 12) / a.purchase_price : 0;
-      const yB = b.purchase_price > 0 ? (b.current_rent * 12) / b.purchase_price : 0;
-      return yB - yA;
+  // Nearest action
+  let nearestAction: { address: string; months: number; prop: PP } | null = null;
+  for (const p of properties) {
+    const m = monthsUntilFixedRateExpiry(p.fixed_rate_until);
+    if (m !== null && m < 24 && (!nearestAction || m < nearestAction.months)) {
+      nearestAction = { address: p.address, months: m, prop: p };
     }
-    if (a.is_favorite && !b.is_favorite) return -1;
-    if (!a.is_favorite && b.is_favorite) return 1;
-    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-
-  // Stats
-  const totalValue = properties.reduce((sum, p) => sum + p.purchase_price, 0);
-  const avgScore = properties.length > 0
-    ? Math.round(properties.reduce((sum, p) => sum + (p.score || 0), 0) / properties.length)
-    : 0;
-  const avgYield = properties.length > 0
-    ? properties.reduce((sum, p) => sum + (p.purchase_price > 0 ? ((p.current_rent * 12) / p.purchase_price) * 100 : 0), 0) / properties.length
-    : 0;
+  }
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-6">
+    <div className="mx-auto max-w-[1200px] space-y-6">
       <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
         ← Dashboard
       </Link>
@@ -258,160 +314,288 @@ export default function PortfolioPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold">Portfolio</h1>
+          <h1 className="text-xl font-bold">Mein Portfolio</h1>
           {properties.length > 0 && (
             <span className="rounded-full px-2.5 py-0.5 text-[11px] font-bold" style={{ background: C.surface3, color: C.sub }}>
-              {properties.length} Objekte
+              {properties.length} {properties.length === 1 ? "Objekt" : "Objekte"}
             </span>
           )}
         </div>
-        <Link
-          href="/analysis"
+        <Link href="/portfolio/add"
           className="rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:opacity-90"
-          style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-        >
-          Neue Analyse
+          style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>
+          + Immobilie hinzufügen
         </Link>
       </div>
 
-      {/* Stats */}
-      {properties.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <SummaryCard icon="house" label="Immobilien" value={String(properties.length)} />
-          <SummaryCard icon="star" label="Ø Score" value={`${avgScore}/100`} color={scoreColor(avgScore)} />
-          <SummaryCard icon="euro" label="Gesamtwert" value={`${(totalValue / 1000).toFixed(0)}k €`} />
-          <SummaryCard icon="percent" label="Ø Rendite" value={`${avgYield.toFixed(2)} %`} color={avgYield >= 4 ? C.green : avgYield >= 3 ? C.amber : C.red} />
-        </div>
-      )}
-
-      {/* Filter + Sort */}
-      {properties.length > 0 && (
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1">
-            {(["all", "favorites"] as const).map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-all"
-                style={{
-                  background: filter === f ? C.accentMid : C.surface,
-                  color: filter === f ? C.accent : C.sub,
-                  border: `1px solid ${filter === f ? C.accent : C.border}`,
-                }}
-              >
-                {f === "all" ? "Alle" : "Favoriten"}
-              </button>
-            ))}
-          </div>
-          <div className="h-4 w-px" style={{ background: C.border }} />
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as typeof sort)}
-            className="rounded-lg px-3 py-1.5 text-xs font-semibold cursor-pointer"
-            style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.sub }}
-          >
-            <option value="date">Neueste zuerst</option>
-            <option value="score">Bester Score</option>
-            <option value="yield">Höchste Rendite</option>
-          </select>
-        </div>
-      )}
-
-      {/* Empty */}
+      {/* Empty state */}
       {properties.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 gap-5">
           <AIOrb size={48} active />
-          <h2 className="text-base font-bold" style={{ color: C.text }}>
-            Noch keine Immobilien in Ihrem Portfolio
-          </h2>
+          <h2 className="text-base font-bold" style={{ color: C.text }}>Noch keine Immobilien im Portfolio</h2>
           <p className="text-sm text-center max-w-sm" style={{ color: C.sub }}>
-            Analysieren Sie eine Immobilie und speichern Sie sie als &quot;Meine Immobilie&quot;.
+            Fügen Sie Ihre Bestandsimmobilien hinzu, um Marktwert, Cashflow und Zinsbindungs-Warnungen zu sehen.
           </p>
-          <Link
-            href="/analysis"
-            className="rounded-xl px-6 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
-            style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-          >
-            Neue Analyse starten
+          <Link href="/portfolio/add" className="rounded-xl px-6 py-2.5 text-sm font-semibold transition-all hover:opacity-90" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>
+            Immobilie hinzufügen
           </Link>
         </div>
       )}
 
-      {sorted.length === 0 && properties.length > 0 && (
-        <div className="flex flex-col items-center justify-center py-16 gap-3">
-          <p className="text-sm" style={{ color: C.sub }}>Keine Favoriten vorhanden.</p>
+      {properties.length > 0 && (
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* ── Cards (left) ── */}
+          <div className="flex-1 min-w-0">
+            {/* Mobile sidebar toggle */}
+            <button onClick={() => setSidebarOpen(!sidebarOpen)} className="lg:hidden mb-4 rounded-xl px-4 py-2 text-xs font-semibold w-full"
+              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.sub }}>
+              {sidebarOpen ? "Übersicht ausblenden ▲" : "Portfolio-Übersicht anzeigen ▼"}
+            </button>
+
+            {/* Mobile/Tablet sidebar (collapsible) */}
+            {sidebarOpen && (
+              <div className="lg:hidden mb-6">
+                <SidebarContent
+                  count={properties.length} rented={rented} totalMV={totalMV} totalDebt={totalDebt}
+                  equity={equity} totalRent={totalRent} totalRate={totalRate} totalHG={totalHG}
+                  netCashflow={netCashflow} avgYield={avgYield} avgInterest={avgInterest}
+                  nearestAction={nearestAction} onActionClick={(p) => openFinanzierung(p)}
+                />
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-4">
+              {properties.map((p) => {
+                const mv = getMarketValue(p);
+                const rent = getRent(p);
+                const rate = p.monthly_payment || 0;
+                const hg = p.house_money || 0;
+                const cf = rent - rate - hg;
+                const valueChange = p.purchase_price > 0 ? ((mv - p.purchase_price) / p.purchase_price * 100) : 0;
+                const monthsLeft = monthsUntilFixedRateExpiry(p.fixed_rate_until);
+                const warning = getZinsbindungWarning(monthsLeft);
+                const ptLabel = PT_LABEL[p.property_type || ""] || "";
+                const details = [ptLabel, p.rooms ? `${p.rooms} Zi.` : "", p.area ? `${p.area} m²` : ""].filter(Boolean).join(" · ");
+
+                return (
+                  <Card key={p.id} className="p-0 overflow-hidden shrink-0 flex flex-col" style={{ width: 280 }} hover onClick={() => setDetail(p)}>
+                    {/* Header */}
+                    <div className="px-4 pt-4 pb-2">
+                      <p className="text-sm font-bold truncate" style={{ color: C.text }}>{p.address}</p>
+                      {details && <p className="text-[11px] mt-0.5" style={{ color: C.dim }}>{details}</p>}
+                      <p className="text-[10px] mt-0.5" style={{ color: C.dim }}>Kaufdatum: {formatPurchaseDate(p.purchase_date)}</p>
+                    </div>
+
+                    {/* Market Value */}
+                    <div className="px-4 py-3" style={{ borderTop: `1px solid ${C.border}` }}>
+                      <p className="text-[10px] font-medium" style={{ color: C.dim }}>Geschätzter Marktwert</p>
+                      <p className="text-lg font-bold" style={{ color: mv >= p.purchase_price ? C.green : C.red }}>{mv.toLocaleString("de-DE")} €</p>
+                      <p className="text-[11px] font-semibold" style={{ color: valueChange >= 0 ? C.green : C.red }}>
+                        {valueChange >= 0 ? "+" : ""}{valueChange.toFixed(1)} % seit Kauf
+                      </p>
+                    </div>
+
+                    {/* Key Facts */}
+                    <div className="px-4 py-2 space-y-1" style={{ borderTop: `1px solid ${C.border}` }}>
+                      <div className="flex justify-between text-[11px]"><span style={{ color: C.dim }}>Miete</span><span className="font-semibold" style={{ color: C.text }}>{rent.toLocaleString("de-DE")} €/Mon.</span></div>
+                      {rate > 0 && <div className="flex justify-between text-[11px]"><span style={{ color: C.dim }}>Rate</span><span className="font-semibold" style={{ color: C.text }}>{rate.toLocaleString("de-DE")} €/Mon.</span></div>}
+                      <div className="flex justify-between text-[11px]"><span style={{ color: C.dim }}>Cashflow</span><span className="font-bold" style={{ color: cf >= 0 ? C.green : C.red }}>{cf >= 0 ? "+" : ""}{cf.toLocaleString("de-DE")} €/Mon.</span></div>
+                    </div>
+
+                    {/* Warning */}
+                    {warning && (
+                      <div className="px-4 py-2.5" style={{ background: warnBg(warning.level), borderTop: `1px solid ${warnBorder(warning.level)}` }}>
+                        <p className="text-[11px] font-semibold" style={{ color: warnColor(warning.level) }}>{warning.text}</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); openFinanzierung(p); }}
+                          className="mt-1 text-[11px] font-bold transition-opacity hover:opacity-80"
+                          style={{ color: warnColor(warning.level) }}
+                        >
+                          {warning.cta} →
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Actions */}
+                    <div className="px-4 py-3 mt-auto flex items-center justify-between" style={{ borderTop: `1px solid ${C.border}` }}>
+                      <button onClick={(e) => { e.stopPropagation(); setDetail(p); }} className="text-xs font-semibold transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+                        Details ansehen →
+                      </button>
+                      {deleteConfirm === p.id ? (
+                        <div className="flex gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="text-[11px] font-bold" style={{ color: C.red }}>Ja</button>
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="text-[11px] font-bold" style={{ color: C.sub }}>Nein</button>
+                        </div>
+                      ) : (
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p.id); }} className="text-[11px] transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+                          Entfernen
+                        </button>
+                      )}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── Sidebar (right, desktop only) ── */}
+          <div className="hidden lg:block w-[300px] shrink-0">
+            <div className="sticky top-24">
+              <SidebarContent
+                count={properties.length} rented={rented} totalMV={totalMV} totalDebt={totalDebt}
+                equity={equity} totalRent={totalRent} totalRate={totalRate} totalHG={totalHG}
+                netCashflow={netCashflow} avgYield={avgYield} avgInterest={avgInterest}
+                nearestAction={nearestAction} onActionClick={(p) => openFinanzierung(p)}
+              />
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Grid */}
-      {sorted.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {sorted.map((p) => (
-            <PropertyCard
-              key={p.id}
-              id={p.id}
-              address={p.address}
-              city={p.city || ""}
-              score={p.score || 0}
-              price={p.purchase_price}
-              rent={p.current_rent}
-              area={p.area || undefined}
-              locationGrade={p.location_grade || undefined}
-              purchaseDate={new Date(p.created_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" })}
-              isFavorite={p.is_favorite}
-              onFavoriteToggle={() => handleToggleFav(p.id, p.is_favorite)}
-              onClick={() => setDetail(p)}
-              showDelete
-              confirmingDelete={confirmDelete === p.id}
-              onDelete={() => setConfirmDelete(p.id)}
-              onConfirmDelete={() => handleDelete(p.id)}
-              onCancelDelete={() => setConfirmDelete(null)}
-              badge={p.work_needed ? "Sanierung nötig" : undefined}
-              badgeColor={p.work_needed ? C.amber : undefined}
-            />
-          ))}
+      {/* ── Finanzierungs-Modal ── */}
+      {showFinanzierung && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)" }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowFinanzierung(false); }}>
+          <div className="w-full max-w-md rounded-2xl p-6 space-y-4 animate-fade-up" style={{ background: C.bg2, border: `1px solid ${C.border}` }}>
+            <h3 className="text-base font-bold" style={{ color: C.text }}>Anschlussfinanzierung anfragen</h3>
+            {finanzSent ? (
+              <div className="space-y-3">
+                <div className="rounded-xl px-4 py-4 text-center" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
+                  <p className="text-sm font-semibold" style={{ color: C.green }}>Anfrage gesendet!</p>
+                  <p className="text-xs mt-1" style={{ color: C.green }}>Wir melden uns innerhalb von 24 Stunden.</p>
+                </div>
+                <button onClick={() => setShowFinanzierung(false)} className="w-full rounded-xl py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Schließen</button>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Vorname *</label>
+                    <input value={finanzForm.firstName} onChange={(e) => setFinanzForm((f) => ({ ...f, firstName: e.target.value }))} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} /></div>
+                  <div><label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachname *</label>
+                    <input value={finanzForm.lastName} onChange={(e) => setFinanzForm((f) => ({ ...f, lastName: e.target.value }))} className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} /></div>
+                </div>
+                <div><label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Telefon *</label>
+                  <input value={finanzForm.phone} onChange={(e) => setFinanzForm((f) => ({ ...f, phone: e.target.value }))} placeholder="+49 170 1234567" className="w-full rounded-xl px-3 py-2 text-sm outline-none" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} /></div>
+                <div><label className="text-[11px] font-medium mb-1 block" style={{ color: C.sub }}>Nachricht</label>
+                  <textarea value={finanzForm.message} onChange={(e) => setFinanzForm((f) => ({ ...f, message: e.target.value }))} rows={2} className="w-full rounded-xl px-3 py-2 text-sm resize-none outline-none" style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }} /></div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={finanzForm.consent} onChange={(e) => setFinanzForm((f) => ({ ...f, consent: e.target.checked }))} className="mt-0.5 rounded" />
+                  <span className="text-xs leading-relaxed" style={{ color: C.sub }}>Ich stimme der Kontaktaufnahme zu. *</span>
+                </label>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowFinanzierung(false)} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Abbrechen</button>
+                  <button onClick={handleFinanzierung}
+                    disabled={finanzSending || !finanzForm.firstName || !finanzForm.lastName || !finanzForm.phone || !finanzForm.consent}
+                    className="flex-1 rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-40"
+                    style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>
+                    {finanzSending ? "Wird gesendet..." : "Anfrage absenden"}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete confirmation modal */}
+      {deleteConfirm && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4" style={{ background: "rgba(0,0,0,0.5)" }}
+          onClick={() => setDeleteConfirm(null)}>
+          <div className="w-full max-w-sm rounded-2xl p-6 space-y-4 animate-fade-up" style={{ background: C.bg2, border: `1px solid ${C.border}` }}
+            onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-sm font-bold" style={{ color: C.text }}>Immobilie entfernen?</h3>
+            <p className="text-xs" style={{ color: C.sub }}>Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteConfirm(null)} className="flex-1 rounded-xl py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Abbrechen</button>
+              <button onClick={() => handleDelete(deleteConfirm)} className="flex-1 rounded-xl py-2.5 text-sm font-bold" style={{ background: C.redDim, color: C.red, border: `1px solid rgba(248,113,113,0.2)` }}>Entfernen</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-/* ── Helpers ── */
+/* ─── Sidebar Component ─── */
 
-function SummaryCard({ icon, label, value, color }: { icon: string; label: string; value: string; color?: string }) {
-  const iconSvg = icon === "house" ? (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></svg>
-  ) : icon === "star" ? (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" /></svg>
-  ) : icon === "euro" ? (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2"><line x1="12" y1="1" x2="12" y2="23" /><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6" /></svg>
-  ) : (
-    <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2"><line x1="19" y1="5" x2="5" y2="19" /><circle cx="6.5" cy="6.5" r="2.5" /><circle cx="17.5" cy="17.5" r="2.5" /></svg>
-  );
-
+function SidebarContent({ count, rented, totalMV, totalDebt, equity, totalRent, totalRate, totalHG, netCashflow, avgYield, avgInterest, nearestAction, onActionClick }: {
+  count: number; rented: number; totalMV: number; totalDebt: number; equity: number;
+  totalRent: number; totalRate: number; totalHG: number; netCashflow: number;
+  avgYield: number; avgInterest: number;
+  nearestAction: { address: string; months: number; prop: PP } | null;
+  onActionClick: (p: PP) => void;
+}) {
   return (
-    <Card className="p-4 flex items-center gap-3">
-      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: C.surface }}>
-        {iconSvg}
+    <Card className="p-0 overflow-hidden">
+      <div className="px-4 py-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <h3 className="text-xs font-bold tracking-wide uppercase" style={{ color: C.dim }}>Portfolio-Übersicht</h3>
       </div>
-      <div>
-        <p className="text-base font-bold" style={{ color: color || C.text }}>{value}</p>
-        <p className="text-[10px]" style={{ color: C.dim }}>{label}</p>
+
+      {/* Counts */}
+      <div className="px-4 py-3 space-y-1" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div className="flex justify-between text-xs"><span style={{ color: C.sub }}>Objekte</span><span className="font-bold" style={{ color: C.text }}>{count}</span></div>
+        <div className="flex justify-between text-xs"><span style={{ color: C.sub }}>Davon vermietet</span><span className="font-bold" style={{ color: C.text }}>{rented}</span></div>
+      </div>
+
+      {/* Values */}
+      <div className="px-4 py-3 space-y-3" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <div>
+          <p className="text-[10px] font-medium" style={{ color: C.dim }}>Geschätzter Gesamtwert</p>
+          <p className="text-lg font-bold" style={{ color: C.text }}>{totalMV.toLocaleString("de-DE")} €</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium" style={{ color: C.dim }}>Gesamt-Restschuld</p>
+          <p className="text-base font-bold" style={{ color: C.text }}>{totalDebt.toLocaleString("de-DE")} €</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-medium" style={{ color: C.dim }}>Eigenkapital (geschätzt)</p>
+          <p className="text-base font-bold" style={{ color: equity >= 0 ? C.green : C.red }}>{equity.toLocaleString("de-DE")} €</p>
+        </div>
+      </div>
+
+      {/* Cashflow */}
+      <div className="px-4 py-3 space-y-1.5" style={{ borderBottom: `1px solid ${C.border}` }}>
+        <p className="text-[10px] font-bold tracking-wide uppercase" style={{ color: C.dim }}>Monatlicher Cashflow</p>
+        <div className="flex justify-between text-[11px]"><span style={{ color: C.sub }}>Mieteinnahmen</span><span className="font-semibold" style={{ color: C.text }}>{totalRent.toLocaleString("de-DE")} €</span></div>
+        {totalRate > 0 && <div className="flex justify-between text-[11px]"><span style={{ color: C.sub }}>Kreditraten</span><span className="font-semibold" style={{ color: C.red }}>-{totalRate.toLocaleString("de-DE")} €</span></div>}
+        {totalHG > 0 && <div className="flex justify-between text-[11px]"><span style={{ color: C.sub }}>Hausgeld</span><span className="font-semibold" style={{ color: C.red }}>-{totalHG.toLocaleString("de-DE")} €</span></div>}
+        <div className="h-px" style={{ background: C.border }} />
+        <div className="flex justify-between text-xs font-bold"><span style={{ color: C.text }}>Netto-Cashflow</span><span style={{ color: netCashflow >= 0 ? C.green : C.red }}>{netCashflow >= 0 ? "+" : ""}{netCashflow.toLocaleString("de-DE")} €</span></div>
+      </div>
+
+      {/* Nearest Action */}
+      {nearestAction && (
+        <div className="px-4 py-3 space-y-1.5" style={{ borderBottom: `1px solid ${C.border}` }}>
+          <p className="text-[10px] font-bold tracking-wide uppercase" style={{ color: C.amber }}>Nächste Aktion</p>
+          <p className="text-[11px]" style={{ color: C.sub }}>
+            {nearestAction.address}: Zinsbindung {nearestAction.months < 0 ? "abgelaufen" : `in ${nearestAction.months} Mon.`}
+          </p>
+          <button onClick={() => onActionClick(nearestAction!.prop)} className="text-[11px] font-bold transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+            Jetzt handeln →
+          </button>
+        </div>
+      )}
+
+      {/* Averages */}
+      <div className="px-4 py-3 space-y-2">
+        <div>
+          <p className="text-[10px] font-medium" style={{ color: C.dim }}>Ø Rendite Portfolio</p>
+          <p className="text-sm font-bold" style={{ color: avgYield >= 4 ? C.green : avgYield >= 3 ? C.amber : C.red }}>{avgYield.toFixed(1)} %</p>
+        </div>
+        {avgInterest > 0 && (
+          <div>
+            <p className="text-[10px] font-medium" style={{ color: C.dim }}>Ø Zins</p>
+            <p className="text-sm font-bold" style={{ color: C.text }}>{avgInterest.toFixed(1)} %</p>
+          </div>
+        )}
       </div>
     </Card>
   );
 }
 
-function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
-  return (
-    <Card className="p-4 text-center">
-      <p className="text-sm font-bold" style={{ color: color || C.text }}>{value}</p>
-      <p className="text-[10px] mt-0.5" style={{ color: C.dim }}>{label}</p>
-    </Card>
-  );
-}
+/* ─── Helpers ─── */
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between rounded-lg px-2.5 py-1.5" style={{ background: C.surface }}>
       <span className="text-[10px]" style={{ color: C.dim }}>{label}</span>
@@ -420,25 +604,20 @@ function DetailRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getNextSteps(p: PortfolioProp): string[] {
-  const steps: string[] = [];
-  const energyIdx = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"].indexOf(p.energy_class || "");
-  if (energyIdx >= 5) {
-    steps.push("Energetische Sanierung kann den Wert um ~15 % steigern und GEG-Anforderungen erfüllen.");
-  }
-  const grossYield = p.purchase_price > 0 ? ((p.current_rent * 12) / p.purchase_price) * 100 : 0;
-  if (grossYield < 4) {
-    steps.push("Mieterhöhung nach §558 BGB prüfen (Mietspiegel vergleichen).");
-  }
-  if (p.work_needed) {
-    steps.push("Ausstehende Sanierungsmaßnahmen zeitnah umsetzen für Werterhalt.");
-  }
-  if ((p.score || 0) >= 70) {
-    steps.push("Starkes Objekt — Sondertilgungsmöglichkeiten bei der Bank prüfen.");
-  }
-  if (steps.length === 0) {
-    steps.push("Regelmäßig Marktmiete prüfen und bei Bedarf anpassen.");
-    steps.push("Instandhaltungsrücklage im WEG-Wirtschaftsplan kontrollieren.");
-  }
-  return steps;
+function warnColor(level: string): string {
+  if (level === "yellow") return C.amber;
+  if (level === "orange") return C.orange;
+  return C.red;
+}
+
+function warnBg(level: string): string {
+  if (level === "yellow") return C.amberDim;
+  if (level === "orange") return C.orangeDim;
+  return C.redDim;
+}
+
+function warnBorder(level: string): string {
+  if (level === "yellow") return C.amberBorder;
+  if (level === "orange") return C.orangeBorder;
+  return "rgba(248,113,113,0.2)";
 }

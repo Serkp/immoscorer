@@ -197,31 +197,69 @@ export async function savePortfolioProperty(userId: string, data: {
   score?: number; scoreData?: Record<string, unknown>;
   locationData?: Record<string, unknown>;
   lat?: number; lng?: number;
+  propertyType?: string; apartmentType?: string; rooms?: number;
+  purchaseDate?: string; loanAmount?: number; interestRate?: number;
+  fixedRateUntil?: string; monthlyPayment?: number; repaymentRate?: number;
+  specialRepaymentAllowed?: boolean; specialRepaymentAmount?: number;
+  isRented?: string; monthlyRent?: number; rentalSince?: string;
+  unitCount?: number; totalRent?: number; unitsRented?: number;
+  estimatedMarketValue?: number;
 }) {
+  const row: Record<string, unknown> = {
+    user_id: userId,
+    address: data.address,
+    city: data.city,
+    purchase_price: data.purchasePrice,
+    current_rent: data.currentRent,
+    area: data.area || null,
+    build_year: data.buildYear || null,
+    energy_class: data.energyClass || null,
+    house_money: data.houseMoney || null,
+    location_grade: data.locationGrade || null,
+    renovations: data.renovations || [],
+    score: data.score || null,
+    score_data: data.scoreData || null,
+    location_data: data.locationData || null,
+    lat: data.lat || null,
+    lng: data.lng || null,
+    property_type: data.propertyType || null,
+    apartment_type: data.apartmentType || null,
+    rooms: data.rooms || null,
+    purchase_date: data.purchaseDate || null,
+    loan_amount: data.loanAmount || null,
+    interest_rate: data.interestRate || null,
+    fixed_rate_until: data.fixedRateUntil || null,
+    monthly_payment: data.monthlyPayment || null,
+    repayment_rate: data.repaymentRate || null,
+    special_repayment_allowed: data.specialRepaymentAllowed || false,
+    special_repayment_amount: data.specialRepaymentAmount || null,
+    is_rented: data.isRented || null,
+    monthly_rent: data.monthlyRent || null,
+    rental_since: data.rentalSince || null,
+    unit_count: data.unitCount || null,
+    total_rent: data.totalRent || null,
+    units_rented: data.unitsRented || null,
+    estimated_market_value: data.estimatedMarketValue || null,
+  };
+  console.log("[savePortfolioProperty] inserting:", JSON.stringify(row, null, 2));
   const { data: prop, error } = await getSupabase()
     .from("portfolio_properties")
-    .insert({
-      user_id: userId,
-      address: data.address,
-      city: data.city,
-      purchase_price: data.purchasePrice,
-      current_rent: data.currentRent,
-      area: data.area || null,
-      build_year: data.buildYear || null,
-      energy_class: data.energyClass || null,
-      house_money: data.houseMoney || null,
-      location_grade: data.locationGrade || null,
-      renovations: data.renovations || [],
-      score: data.score || null,
-      score_data: data.scoreData || null,
-      location_data: data.locationData || null,
-      lat: data.lat || null,
-      lng: data.lng || null,
-    })
+    .insert(row)
     .select()
     .single();
-  if (error) throw error;
+  if (error) {
+    console.error("[savePortfolioProperty] error:", { message: error.message, code: error.code, details: error.details, hint: error.hint });
+    throw error;
+  }
   return prop;
+}
+
+export async function updatePortfolioProperty(id: string, data: Record<string, unknown>) {
+  const { error } = await getSupabase()
+    .from("portfolio_properties")
+    .update({ ...data, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function getPortfolioProperties(userId: string) {
