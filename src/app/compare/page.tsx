@@ -171,7 +171,7 @@ export default function ComparePage() {
             Starten Sie eine Analyse und speichern Sie das Ergebnis mit &quot;Im Vergleich speichern&quot;.
           </p>
           <Link
-            href="/analysis"
+            href="/analysis?new=1"
             className="rounded-xl px-6 py-2.5 text-sm font-semibold transition-all hover:opacity-90"
             style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
@@ -258,7 +258,7 @@ export default function ComparePage() {
         </div>
         {cards.length < 4 && (
           <Link
-            href="/analysis"
+            href="/analysis?new=1"
             className="rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:opacity-90"
             style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
@@ -269,22 +269,15 @@ export default function ComparePage() {
 
       {/* Cards Grid */}
       <div
-        className="grid gap-3"
+        className="grid gap-4"
         style={{
-          gridTemplateColumns: cards.length === 1
-            ? "max-content"
-            : cards.length === 2
-            ? "repeat(2, minmax(0, 240px))"
-            : cards.length === 3
-            ? "repeat(3, minmax(0, 240px))"
-            : "repeat(2, minmax(0, 240px))",
+          gridTemplateColumns: `repeat(${cards.length}, 1fr)`,
         }}
       >
         {cards.map((d) => (
           <Card
             key={d.id}
             className="p-0 overflow-hidden cursor-pointer transition-all"
-            style={{ maxWidth: 240 }}
             hover
             onClick={() => router.push(`/analysis?id=${d.id}`)}
           >

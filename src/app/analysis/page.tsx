@@ -139,7 +139,7 @@ function computeHGSplit(hausgeld: number, hgItems: Record<string, string>) {
 
 export default function AnalysisPage() {
   return (
-    <Suspense>
+    <Suspense fallback={<div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>}>
       <AnalysisContent />
     </Suspense>
   );
@@ -170,15 +170,17 @@ function AnalysisContent() {
   const [finanzSent, setFinanzSent] = useState(false);
   const [hgExpanded, setHgExpanded] = useState(false);
   const [fromCompare, setFromCompare] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   /* ── Load saved analysis from DB when ?id= is present ── */
   useEffect(() => {
     const id = searchParams.get("id");
     if (!id || !user) return;
+    setLoadError(null);
     (async () => {
       try {
         const row = await getAnalysisById(id, user.id);
-        if (!row) return;
+        if (!row) { setLoadError("Analyse nicht gefunden."); return; }
         const inp = (row.inputs || {}) as Record<string, string | number | string[]>;
 
         // Reconstruct form from saved inputs
@@ -233,6 +235,7 @@ function AnalysisContent() {
         setView("result");
       } catch (err) {
         console.error("[loadAnalysis] error:", err);
+        setLoadError("Analyse konnte nicht geladen werden.");
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,6 +244,18 @@ function AnalysisContent() {
   /* ── Restore from sessionStorage (Feature 2: Zwischenspeicher) ── */
   useEffect(() => {
     if (searchParams.get("id")) return; // Skip restore when loading from DB
+    // ?new=1 → fresh analysis (from "Objekt hinzufügen" on compare page)
+    if (searchParams.get("new")) {
+      sessionStorage.removeItem("immoscorer_analysis");
+      sessionStorage.removeItem("immoscorer_step");
+      sessionStorage.removeItem("immoscorer_result");
+      setForm(INIT);
+      setSection(0);
+      setView("input");
+      setResult(null);
+      setFromCompare(false);
+      return;
+    }
     try {
       const savedForm = sessionStorage.getItem("immoscorer_analysis");
       if (savedForm) {
@@ -667,6 +682,18 @@ function AnalysisContent() {
       text: `Von diesem Investment wird abgeraten (${score}/100). Die Risiken überwiegen deutlich. Suchen Sie nach Objekten mit besserem Rendite-Risiko-Profil.`,
       variant: "bad",
     };
+  }
+
+  /* ── Error loading analysis ── */
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-[640px] py-24 text-center space-y-4">
+        <p className="text-sm font-semibold" style={{ color: C.red }}>{loadError}</p>
+        <Link href="/compare" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+          ← Zurück zum Vergleich
+        </Link>
+      </div>
+    );
   }
 
   /* ══════════════════════════════════
