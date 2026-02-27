@@ -180,12 +180,11 @@ function AnalysisContent() {
         const row = await getAnalysisById(id, user.id);
         if (!row) return;
         const inp = (row.inputs || {}) as Record<string, string | number | string[]>;
-        const res = (row.result || {}) as Record<string, unknown>;
 
         // Reconstruct form from saved inputs
         const addr = String(inp.address || "");
         const parts = addr.split(",").map((s: string) => s.trim());
-        setForm({
+        const loadedForm: FormData = {
           street: parts[0] || String(inp.street || ""),
           city: parts[1] || String(inp.city || row.city || ""),
           price: String(inp.purchasePrice || inp.price || row.purchase_price || ""),
@@ -196,37 +195,38 @@ function AnalysisContent() {
           hgItems: {},
           area: String(inp.areaSqm || inp.area || row.area_sqm || ""),
           year: String(inp.buildingYear || inp.year || row.building_year || ""),
-          energyClass: String(inp.energyClass || row.energy_class || ""),
-          locationGrade: String(inp.locationGrade || row.location_grade || ""),
+          energyClass: String(inp.energyClass || row.energy_class || "C"),
+          locationGrade: String(inp.locationGrade || row.location_grade || "B"),
           renovations: Array.isArray(inp.renovations) ? inp.renovations as string[] : [],
           propertyType: String(inp.propertyType || "") as FormData["propertyType"],
           apartmentType: String(inp.apartmentType || "") as FormData["apartmentType"],
           rooms: String(inp.rooms || ""),
           estimatedUtilities: String(inp.estimatedUtilities || ""),
           unitCount: String(inp.unitCount || ""),
-        });
+        };
+        setForm(loadedForm);
 
-        // Reconstruct result
-        if (res.totalScore != null) {
-          setResult(res as unknown as ScoringResult);
-        } else {
-          // Re-run scoring from flat columns
-          const rent = Number(inp.monthlyRent || inp.rent || row.monthly_rent) || 0;
-          const hausgeld = Number(inp.managementFee || inp.hausgeld || row.management_fee) || 0;
-          const input: PropertyInput = {
-            street: parts[0] || "",
-            city: parts[1] || String(row.city || ""),
-            price: Number(inp.purchasePrice || inp.price || row.purchase_price) || 0,
-            rent,
-            hausgeld,
-            area: Number(inp.areaSqm || inp.area || row.area_sqm) || 0,
-            year: Number(inp.buildingYear || inp.year || row.building_year) || 0,
-            energyClass: String(inp.energyClass || row.energy_class || "C"),
-            locationGrade: String(inp.locationGrade || row.location_grade || "B"),
-            renovations: Array.isArray(inp.renovations) ? inp.renovations as string[] : [],
-          };
-          setResult(computeScore(input));
-        }
+        // Always re-run scoring from saved inputs (stored result is flat, not full ScoringResult)
+        const rent = Number(inp.monthlyRent || inp.rent || row.monthly_rent) || 0;
+        const hausgeld = Number(inp.managementFee || inp.hausgeld || row.management_fee) || 0;
+        const input: PropertyInput = {
+          street: parts[0] || "",
+          city: parts[1] || String(row.city || ""),
+          price: Number(inp.purchasePrice || inp.price || row.purchase_price) || 0,
+          rent,
+          hausgeld,
+          area: Number(inp.areaSqm || inp.area || row.area_sqm) || 0,
+          year: Number(inp.buildingYear || inp.year || row.building_year) || 0,
+          energyClass: String(inp.energyClass || row.energy_class || "C"),
+          locationGrade: String(inp.locationGrade || row.location_grade || "B"),
+          renovations: Array.isArray(inp.renovations) ? inp.renovations as string[] : [],
+          ...(inp.propertyType ? { propertyType: String(inp.propertyType) } : {}),
+          ...(inp.apartmentType ? { apartmentType: String(inp.apartmentType) } : {}),
+          ...(inp.rooms ? { rooms: Number(inp.rooms) } : {}),
+          ...(inp.unitCount ? { unitCount: Number(inp.unitCount) } : {}),
+          ...(inp.estimatedUtilities ? { estimatedUtilities: Number(inp.estimatedUtilities) } : {}),
+        };
+        setResult(computeScore(input));
 
         setFromCompare(true);
         setSaveChoice("compare"); // Already saved
