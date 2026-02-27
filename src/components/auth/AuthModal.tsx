@@ -6,6 +6,7 @@ import { AIOrb } from "@/components/ui/AIOrb";
 import { C } from "@/lib/theme";
 
 type Mode = "login" | "register";
+type ForgotStep = "form" | "sent";
 
 interface AuthModalProps {
   open: boolean;
@@ -21,10 +22,17 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
   const [newsletter, setNewsletter] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotStep, setForgotStep] = useState<ForgotStep>("form");
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
       setError(null);
+      setShowForgot(false);
+      setForgotStep("form");
+      setForgotError(null);
     }
   }, [open]);
 
@@ -97,6 +105,24 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     }
   }
 
+  async function handleForgotPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) { setForgotError("Bitte geben Sie Ihre E-Mail-Adresse ein."); return; }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      const supabase = getSupabase();
+      const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + "/auth/reset-password",
+      });
+      if (err) { setForgotError(err.message); setForgotLoading(false); return; }
+      setForgotStep("sent");
+    } catch {
+      setForgotError("Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.");
+    }
+    setForgotLoading(false);
+  }
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center px-4"
@@ -107,134 +133,225 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
         className="w-full max-w-[420px] rounded-2xl p-6 space-y-6 animate-fade-up"
         style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: `0 0 60px ${C.accentDim}` }}
       >
-        {/* Header */}
-        <div className="flex flex-col items-center gap-3 text-center">
-          <AIOrb size={40} active />
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: C.text }}>
-              {mode === "register"
-                ? "Kostenlos registrieren"
-                : "Willkommen zurück"}
-            </h2>
-            <p className="text-xs mt-1" style={{ color: C.sub }}>
-              {mode === "register"
-                ? "um Ihre Analyse zu sehen"
-                : "Melden Sie sich an um Ihre Analyse zu sehen."}
-            </p>
-          </div>
-        </div>
-
-        {/* Tab Toggle */}
-        <div className="flex rounded-xl p-1" style={{ background: C.surface }}>
-          {(["register", "login"] as Mode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => { setMode(m); setError(null); }}
-              className="flex-1 rounded-lg py-2 text-sm font-semibold transition-all"
-              style={{
-                background: mode === m ? C.surface3 : "transparent",
-                color: mode === m ? C.text : C.sub,
-              }}
-            >
-              {m === "login" ? "Anmelden" : "Registrieren"}
-            </button>
-          ))}
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div
-            className="rounded-xl px-4 py-3 text-sm"
-            style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {mode === "register" && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium" style={{ color: C.sub }}>Name</label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Max Mustermann"
-                autoComplete="name"
-                className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-                style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-              />
+        {showForgot ? (
+          /* ── Passwort vergessen ── */
+          <>
+            <div className="flex flex-col items-center gap-3 text-center">
+              <AIOrb size={40} active />
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: C.text }}>Passwort zurücksetzen</h2>
+                <p className="text-xs mt-1" style={{ color: C.sub }}>
+                  {forgotStep === "form"
+                    ? "Geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link zum Zurücksetzen."
+                    : ""}
+                </p>
+              </div>
             </div>
-          )}
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: C.sub }}>E-Mail-Adresse</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              placeholder="name@beispiel.de"
-              autoComplete="email"
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-            />
-          </div>
+            {forgotStep === "sent" ? (
+              <div className="space-y-4">
+                <div className="rounded-xl px-4 py-4 text-center space-y-2" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
+                  <p className="text-sm font-semibold" style={{ color: C.green }}>E-Mail gesendet!</p>
+                  <p className="text-xs" style={{ color: C.green }}>Prüfen Sie Ihr Postfach und klicken Sie auf den Link zum Zurücksetzen.</p>
+                </div>
+                <p className="text-[11px] text-center" style={{ color: C.dim }}>
+                  Keine E-Mail erhalten? Prüfen Sie den Spam-Ordner.
+                </p>
+                <button
+                  onClick={() => { setShowForgot(false); setForgotStep("form"); setForgotError(null); }}
+                  className="w-full rounded-xl py-3 text-sm font-bold transition-all"
+                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                >
+                  Zurück zur Anmeldung
+                </button>
+              </div>
+            ) : (
+              <>
+                {forgotError && (
+                  <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}>
+                    {forgotError}
+                  </div>
+                )}
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium" style={{ color: C.sub }}>E-Mail-Adresse</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="name@beispiel.de"
+                      autoComplete="email"
+                      className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+                      style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={forgotLoading}
+                    className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
+                    style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                  >
+                    {forgotLoading ? "..." : "Link senden"}
+                  </button>
+                </form>
+                <button
+                  onClick={() => { setShowForgot(false); setForgotError(null); }}
+                  className="w-full text-center text-xs py-1"
+                  style={{ color: C.dim }}
+                >
+                  ← Zurück zur Anmeldung
+                </button>
+              </>
+            )}
+          </>
+        ) : (
+          /* ── Login / Register ── */
+          <>
+            {/* Header */}
+            <div className="flex flex-col items-center gap-3 text-center">
+              <AIOrb size={40} active />
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: C.text }}>
+                  {mode === "register"
+                    ? "Kostenlos registrieren"
+                    : "Willkommen zurück"}
+                </h2>
+                <p className="text-xs mt-1" style={{ color: C.sub }}>
+                  {mode === "register"
+                    ? "um Ihre Analyse zu sehen"
+                    : "Melden Sie sich an um Ihre Analyse zu sehen."}
+                </p>
+              </div>
+            </div>
 
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium" style={{ color: C.sub }}>Passwort</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              minLength={6}
-              placeholder="Mindestens 6 Zeichen"
-              autoComplete={mode === "register" ? "new-password" : "current-password"}
-              className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
-            />
-          </div>
+            {/* Tab Toggle */}
+            <div className="flex rounded-xl p-1" style={{ background: C.surface }}>
+              {(["register", "login"] as Mode[]).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => { setMode(m); setError(null); }}
+                  className="flex-1 rounded-lg py-2 text-sm font-semibold transition-all"
+                  style={{
+                    background: mode === m ? C.surface3 : "transparent",
+                    color: mode === m ? C.text : C.sub,
+                  }}
+                >
+                  {m === "login" ? "Anmelden" : "Registrieren"}
+                </button>
+              ))}
+            </div>
 
-          {mode === "register" && (
-            <div className="space-y-1">
-              <label className="flex items-start gap-2.5 cursor-pointer">
+            {/* Error */}
+            {error && (
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}
+              >
+                {error}
+              </div>
+            )}
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {mode === "register" && (
+                <div className="space-y-1.5">
+                  <label className="text-xs font-medium" style={{ color: C.sub }}>Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Max Mustermann"
+                    autoComplete="name"
+                    className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+                    style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium" style={{ color: C.sub }}>E-Mail-Adresse</label>
                 <input
-                  type="checkbox"
-                  checked={newsletter}
-                  onChange={(e) => setNewsletter(e.target.checked)}
-                  className="mt-0.5 rounded accent-[#7C6AFF]"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="name@beispiel.de"
+                  autoComplete="email"
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+                  style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
                 />
-                <span className="text-xs leading-relaxed" style={{ color: C.sub }}>
-                  Markttrends, Investment-Tipps und neue Features per E-Mail erhalten
-                </span>
-              </label>
-              <p className="text-[10px] ml-6" style={{ color: C.dim }}>
-                Maximal 2× pro Monat. Jederzeit abmeldbar.
-              </p>
-            </div>
-          )}
+              </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
-            style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-          >
-            {loading ? "..." : mode === "login" ? "Anmelden & Analyse sehen" : "Registrieren & Analyse sehen"}
-          </button>
-        </form>
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium" style={{ color: C.sub }}>Passwort</label>
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  placeholder="Mindestens 6 Zeichen"
+                  autoComplete={mode === "register" ? "new-password" : "current-password"}
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
+                  style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                />
+              </div>
 
-        {/* Close hint */}
-        <button
-          onClick={onClose}
-          className="w-full text-center text-xs py-1"
-          style={{ color: C.dim }}
-        >
-          Abbrechen
-        </button>
+              {/* Passwort vergessen — nur im Login-Modus */}
+              {mode === "login" && (
+                <div className="flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowForgot(true); setError(null); }}
+                    className="text-[11px] transition-opacity hover:opacity-80"
+                    style={{ color: C.dim }}
+                  >
+                    Passwort vergessen?
+                  </button>
+                </div>
+              )}
+
+              {mode === "register" && (
+                <div className="space-y-1">
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newsletter}
+                      onChange={(e) => setNewsletter(e.target.checked)}
+                      className="mt-0.5 rounded accent-[#7C6AFF]"
+                    />
+                    <span className="text-xs leading-relaxed" style={{ color: C.sub }}>
+                      Markttrends, Investment-Tipps und neue Features per E-Mail erhalten
+                    </span>
+                  </label>
+                  <p className="text-[10px] ml-6" style={{ color: C.dim }}>
+                    Maximal 2× pro Monat. Jederzeit abmeldbar.
+                  </p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+              >
+                {loading ? "..." : mode === "login" ? "Anmelden & Analyse sehen" : "Registrieren & Analyse sehen"}
+              </button>
+            </form>
+
+            {/* Close hint */}
+            <button
+              onClick={onClose}
+              className="w-full text-center text-xs py-1"
+              style={{ color: C.dim }}
+            >
+              Abbrechen
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

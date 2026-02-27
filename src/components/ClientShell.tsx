@@ -10,8 +10,8 @@ import { C } from "@/lib/theme";
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Landing page — no shell, no auth required
-  if (pathname === "/") {
+  // Landing page & password reset — no shell, no auth required
+  if (pathname === "/" || pathname === "/auth/reset-password") {
     return <>{children}</>;
   }
 
