@@ -2,9 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
-import { Card } from "@/components/ui/Card";
-import { ScoreRing } from "@/components/ui/ScoreRing";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getAnalyses } from "@/lib/db";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
@@ -23,9 +22,10 @@ interface AnalysisRow {
   net_yield?: number;
   price_factor?: number;
   created_at: string;
-  /* legacy */
   inputs?: Record<string, unknown>;
   result?: Record<string, unknown>;
+  save_type?: string;
+  property_type?: string;
 }
 
 function getScore(a: AnalysisRow): number {
@@ -48,19 +48,30 @@ function getAddress(a: AnalysisRow): string {
   return String(inp?.city || "—");
 }
 
-function getDetails(a: AnalysisRow): string {
-  const area = a.area_sqm || (a.inputs as { area?: number } | undefined)?.area || 0;
-  const year = a.building_year || (a.inputs as { year?: number } | undefined)?.year || 0;
+function getPropertyInfo(a: AnalysisRow): string {
   const parts: string[] = [];
-  if (area > 0) parts.push(`${area} m²`);
-  if (year > 0) parts.push(`Bj. ${year}`);
+  const type = a.property_type || (a.inputs as { propertyType?: string } | undefined)?.propertyType;
+  if (type) parts.push(type.toUpperCase());
+  const area = a.area_sqm || (a.inputs as { area?: number } | undefined)?.area || 0;
+  if (area > 0) parts.push(`${area}m²`);
   return parts.join(" · ");
 }
 
-function getPrice(a: AnalysisRow): number {
-  if (a.purchase_price && a.purchase_price > 0) return a.purchase_price;
-  const inp = a.inputs as { price?: number } | undefined;
-  return inp?.price || 0;
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diffMs = now - then;
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return "gerade eben";
+  if (mins < 60) return `vor ${mins} Min.`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `vor ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "gestern";
+  if (days < 7) return `vor ${days} Tagen`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `vor ${weeks} Wo.`;
+  return new Date(dateStr).toLocaleDateString("de-DE");
 }
 
 function getGreeting(): string {
@@ -72,6 +83,7 @@ function getGreeting(): string {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRow[]>([]);
   const [compareCount, setCompareCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -109,10 +121,44 @@ export default function DashboardPage() {
   const bestYield = yields.length > 0 ? Math.max(...yields) : 0;
   const recentAnalyses = allAnalyses.slice(0, 5);
 
+  // Empty state
+  if (totalAnalyses === 0) {
+    return (
+      <div className="mx-auto max-w-[1100px] px-4 md:px-8 animate-fade-up">
+        <div className="flex flex-col items-center text-center pt-16 pb-8 gap-6">
+          <AIOrb size={56} active />
+          <div>
+            <h2 className="text-2xl font-bold" style={{ color: C.text }}>
+              Willkommen bei ImmoScorer
+            </h2>
+            <p className="text-base mt-3 max-w-lg mx-auto" style={{ color: C.dim }}>
+              Bewerten Sie Ihre erste Immobilie in unter 60 Sekunden.
+            </p>
+          </div>
+          <Link
+            href="/analysis"
+            className="rounded-xl px-8 py-3.5 text-sm font-bold transition-all hover:opacity-90"
+            style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+          >
+            Erste Analyse starten →
+          </Link>
+          <div className="flex flex-wrap justify-center gap-x-8 gap-y-2 mt-4">
+            {["Score in Sekunden", "6 Teilbewertungen", "Vergleich & Portfolio"].map((t) => (
+              <span key={t} className="text-[13px]" style={{ color: C.dim }}>✓ {t}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Score color for avg
+  const avgScoreColor = avgScore >= 70 ? C.green : avgScore >= 50 ? C.amber : avgScore > 0 ? C.orange : C.dim;
+
   return (
-    <div className="mx-auto max-w-[1100px] space-y-8">
-      {/* ── Header ── */}
-      <div>
+    <div className="mx-auto max-w-[1100px] px-4 md:px-8 animate-fade-up">
+      {/* Header */}
+      <div className="mb-8">
         <h1 className="text-xl font-bold" style={{ color: C.text }}>
           {getGreeting()}, {displayName}
         </h1>
@@ -121,182 +167,192 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* ── Stat Cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+        <StatCard label="ANALYSEN" value={String(totalAnalyses)} sub="gesamt" color={C.text} />
+        <StatCard label="IM VERGLEICH" value={String(compareCount)} sub="Objekte" color={C.text} />
         <StatCard
-          label="Analysen"
-          value={String(totalAnalyses)}
-          sub={totalAnalyses === 1 ? "Analyse durchgeführt" : "Analysen durchgeführt"}
-          color={C.accent}
-        />
-        <StatCard
-          label="Im Vergleich"
-          value={String(compareCount)}
-          sub={compareCount === 1 ? "Objekt gespeichert" : "Objekte gespeichert"}
-          color={C.blue}
-        />
-        <StatCard
-          label="Ø Score"
+          label="Ø SCORE"
           value={avgScore > 0 ? String(avgScore) : "—"}
           sub={avgScore > 0 ? scoreLabel(avgScore) : "Noch keine Daten"}
-          color={avgScore > 0 ? scoreColor(avgScore) : C.dim}
+          color={avgScoreColor}
         />
         <StatCard
-          label="Beste Rendite"
-          value={bestYield > 0 ? `${bestYield.toFixed(1)} %` : "—"}
+          label="BESTE RENDITE"
+          value={bestYield > 0 ? `${bestYield.toFixed(1)}%` : "—"}
           sub={bestYield > 0 ? "Bruttorendite" : "Noch keine Daten"}
-          color={bestYield >= 5 ? C.green : bestYield >= 3 ? C.amber : C.dim}
+          color={bestYield > 0 ? C.cyan : C.dim}
         />
       </div>
 
-      {/* ── Content depending on analyses count ── */}
-      {totalAnalyses === 0 ? (
-        /* Empty state / Welcome */
-        <Card className="p-8 flex flex-col items-center text-center gap-5">
-          <AIOrb size={56} active />
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: C.text }}>
-              Willkommen bei ImmoScorer
-            </h2>
-            <p className="text-sm mt-2 max-w-md" style={{ color: C.sub }}>
-              Bewerten Sie Ihre erste Immobilie mit unserer KI-gestützten Analyse.
-              Erhalten Sie sofort einen detaillierten Score mit Handlungsempfehlungen.
-            </p>
-          </div>
-          <Link
-            href="/analysis"
-            className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90"
-            style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-          >
-            Erste Analyse starten
-          </Link>
-        </Card>
-      ) : (
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* ── Recent Analyses ── */}
-          <div className="lg:col-span-2 space-y-4">
-            <h2 className="text-sm font-bold" style={{ color: C.text }}>Letzte Analysen</h2>
-            <div className="space-y-3">
-              {recentAnalyses.map((a) => {
-                const score = getScore(a);
-                const price = getPrice(a);
-                return (
-                  <Card key={a.id} className="p-4 flex items-center gap-4">
-                    <ScoreRing value={score} size={48} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-bold truncate" style={{ color: C.text }}>
-                        {getAddress(a)}
-                      </p>
-                      <p className="text-xs mt-0.5" style={{ color: C.dim }}>
-                        {getDetails(a)}
-                        {price > 0 ? ` · ${price.toLocaleString("de-DE")} €` : ""}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-sm font-bold" style={{ color: scoreColor(score) }}>
-                        {score}/100
-                      </p>
-                      <p className="text-[10px]" style={{ color: C.dim }}>
-                        {new Date(a.created_at).toLocaleDateString("de-DE")}
-                      </p>
-                    </div>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-10">
+        <ActionCard
+          onClick={() => router.push("/analysis")}
+          icon={<SearchIcon />}
+          title="Neue Analyse"
+          subtitle="Immobilie in Sekunden bewerten"
+        />
+        <ActionCard
+          onClick={() => router.push("/compare")}
+          icon={<ColumnsIcon />}
+          title="Vergleich"
+          subtitle={`${compareCount} Objekte vergleichen`}
+        />
+        <ActionCard
+          onClick={() => router.push("/financing")}
+          icon={<BankIcon />}
+          title="Finanzierung"
+          subtitle="Kostenlose Expertenberatung"
+        />
+      </div>
 
-          {/* ── Quick Actions ── */}
-          <div className="space-y-4">
-            <h2 className="text-sm font-bold" style={{ color: C.text }}>Schnellaktionen</h2>
-            <div className="space-y-3">
-              <QuickAction
-                href="/analysis"
-                icon={
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M12 8v8M8 12h8" />
-                  </svg>
-                }
-                label="Neue Analyse"
-                desc="Immobilie bewerten"
-              />
-              <QuickAction
-                href="/compare"
-                icon={
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="2" strokeLinecap="round">
-                    <rect x="3" y="3" width="7" height="7" />
-                    <rect x="14" y="3" width="7" height="7" />
-                    <rect x="3" y="14" width="7" height="7" />
-                    <rect x="14" y="14" width="7" height="7" />
-                  </svg>
-                }
-                label="Objekte vergleichen"
-                desc={`${compareCount} im Vergleich`}
-              />
-              <QuickAction
-                href="/strategies"
-                icon={
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round">
-                    <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
-                  </svg>
-                }
-                label="Strategien"
-                desc="Investment-Strategien entdecken"
-              />
-              <QuickAction
-                href="/guide"
-                icon={
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={C.amber} strokeWidth="2" strokeLinecap="round">
-                    <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
-                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
-                  </svg>
-                }
-                label="Wissensportal"
-                desc="Immobilien-Fachwissen"
-              />
-            </div>
-          </div>
+      {/* Recent Analyses */}
+      <div className="mt-10">
+        <h2 className="text-xl font-semibold mb-5" style={{ color: C.text }}>Letzte Analysen</h2>
+        <div>
+          {recentAnalyses.map((a, i) => {
+            const score = getScore(a);
+            const yld = getYield(a);
+            const isLast = i === recentAnalyses.length - 1;
+            return (
+              <div
+                key={a.id}
+                className="flex items-center gap-4 py-4 cursor-pointer transition-colors"
+                style={{
+                  borderBottom: isLast ? "none" : "1px solid rgba(255,255,255,0.06)",
+                }}
+                onClick={() => router.push(`/analysis?id=${a.id}`)}
+                onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+              >
+                {/* Address */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: C.text }}>
+                    {getAddress(a)}
+                  </p>
+                </div>
+                {/* Property info — hidden on mobile */}
+                <div className="hidden md:block shrink-0 w-28">
+                  <p className="text-[13px]" style={{ color: C.dim }}>{getPropertyInfo(a)}</p>
+                </div>
+                {/* Score + dot + label */}
+                <div className="flex items-center gap-2 shrink-0">
+                  <span
+                    className="inline-block w-2 h-2 rounded-full"
+                    style={{ background: score > 0 ? scoreColor(score) : C.dim }}
+                  />
+                  <span className="text-base font-semibold" style={{ color: C.text }}>
+                    {score > 0 ? score : "—"}
+                  </span>
+                  <span className="text-xs hidden sm:inline" style={{ color: score > 0 ? scoreColor(score) : C.dim }}>
+                    {score > 0 ? scoreLabel(score) : ""}
+                  </span>
+                </div>
+                {/* Yield — hidden on mobile */}
+                <div className="hidden md:block shrink-0 w-16 text-right">
+                  <span className="text-sm" style={{ color: C.cyan }}>
+                    {yld > 0 ? `${yld.toFixed(1)}%` : "—"}
+                  </span>
+                </div>
+                {/* Time — hidden on mobile */}
+                <div className="hidden md:block shrink-0 w-24 text-right">
+                  <span className="text-xs" style={{ color: C.dim }}>
+                    {relativeTime(a.created_at)}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
         </div>
-      )}
+        {allAnalyses.length > 5 && (
+          <Link href="/compare" className="inline-block mt-4 text-sm font-medium transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+            Alle Analysen anzeigen →
+          </Link>
+        )}
+      </div>
     </div>
   );
 }
 
+/* ── Stat Card ── */
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
-    <Card className="p-5 space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-wide" style={{ color: C.dim }}>
+    <div
+      className="rounded-2xl p-6"
+      style={{
+        background: C.surface2,
+        border: `1px solid rgba(255,255,255,0.08)`,
+        minWidth: 0,
+      }}
+    >
+      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: C.dim, letterSpacing: "1px" }}>
         {label}
       </p>
-      <p className="text-2xl font-bold" style={{ color }}>
+      <p className="text-4xl font-bold mt-2 leading-none lg:text-4xl max-sm:text-[28px]" style={{ color }}>
         {value}
       </p>
-      <p className="text-xs" style={{ color: C.sub }}>
-        {sub}
-      </p>
-    </Card>
+      <p className="text-xs mt-2" style={{ color: C.dim }}>{sub}</p>
+    </div>
   );
 }
 
-function QuickAction({ href, icon, label, desc }: { href: string; icon: React.ReactNode; label: string; desc: string }) {
+/* ── Action Card ── */
+function ActionCard({ onClick, icon, title, subtitle }: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+}) {
   return (
-    <Link href={href}>
-      <Card className="p-4 flex items-center gap-3 cursor-pointer transition-all hover:opacity-80" hover>
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-          style={{ background: C.surface2 }}
-        >
-          {icon}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold" style={{ color: C.text }}>{label}</p>
-          <p className="text-xs" style={{ color: C.dim }}>{desc}</p>
-        </div>
-        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={C.dim} strokeWidth="2" strokeLinecap="round">
-          <path d="M9 18l6-6-6-6" />
-        </svg>
-      </Card>
-    </Link>
+    <div
+      className="rounded-2xl p-7 cursor-pointer transition-all duration-200"
+      style={{
+        background: C.surface2,
+        border: `1px solid rgba(255,255,255,0.08)`,
+      }}
+      onClick={onClick}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.16)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
+        e.currentTarget.style.transform = "translateY(0)";
+      }}
+    >
+      <div className="mb-3">{icon}</div>
+      <p className="text-base font-semibold" style={{ color: C.text }}>{title}</p>
+      <p className="text-[13px] mt-1.5" style={{ color: C.dim }}>{subtitle}</p>
+    </div>
+  );
+}
+
+/* ── Icons ── */
+function SearchIcon() {
+  return (
+    <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="8" />
+      <path d="M21 21l-4.35-4.35" />
+      <path d="M8 11h6M11 8v6" />
+    </svg>
+  );
+}
+
+function ColumnsIcon() {
+  return (
+    <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={C.blue} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="18" rx="1" />
+      <rect x="14" y="3" width="7" height="18" rx="1" />
+    </svg>
+  );
+}
+
+function BankIcon() {
+  return (
+    <svg width={32} height={32} viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 21h18M3 10h18M12 3l9 7H3l9-7z" />
+      <path d="M5 10v8M9 10v8M15 10v8M19 10v8" />
+    </svg>
   );
 }
