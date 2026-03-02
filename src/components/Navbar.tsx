@@ -15,7 +15,7 @@ const NAV = [
   { href: "/compare", label: "Vergleich" },
   { href: "/financing", label: "Finanzierung" },
   { href: "/strategies", label: "Strategien" },
-  { href: "/guide", label: "Wissen" },
+  { href: "/wissen", label: "Wissen" },
 ] as const;
 
 export function Navbar() {
