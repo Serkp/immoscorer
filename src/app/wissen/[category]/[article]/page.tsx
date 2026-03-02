@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -11,24 +11,28 @@ import { getArticle } from "@/data/knowledge-base";
 export default function ArticlePage({
   params,
 }: {
-  params: Promise<{ category: string; article: string }>;
+  params: { category: string; article: string };
 }) {
-  const { category: catSlug, article: artSlug } = use(params);
-  const result = getArticle(catSlug, artSlug);
+  const result = getArticle(params.category, params.article);
   if (!result) notFound();
 
   const { category, article } = result;
 
   /* Next / prev navigation */
-  const artIdx = category.articles.findIndex((a) => a.slug === artSlug);
+  const artIdx = category.articles.findIndex((a) => a.slug === params.article);
   const prev = artIdx > 0 ? category.articles[artIdx - 1] : null;
   const next =
     artIdx < category.articles.length - 1
       ? category.articles[artIdx + 1]
       : null;
 
+  /* Similar articles (other articles in same category, max 3) */
+  const similar = category.articles
+    .filter((a) => a.slug !== params.article)
+    .slice(0, 3);
+
   return (
-    <div className="mx-auto max-w-[760px] space-y-8">
+    <div className="mx-auto max-w-[720px] space-y-8">
       {/* Breadcrumb */}
       <div
         className="flex items-center gap-1.5 text-xs flex-wrap"
@@ -83,17 +87,14 @@ export default function ArticlePage({
         >
           {article.title}
         </h1>
-        <p className="text-sm mt-2" style={{ color: C.sub }}>
+        <p className="text-sm mt-2" style={{ color: C.sub, lineHeight: 1.7 }}>
           {article.summary}
         </p>
         <div className="flex items-center gap-3 mt-3">
           <span className="text-[11px]" style={{ color: C.dim }}>
             {article.readMinutes} Min. Lesezeit
           </span>
-          <span
-            className="text-[11px]"
-            style={{ color: C.dim }}
-          >
+          <span className="text-[11px]" style={{ color: C.dim }}>
             · {article.sections.length} Abschnitte
           </span>
         </div>
@@ -112,7 +113,7 @@ export default function ArticlePage({
                 style={{ color: C.text }}
               >
                 <span
-                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold mr-2"
+                  className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold mr-2 align-middle"
                   style={{
                     background: category.color + "18",
                     color: category.color,
@@ -123,15 +124,27 @@ export default function ArticlePage({
                 {section.heading}
               </h2>
               <div className="space-y-3">
-                {section.body.split("\n\n").map((paragraph, pIdx) => (
-                  <p
-                    key={pIdx}
-                    className="text-xs leading-relaxed whitespace-pre-line"
-                    style={{ color: C.sub }}
-                  >
-                    {paragraph}
-                  </p>
-                ))}
+                {section.body.split("\n\n").map((paragraph, pIdx) => {
+                  /* Render bold text between ** markers */
+                  const parts = paragraph.split(/(\*\*[^*]+\*\*)/g);
+                  return (
+                    <p
+                      key={pIdx}
+                      className="text-xs whitespace-pre-line"
+                      style={{ color: C.sub, lineHeight: 1.7 }}
+                    >
+                      {parts.map((part, i) =>
+                        part.startsWith("**") && part.endsWith("**") ? (
+                          <strong key={i} style={{ color: C.text, fontWeight: 600 }}>
+                            {part.slice(2, -2)}
+                          </strong>
+                        ) : (
+                          part
+                        )
+                      )}
+                    </p>
+                  );
+                })}
               </div>
             </Card>
           </section>
@@ -144,8 +157,70 @@ export default function ArticlePage({
           <p className="text-xs font-semibold mb-1" style={{ color: C.green }}>
             Praxis-Tipp
           </p>
-          <p className="text-xs leading-relaxed">{article.tip}</p>
+          <p className="text-xs" style={{ lineHeight: 1.7 }}>{article.tip}</p>
         </AIComment>
+      )}
+
+      {/* CTA Box */}
+      <Card
+        className="p-6 text-center"
+        style={{
+          background: `linear-gradient(135deg, ${C.accentDim}, ${C.surface2})`,
+          border: `1px solid ${C.accentMid}`,
+        }}
+      >
+        <p className="text-sm font-bold mb-1" style={{ color: C.text }}>
+          Bereit für die Praxis?
+        </p>
+        <p className="text-xs mb-4" style={{ color: C.sub }}>
+          Analysieren Sie jetzt eine Immobilie oder lassen Sie sich zur Finanzierung beraten.
+        </p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <Link
+            href="/analysis"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90"
+            style={{ background: C.accent, color: "#fff" }}
+          >
+            Jetzt Immobilie analysieren →
+          </Link>
+          <Link
+            href="/financing"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90"
+            style={{
+              background: C.surface2,
+              color: C.text,
+              border: `1px solid ${C.border}`,
+            }}
+          >
+            Finanzierungsberatung →
+          </Link>
+        </div>
+      </Card>
+
+      {/* Similar articles */}
+      {similar.length > 0 && (
+        <div>
+          <h3 className="text-xs font-bold mb-3" style={{ color: C.text }}>
+            Ähnliche Artikel
+          </h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {similar.map((a) => (
+              <Link key={a.slug} href={`/wissen/${category.slug}/${a.slug}`}>
+                <Card className="p-3 h-full group" hover>
+                  <p
+                    className="text-xs font-semibold group-hover:underline line-clamp-2"
+                    style={{ color: C.text }}
+                  >
+                    {a.title}
+                  </p>
+                  <p className="text-[10px] mt-1" style={{ color: C.dim }}>
+                    {a.readMinutes} Min.
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* Prev / Next */}

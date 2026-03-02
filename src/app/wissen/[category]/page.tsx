@@ -1,6 +1,5 @@
 "use client";
 
-import { use } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
@@ -10,10 +9,9 @@ import { getCategoryBySlug } from "@/data/knowledge-base";
 export default function CategoryPage({
   params,
 }: {
-  params: Promise<{ category: string }>;
+  params: { category: string };
 }) {
-  const { category: slug } = use(params);
-  const cat = getCategoryBySlug(slug);
+  const cat = getCategoryBySlug(params.category);
   if (!cat) notFound();
 
   return (
@@ -62,13 +60,13 @@ export default function CategoryPage({
       </div>
 
       {/* Articles */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {cat.articles.map((article, idx) => (
           <Link
             key={article.slug}
             href={`/wissen/${cat.slug}/${article.slug}`}
           >
-            <Card className="p-5 group mb-4" hover>
+            <Card className="p-5 group mb-3" hover>
               <div className="flex items-start gap-4">
                 {/* Number */}
                 <span
