@@ -6,11 +6,11 @@ import { getSupabase } from "@/lib/supabase";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { C } from "@/lib/theme";
 
-type Phase = "email" | "new-password" | "success";
+type Phase = "loading" | "email" | "new-password" | "success";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-  const [phase, setPhase] = useState<Phase>("email");
+  const [phase, setPhase] = useState<Phase>("loading");
 
   // Phase 1 state
   const [email, setEmail] = useState("");
@@ -27,26 +27,35 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     const supabase = getSupabase();
 
-    // Listen for PASSWORD_RECOVERY event — Supabase sets session from URL hash
+    // Supabase processes the URL hash automatically on load,
+    // then fires onAuthStateChange with PASSWORD_RECOVERY
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY") {
         setPhase("new-password");
-      }
-    });
-
-    // Also check if there's already a session (e.g. redirected from /auth/callback)
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      // If user has a recovery session, show password form
-      if (session) {
-        // Check URL hash for recovery indicators
+      } else if (event === "SIGNED_IN" && session) {
+        // Signed in via token but no PASSWORD_RECOVERY event —
+        // check if we came from a recovery link
         const hash = window.location.hash;
-        if (hash.includes("type=recovery") || hash.includes("access_token")) {
+        if (hash.includes("type=recovery")) {
           setPhase("new-password");
         }
       }
     });
+
+    // Initial check: did the user arrive via a reset link (hash fragment)?
+    const hash = window.location.hash;
+    if (hash.includes("access_token") || hash.includes("type=recovery")) {
+      // Token present — wait for onAuthStateChange to fire
+      // Timeout as fallback in case the event doesn't fire
+      setTimeout(() => {
+        setPhase((prev) => (prev === "loading" ? "new-password" : prev));
+      }, 1500);
+    } else {
+      // No token — show the email request form
+      setPhase("email");
+    }
 
     return () => {
       subscription.unsubscribe();
@@ -123,7 +132,16 @@ export default function ResetPasswordPage() {
           boxShadow: `0 0 60px ${C.accentDim}`,
         }}
       >
+        {/* Loading state */}
+        {phase === "loading" && (
+          <div className="flex flex-col items-center gap-3 py-8">
+            <AIOrb size={40} active />
+            <p className="text-sm" style={{ color: C.sub }}>Wird geladen...</p>
+          </div>
+        )}
+
         {/* Header */}
+        {phase !== "loading" && (
         <div className="flex flex-col items-center gap-3 text-center">
           <AIOrb size={40} active />
           <div>
@@ -141,6 +159,7 @@ export default function ResetPasswordPage() {
             )}
           </div>
         </div>
+        )}
 
         {/* ═══ SUCCESS ═══ */}
         {phase === "success" && (
@@ -351,7 +370,7 @@ export default function ResetPasswordPage() {
         )}
 
         {/* Back to login link */}
-        {phase !== "success" && (
+        {phase !== "success" && phase !== "loading" && (
           <div className="pt-2" style={{ borderTop: `1px solid ${C.border}` }}>
             <a
               href="/"

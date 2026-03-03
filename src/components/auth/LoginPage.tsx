@@ -112,6 +112,7 @@ export function LoginPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Max Mustermann"
+                autoComplete="name"
                 className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
                 style={{
                   background: C.surface2,
@@ -134,6 +135,7 @@ export function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="name@beispiel.de"
+              autoComplete="email"
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
               style={{
                 background: C.surface2,
@@ -156,6 +158,7 @@ export function LoginPage() {
               required
               minLength={6}
               placeholder="Mindestens 6 Zeichen"
+              autoComplete={mode === "register" ? "new-password" : "current-password"}
               className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
               style={{
                 background: C.surface2,
