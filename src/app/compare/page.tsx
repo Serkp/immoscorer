@@ -8,6 +8,8 @@ import { Card } from "@/components/ui/Card";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { getAnalyses, deleteAnalysis } from "@/lib/db";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
+import { AIChat } from "@/components/AIChat";
+import type { AIChatContext } from "@/components/AIChat";
 
 /* ── Flat-column analysis row from Supabase ── */
 interface AnalysisRow {
@@ -288,6 +290,24 @@ export default function ComparePage() {
                   Analyse ansehen →
                 </button>
                 <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const ctrl = document.getElementById("ai-chat-controller") as unknown as { openWithQuestion?: (q: string, ctx?: AIChatContext) => void };
+                    if (ctrl?.openWithQuestion) {
+                      ctrl.openWithQuestion(
+                        `Analysiere das Objekt ${d.address} (Score: ${d.score}, Rendite: ${d.grossYield.toFixed(1)}%, Faktor: ${d.factor.toFixed(1)}x, Preis: ${d.price.toLocaleString("de-DE")} €)`,
+                        { type: "compare", data: cards.map(c => ({ address: c.address, score: c.score, grossYield: c.grossYield, factor: c.factor, price: c.price, area: c.area, year: c.year })) }
+                      );
+                    }
+                    document.getElementById("ai-chat-controller")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  }}
+                  className="w-full text-left text-[11px] font-semibold py-1 transition-all hover:opacity-80 flex items-center gap-1"
+                  style={{ color: C.cyan }}
+                >
+                  <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                  KI fragen
+                </button>
+                <button
                   onClick={(e) => { e.stopPropagation(); setDeleteConfirm(d.id); }}
                   className="w-full text-left text-[11px] py-0.5 transition-all hover:opacity-80"
                   style={{ color: C.dim }}
@@ -299,6 +319,19 @@ export default function ComparePage() {
           );
         })}
       </div>
+
+      {/* ── KI-Berater ── */}
+      <AIChat
+        context={{ type: "compare", data: cards.map(c => ({ address: c.address, score: c.score, grossYield: c.grossYield, factor: c.factor, price: c.price, area: c.area, year: c.year })) }}
+        suggestedQuestions={[
+          "Welches Objekt ist das beste Investment?",
+          "Vergleiche die Renditen der Objekte",
+          "Welches Objekt hat das beste Preis-Leistungs-Verhältnis?",
+          "Welche Risiken sehe ich bei den Objekten?",
+        ]}
+        title="KI-Vergleichsberater"
+        subtitle="Fragen Sie die KI zum Vergleich Ihrer Objekte."
+      />
     </div>
   );
 }

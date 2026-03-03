@@ -9,6 +9,8 @@ import { getPortfolioProperties, deletePortfolioProperty } from "@/lib/db";
 import { estimateMarketValue, monthsUntilFixedRateExpiry, getZinsbindungWarning, getStrategyRecommendations } from "@/lib/portfolio-utils";
 import { findCityData } from "@/data/german-cities";
 import { C } from "@/lib/theme";
+import { AIChat } from "@/components/AIChat";
+import type { AIChatContext } from "@/components/AIChat";
 
 const PT_LABEL: Record<string, string> = { etw: "ETW", efh: "EFH", mfh: "MFH", dhh: "DHH" };
 
@@ -417,20 +419,40 @@ export default function PortfolioPage() {
                     )}
 
                     {/* Actions */}
-                    <div className="px-4 py-3 mt-auto flex items-center justify-between" style={{ borderTop: `1px solid ${C.border}` }}>
-                      <button onClick={(e) => { e.stopPropagation(); setDetail(p); }} className="text-xs font-semibold transition-opacity hover:opacity-80" style={{ color: C.accent }}>
-                        Details ansehen →
-                      </button>
-                      {deleteConfirm === p.id ? (
-                        <div className="flex gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="text-[11px] font-bold" style={{ color: C.red }}>Ja</button>
-                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="text-[11px] font-bold" style={{ color: C.sub }}>Nein</button>
-                        </div>
-                      ) : (
-                        <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p.id); }} className="text-[11px] transition-opacity hover:opacity-80" style={{ color: C.dim }}>
-                          Entfernen
+                    <div className="px-4 py-3 mt-auto space-y-1" style={{ borderTop: `1px solid ${C.border}` }}>
+                      <div className="flex items-center justify-between">
+                        <button onClick={(e) => { e.stopPropagation(); setDetail(p); }} className="text-xs font-semibold transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+                          Details ansehen →
                         </button>
-                      )}
+                        {deleteConfirm === p.id ? (
+                          <div className="flex gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="text-[11px] font-bold" style={{ color: C.red }}>Ja</button>
+                            <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(null); }} className="text-[11px] font-bold" style={{ color: C.sub }}>Nein</button>
+                          </div>
+                        ) : (
+                          <button onClick={(e) => { e.stopPropagation(); setDeleteConfirm(p.id); }} className="text-[11px] transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+                            Entfernen
+                          </button>
+                        )}
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const ctrl = document.getElementById("ai-chat-controller") as unknown as { openWithQuestion?: (q: string, ctx?: AIChatContext) => void };
+                          if (ctrl?.openWithQuestion) {
+                            ctrl.openWithQuestion(
+                              `Analysiere mein Objekt ${p.address}, ${p.city} (Miete: ${rent} €, Cashflow: ${cf >= 0 ? "+" : ""}${cf} €, Marktwert: ${mv.toLocaleString("de-DE")} €)`,
+                              { type: "portfolio", data: properties.map(pp => ({ address: pp.address, city: pp.city, rent: getRent(pp), purchasePrice: pp.purchase_price, marketValue: getMarketValue(pp) })) }
+                            );
+                          }
+                          document.getElementById("ai-chat-controller")?.scrollIntoView({ behavior: "smooth", block: "center" });
+                        }}
+                        className="w-full text-left text-[11px] font-semibold py-0.5 transition-all hover:opacity-80 flex items-center gap-1"
+                        style={{ color: C.cyan }}
+                      >
+                        <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" /></svg>
+                        KI fragen
+                      </button>
                     </div>
                   </Card>
                 );
@@ -450,6 +472,21 @@ export default function PortfolioPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── KI-Berater ── */}
+      {properties.length > 0 && (
+        <AIChat
+          context={{ type: "portfolio", data: properties.map(p => ({ address: p.address, city: p.city, rent: getRent(p), purchasePrice: p.purchase_price, marketValue: getMarketValue(p), cashflow: getRent(p) - (p.monthly_payment || 0) - (p.house_money || 0) })) }}
+          suggestedQuestions={[
+            "Wie ist die Performance meines Portfolios?",
+            "Welche Optimierungen empfiehlst du?",
+            "Wann sollte ich über Anschlussfinanzierung nachdenken?",
+            "Wie kann ich meinen Cashflow verbessern?",
+          ]}
+          title="KI-Portfolioberater"
+          subtitle="Fragen Sie die KI zu Ihrem Immobilienportfolio."
+        />
       )}
 
       {/* ── Finanzierungs-Modal ── */}

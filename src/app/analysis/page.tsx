@@ -13,12 +13,12 @@ import { ScoreRing, MiniRing } from "@/components/ui/ScoreRing";
 
 import { AddressAutocomplete } from "@/components/AddressAutocomplete";
 import type { PlaceResult } from "@/components/AddressAutocomplete";
-import { AIAdvisor } from "@/components/AIAdvisor";
+import { AIChat } from "@/components/AIChat";
+import type { AIChatContext } from "@/components/AIChat";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { findCityData } from "@/data/german-cities";
 import { saveComparisonFlat, getAnalysisById } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
@@ -119,6 +119,29 @@ function getKaltmiete(f: FormData): number {
   if (f.rentType === "kalt") return rent;
   const nk = Number(f.warmNK);
   return nk > 0 ? rent - nk : rent * 0.70;
+}
+
+/** Generate dynamic AI chat suggestions based on analysis results */
+function getDynamicSuggestions(result: { totalScore: number; kpis: { grossYield: number; factor: number }; subscores: { key: string; value: number }[] }, form: FormData): string[] {
+  const suggestions: string[] = [];
+  const score = result.totalScore;
+  const grossYield = result.kpis.grossYield * 100;
+  const energy = result.subscores.find(s => s.key === "energy");
+  const risk = result.subscores.find(s => s.key === "risk");
+
+  if (score < 50) suggestions.push("Welche konkreten Risiken hat dieses Objekt?");
+  else if (score >= 70) suggestions.push("Was macht dieses Objekt zu einem guten Investment?");
+  else suggestions.push("Wie kann ich den Score dieses Objekts verbessern?");
+
+  if (grossYield < 4) suggestions.push("Ist die Rendite hier ausreichend?");
+  else suggestions.push("Wie kann ich die Rendite weiter optimieren?");
+
+  if (energy && energy.value < 50) suggestions.push("Welche energetischen Sanierungen lohnen sich?");
+  if (risk && risk.value < 50) suggestions.push("Wie kann ich das Risiko minimieren?");
+  if (form.propertyType === "mfh") suggestions.push("Was muss ich bei einem MFH besonders beachten?");
+  if (Number(form.year) < 1970) suggestions.push("Welche Sanierungen sind bei einem Altbau nötig?");
+
+  return suggestions.slice(0, 4);
 }
 
 /** Compute HG breakdown: nicht-umlagefähig and umlagefähig portions */
@@ -1726,20 +1749,12 @@ function AnalysisContent() {
 
             {/* ── KI-Investitionsberater ── */}
             {result && (() => {
-              const cd = findCityData(form.city || "");
-              const invS = result.subscores.find(s => s.key === "investment");
-              const renS = result.subscores.find(s => s.key === "rentability");
-              const rskS = result.subscores.find(s => s.key === "risk");
-              const finS = result.subscores.find(s => s.key === "financing");
-              const futS = result.subscores.find(s => s.key === "projection");
-              const engS = result.subscores.find(s => s.key === "energy");
-              return (
-                <AIAdvisor analysisData={{
+              const analysisContext: AIChatContext = {
+                type: "analysis",
+                data: {
                   address: `${form.street}, ${form.city}`,
                   city: form.city,
                   propertyType: form.propertyType || "etw",
-                  apartmentType: form.apartmentType || undefined,
-                  rooms: form.rooms || undefined,
                   area: Number(form.area),
                   buildingYear: Number(form.year),
                   energyClass: form.energyClass,
@@ -1747,21 +1762,21 @@ function AnalysisContent() {
                   monthlyRent: getKaltmiete(form),
                   managementFee: Number(form.hausgeld),
                   renovations: form.renovations,
-                  renovationCosts: result.renovationEstimate?.total,
-                  effectivePrice: result.renovationEstimate ? Number(form.price) + result.renovationEstimate.total : undefined,
                   totalScore: result.totalScore,
-                  investmentScore: invS?.value ?? 0,
-                  rentabilityScore: renS?.value ?? 0,
-                  riskScore: rskS?.value ?? 0,
-                  financingScore: finS?.value ?? 0,
-                  futureScore: futS?.value ?? 0,
-                  energyScore: engS?.value ?? 0,
                   grossYield: (result.kpis.grossYield * 100).toFixed(1),
                   netYield: (result.kpis.netYield * 100).toFixed(1),
                   priceFactor: result.kpis.factor.toFixed(1),
                   locationGrade: form.locationGrade,
-                  vacancyRate: cd?.vacancyRate,
-                }} />
+                  subscores: Object.fromEntries(result.subscores.map(s => [s.key, s.value])),
+                },
+              };
+              const suggestions = getDynamicSuggestions(result, form);
+              return (
+                <AIChat
+                  context={analysisContext}
+                  suggestedQuestions={suggestions}
+                  defaultOpen={false}
+                />
               );
             })()}
 

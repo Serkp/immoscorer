@@ -10,6 +10,7 @@ import { getSupabase } from "@/lib/supabase";
 import { getPortfolioProperties } from "@/lib/db";
 import { monthsUntilFixedRateExpiry, getZinsbindungWarning } from "@/lib/portfolio-utils";
 import { C } from "@/lib/theme";
+import { AIChat } from "@/components/AIChat";
 
 interface FinancingLead {
   id: string;
@@ -295,6 +296,19 @@ export default function FinancingPage() {
           </div>
         )}
       </div>
+
+      {/* ── KI-Berater ── */}
+      <AIChat
+        context={{ type: "general", data: null }}
+        suggestedQuestions={[
+          "Was ist ein Forward-Darlehen und wann lohnt es sich?",
+          "Wie finde ich den besten Zinssatz?",
+          "Sondertilgung vs. Anlage — was ist besser?",
+          "Wie wirkt sich die Tilgung auf die Gesamtkosten aus?",
+        ]}
+        title="KI-Finanzierungsberater"
+        subtitle="Fragen Sie die KI zu Finanzierung, Zinsen und Darlehen."
+      />
     </div>
   );
 }

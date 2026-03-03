@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/Card";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { C } from "@/lib/theme";
+import { AIChat } from "@/components/AIChat";
 import { KNOWLEDGE_BASE, getAllArticlesFlat } from "@/data/knowledge-base";
 
 export default function WissenPage() {
@@ -243,6 +244,19 @@ export default function WissenPage() {
           ))}
         </div>
       )}
+
+      {/* KI-Berater */}
+      <AIChat
+        context={{ type: "general", data: null }}
+        suggestedQuestions={[
+          "Was ist eine gute Bruttorendite?",
+          "Wie funktioniert die AfA bei Immobilien?",
+          "Was sind Kaufnebenkosten und wie hoch sind sie?",
+          "Immobilien-GmbH: Wann lohnt sie sich?",
+        ]}
+        title="KI-Wissensberater"
+        subtitle="Stellen Sie Fragen zu Immobilien-Investment, Steuern, Recht und mehr."
+      />
 
       {/* Stats */}
       <div
