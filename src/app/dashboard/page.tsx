@@ -125,7 +125,17 @@ export default function DashboardPage() {
   if (totalAnalyses === 0) {
     return (
       <div className="mx-auto max-w-[1100px] px-4 md:px-8 animate-fade-up">
-        <div className="flex flex-col items-center text-center pt-16 pb-8 gap-6">
+        {/* Dashboard Header — always visible */}
+        <div className="mb-8">
+          <h1 className="text-xl font-bold" style={{ color: C.text }}>
+            {getGreeting()}, {displayName}
+          </h1>
+          <p className="text-sm mt-1" style={{ color: C.sub }}>
+            Ihr Investment-Dashboard auf einen Blick.
+          </p>
+        </div>
+
+        <div className="flex flex-col items-center text-center pt-8 pb-8 gap-6">
           <AIOrb size={56} active />
           <div>
             <h2 className="text-2xl font-bold" style={{ color: C.text }}>
