@@ -113,7 +113,7 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     try {
       const supabase = getSupabase();
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/auth/reset-password",
+        redirectTo: window.location.origin + "/reset-password",
       });
       if (err) { setForgotError(err.message); setForgotLoading(false); return; }
       setForgotStep("sent");
@@ -302,14 +302,13 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               {/* Passwort vergessen — nur im Login-Modus */}
               {mode === "login" && (
                 <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => { setShowForgot(true); setError(null); }}
+                  <a
+                    href="/reset-password"
                     className="text-[11px] transition-opacity hover:opacity-80"
                     style={{ color: C.dim }}
                   >
                     Passwort vergessen?
-                  </button>
+                  </a>
                 </div>
               )}
 

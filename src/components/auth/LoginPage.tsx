@@ -167,6 +167,18 @@ export function LoginPage() {
             />
           </div>
 
+          {mode === "login" && (
+            <div className="flex justify-end">
+              <a
+                href="/reset-password"
+                className="text-[11px] transition-opacity hover:opacity-80"
+                style={{ color: C.dim }}
+              >
+                Passwort vergessen?
+              </a>
+            </div>
+          )}
+
           {mode === "register" && (
             <div className="space-y-1">
               <label className="flex items-start gap-2.5 cursor-pointer">

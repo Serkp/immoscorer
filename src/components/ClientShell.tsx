@@ -11,7 +11,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Public pages — no shell, no auth required
-  const publicPaths = ["/", "/auth/callback", "/auth/confirm", "/auth/reset-password", "/auth/error"];
+  const publicPaths = ["/", "/auth/callback", "/auth/confirm", "/auth/reset-password", "/auth/error", "/reset-password"];
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     return <>{children}</>;
   }
