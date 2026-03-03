@@ -193,7 +193,7 @@ export default function ComparePage() {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold" style={{ color: C.text }}>Immobilien-Vergleich</h1>
           <p className="text-sm mt-1" style={{ color: C.sub }}>
@@ -203,7 +203,7 @@ export default function ComparePage() {
         {cards.length < 4 && (
           <Link
             href="/analysis?new=1"
-            className="rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:opacity-90"
+            className="rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:opacity-90 text-center sm:text-left"
             style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
           >
             + Objekt hinzufügen
@@ -211,8 +211,8 @@ export default function ComparePage() {
         )}
       </div>
 
-      {/* Cards — flex wrap, 280px fixed width */}
-      <div className="flex flex-wrap gap-4">
+      {/* Cards — responsive grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((d) => {
           const isBestCard = cards.length > 1 && d.score === bestScore && d.score > 0;
           const ptLabel = PT_LABEL[d.propertyType] || "";
@@ -221,8 +221,7 @@ export default function ComparePage() {
           return (
             <Card
               key={d.id}
-              className="p-0 overflow-hidden cursor-pointer transition-all shrink-0"
-              style={{ width: 280 }}
+              className="p-0 overflow-hidden cursor-pointer transition-all"
               hover
               onClick={() => router.push(`/analysis?id=${d.id}`)}
             >

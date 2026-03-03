@@ -364,7 +364,7 @@ export default function PortfolioPage() {
               </div>
             )}
 
-            <div className="flex flex-wrap gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {properties.map((p) => {
                 const mv = getMarketValue(p);
                 const rent = getRent(p);
@@ -378,7 +378,7 @@ export default function PortfolioPage() {
                 const details = [ptLabel, p.rooms ? `${p.rooms} Zi.` : "", p.area ? `${p.area} m²` : ""].filter(Boolean).join(" · ");
 
                 return (
-                  <Card key={p.id} className="p-0 overflow-hidden shrink-0 flex flex-col" style={{ width: 280 }} hover onClick={() => setDetail(p)}>
+                  <Card key={p.id} className="p-0 overflow-hidden flex flex-col" hover onClick={() => setDetail(p)}>
                     {/* Header */}
                     <div className="px-4 pt-4 pb-2">
                       <p className="text-sm font-bold truncate" style={{ color: C.text }}>{p.address}</p>

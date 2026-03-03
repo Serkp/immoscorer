@@ -151,7 +151,7 @@ export default function FinancingPage() {
       </div>
 
       {/* ── Bereich 1: Finanzierungsanfrage ── */}
-      <Card className="p-6 space-y-4" glow>
+      <Card className="p-4 md:p-6 space-y-4" glow>
         <h2 className="text-base font-bold" style={{ color: C.text }}>Kostenlose Finanzierungsberatung</h2>
         <p className="text-sm" style={{ color: C.sub }}>
           Unsere Experten prüfen Ihre Finanzierungsmöglichkeiten — persönlich, unverbindlich, in 24 Stunden.

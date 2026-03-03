@@ -92,6 +92,42 @@ body {
   animation: countUp 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
 }
 
+/* ── Mobile slide-in animation ── */
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* ── Mobile responsive utilities ── */
+@media (max-width: 767px) {
+  html {
+    overflow-x: hidden;
+  }
+  body {
+    overflow-x: hidden;
+  }
+
+  /* Prevent iOS zoom on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+
+  /* Better touch targets */
+  button, a, [role="button"] {
+    min-height: 40px;
+  }
+
+  /* Tighter padding on mobile */
+  .mx-auto.max-w-6xl {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
 /* ── Input focus ── */
 input:focus,
 select:focus,

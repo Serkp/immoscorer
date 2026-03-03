@@ -125,6 +125,11 @@ export default function ResetPasswordPage() {
                   className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
                   style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
                 />
+                {confirm.length > 0 && (
+                  <p className="text-[11px] mt-1" style={{ color: password === confirm ? C.green : C.red }}>
+                    {password === confirm ? "Passwörter stimmen überein ✓" : "Passwörter stimmen nicht überein"}
+                  </p>
+                )}
               </div>
 
               <button

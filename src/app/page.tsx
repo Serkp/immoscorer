@@ -467,7 +467,7 @@ function LandingContent() {
           }}
         >
           <div
-            className="mx-auto flex items-center justify-between px-5 py-3"
+            className="mx-auto flex items-center justify-between px-4 md:px-5 py-3"
             style={{ maxWidth: 1100 }}
           >
             <div className="flex items-center gap-2.5">
@@ -492,7 +492,7 @@ function LandingContent() {
               </button>
               <button
                 onClick={() => setShowAuthModal(true)}
-                className="text-sm font-bold px-4 py-2 rounded-xl transition-all"
+                className="text-sm font-bold px-4 py-2.5 rounded-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
                   color: "#fff",
@@ -507,7 +507,7 @@ function LandingContent() {
         {/* ════════════════════════════════════
             2. HERO
            ════════════════════════════════════ */}
-        <section className="px-5 pt-16 pb-20 md:pt-24 md:pb-28">
+        <section className="px-4 md:px-5 pt-12 pb-16 md:pt-24 md:pb-28">
           <style>{`@media(min-width:768px){.hero-grid{grid-template-columns:1fr 440px!important}}`}</style>
           <div
             className="hero-grid mx-auto grid gap-10 md:gap-12 items-start w-full"
@@ -1107,7 +1107,7 @@ function LandingContent() {
         <section className="px-5 py-20 md:py-28">
           <FadeIn>
             <div
-              className="mx-auto rounded-2xl p-10 md:p-14 text-center"
+              className="mx-auto rounded-2xl p-6 md:p-14 text-center"
               style={{
                 maxWidth: 680,
                 background: C.surface,

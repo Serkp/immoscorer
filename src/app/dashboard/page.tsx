@@ -168,7 +168,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
         <StatCard label="ANALYSEN" value={String(totalAnalyses)} sub="gesamt" color={C.text} />
         <StatCard label="IM VERGLEICH" value={String(compareCount)} sub="Objekte" color={C.text} />
         <StatCard
@@ -279,17 +279,17 @@ export default function DashboardPage() {
 function StatCard({ label, value, sub, color }: { label: string; value: string; sub: string; color: string }) {
   return (
     <div
-      className="rounded-2xl p-6"
+      className="rounded-2xl p-4 md:p-6"
       style={{
         background: C.surface2,
         border: `1px solid rgba(255,255,255,0.08)`,
         minWidth: 0,
       }}
     >
-      <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: C.dim, letterSpacing: "1px" }}>
+      <p className="text-[10px] md:text-xs font-semibold uppercase tracking-widest" style={{ color: C.dim, letterSpacing: "1px" }}>
         {label}
       </p>
-      <p className="text-4xl font-bold mt-2 leading-none lg:text-4xl max-sm:text-[28px]" style={{ color }}>
+      <p className="text-[28px] md:text-4xl font-bold mt-2 leading-none" style={{ color }}>
         {value}
       </p>
       <p className="text-xs mt-2" style={{ color: C.dim }}>{sub}</p>
@@ -306,7 +306,7 @@ function ActionCard({ onClick, icon, title, subtitle }: {
 }) {
   return (
     <div
-      className="rounded-2xl p-7 cursor-pointer transition-all duration-200"
+      className="rounded-2xl p-5 md:p-7 cursor-pointer transition-all duration-200"
       style={{
         background: C.surface2,
         border: `1px solid rgba(255,255,255,0.08)`,

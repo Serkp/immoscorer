@@ -10,8 +10,9 @@ import { C } from "@/lib/theme";
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Landing page & password reset — no shell, no auth required
-  if (pathname === "/" || pathname === "/auth/reset-password") {
+  // Public pages — no shell, no auth required
+  const publicPaths = ["/", "/auth/callback", "/auth/reset-password", "/auth/error"];
+  if (publicPaths.some((p) => pathname.startsWith(p))) {
     return <>{children}</>;
   }
 
@@ -20,7 +21,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <AuthGuard>
         <Navbar />
-        <main className="mx-auto max-w-6xl px-5 pb-16 pt-6">{children}</main>
+        <main className="mx-auto max-w-6xl px-4 md:px-5 pb-16 pt-4 md:pt-6">{children}</main>
       </AuthGuard>
     </AuthProvider>
   );

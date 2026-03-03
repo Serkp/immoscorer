@@ -246,7 +246,7 @@ export default function WissenPage() {
 
       {/* Stats */}
       <div
-        className="flex flex-wrap justify-center gap-8 py-6 rounded-xl"
+        className="flex flex-wrap justify-center gap-6 md:gap-8 py-6 rounded-xl"
         style={{ background: C.surface }}
       >
         <Stat value={KNOWLEDGE_BASE.length.toString()} label="Kategorien" />
