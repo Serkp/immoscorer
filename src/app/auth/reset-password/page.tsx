@@ -12,20 +12,34 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [ready, setReady] = useState(false);
+  const [timedOut, setTimedOut] = useState(false);
 
-  // Supabase processes the token fragment on load via onAuthStateChange
   useEffect(() => {
     const supabase = getSupabase();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") {
+
+    // Listen for PASSWORD_RECOVERY event (Supabase processes hash fragment)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY" || event === "SIGNED_IN") {
         setReady(true);
       }
     });
-    // Also check if session already exists (token already processed)
+
+    // Also check if a session already exists (callback already set cookies)
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) setReady(true);
     });
-    return () => subscription.unsubscribe();
+
+    // Timeout after 5 seconds — if no session arrived, show recovery option
+    const timer = setTimeout(() => {
+      setTimedOut(true);
+    }, 5000);
+
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timer);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -67,7 +81,11 @@ export default function ResetPasswordPage() {
     >
       <div
         className="w-full max-w-[420px] rounded-2xl p-6 space-y-6"
-        style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: `0 0 60px ${C.accentDim}` }}
+        style={{
+          background: C.bg2,
+          border: `1px solid ${C.border}`,
+          boxShadow: `0 0 60px ${C.accentDim}`,
+        }}
       >
         <div className="flex flex-col items-center gap-3 text-center">
           <AIOrb size={40} active />
@@ -78,27 +96,93 @@ export default function ResetPasswordPage() {
 
         {success ? (
           <div className="space-y-4 text-center">
-            <div className="rounded-xl px-4 py-4 space-y-1" style={{ background: C.greenDim, border: `1px solid ${C.greenBorder}` }}>
-              <p className="text-sm font-semibold" style={{ color: C.green }}>Passwort geändert!</p>
-              <p className="text-xs" style={{ color: C.green }}>Sie werden weitergeleitet…</p>
+            <div
+              className="rounded-xl px-4 py-4 space-y-1"
+              style={{
+                background: C.greenDim,
+                border: `1px solid ${C.greenBorder}`,
+              }}
+            >
+              <p className="text-sm font-semibold" style={{ color: C.green }}>
+                Passwort geändert!
+              </p>
+              <p className="text-xs" style={{ color: C.green }}>
+                Sie werden weitergeleitet…
+              </p>
             </div>
           </div>
         ) : !ready ? (
           <div className="flex flex-col items-center gap-3 py-6">
-            <AIOrb size={32} active />
-            <p className="text-sm" style={{ color: C.sub }}>Token wird verarbeitet…</p>
+            {!timedOut ? (
+              <>
+                <AIOrb size={32} active />
+                <p className="text-sm" style={{ color: C.sub }}>
+                  Session wird geladen…
+                </p>
+              </>
+            ) : (
+              <div className="space-y-4 text-center w-full">
+                <div
+                  className="rounded-xl px-4 py-3"
+                  style={{
+                    background: C.amberDim,
+                    border: `1px solid ${C.amberBorder}`,
+                  }}
+                >
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: C.amber }}
+                  >
+                    Keine aktive Session gefunden.
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: C.amber }}>
+                    Der Link ist möglicherweise abgelaufen. Bitte fordern Sie
+                    einen neuen an.
+                  </p>
+                </div>
+                <a
+                  href="/auth/error?message=otp_expired"
+                  className="block w-full rounded-xl py-3 text-sm font-bold text-center transition-all hover:opacity-90"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+                    color: "#fff",
+                  }}
+                >
+                  Neuen Link anfordern
+                </a>
+                <a
+                  href="/"
+                  className="block text-xs transition-opacity hover:opacity-80"
+                  style={{ color: C.dim }}
+                >
+                  Zur Anmeldung →
+                </a>
+              </div>
+            )}
           </div>
         ) : (
           <>
             {error && (
-              <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}>
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{
+                  background: C.redDim,
+                  color: C.red,
+                  border: "1px solid rgba(248,113,113,0.2)",
+                }}
+              >
                 {error}
               </div>
             )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-medium" style={{ color: C.sub }}>Neues Passwort</label>
+                <label
+                  className="text-xs font-medium"
+                  style={{ color: C.sub }}
+                >
+                  Neues Passwort
+                </label>
                 <input
                   type="password"
                   value={password}
@@ -107,13 +191,36 @@ export default function ResetPasswordPage() {
                   minLength={8}
                   placeholder="Mindestens 8 Zeichen"
                   autoComplete="new-password"
-                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-                  style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
+                  style={{
+                    background: C.surface2,
+                    border: `1px solid ${C.border}`,
+                    color: C.text,
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.accent;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                  }}
                 />
+                {password.length > 0 && password.length < 8 && (
+                  <p
+                    className="text-[11px] mt-1"
+                    style={{ color: C.amber }}
+                  >
+                    Noch {8 - password.length} Zeichen nötig
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-xs font-medium" style={{ color: C.sub }}>Passwort bestätigen</label>
+                <label
+                  className="text-xs font-medium"
+                  style={{ color: C.sub }}
+                >
+                  Passwort bestätigen
+                </label>
                 <input
                   type="password"
                   value={confirm}
@@ -122,23 +229,43 @@ export default function ResetPasswordPage() {
                   minLength={8}
                   placeholder="Passwort wiederholen"
                   autoComplete="new-password"
-                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
-                  style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+                  className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all"
+                  style={{
+                    background: C.surface2,
+                    border: `1px solid ${C.border}`,
+                    color: C.text,
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = C.accent;
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = C.border;
+                  }}
                 />
                 {confirm.length > 0 && (
-                  <p className="text-[11px] mt-1" style={{ color: password === confirm ? C.green : C.red }}>
-                    {password === confirm ? "Passwörter stimmen überein ✓" : "Passwörter stimmen nicht überein"}
+                  <p
+                    className="text-[11px] mt-1"
+                    style={{
+                      color: password === confirm ? C.green : C.red,
+                    }}
+                  >
+                    {password === confirm
+                      ? "Passwörter stimmen überein"
+                      : "Passwörter stimmen nicht überein"}
                   </p>
                 )}
               </div>
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || password.length < 8 || password !== confirm}
                 className="w-full rounded-xl py-3 text-sm font-bold transition-all disabled:opacity-50"
-                style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
+                style={{
+                  background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+                  color: "#fff",
+                }}
               >
-                {loading ? "..." : "Passwort speichern"}
+                {loading ? "Wird gespeichert..." : "Passwort speichern"}
               </button>
             </form>
           </>

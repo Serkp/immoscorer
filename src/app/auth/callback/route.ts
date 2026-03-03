@@ -1,51 +1,124 @@
-import { createClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get("code");
-  const type = requestUrl.searchParams.get("type");
   const token_hash = requestUrl.searchParams.get("token_hash");
-  const next = requestUrl.searchParams.get("next") || "/dashboard";
+  const type = requestUrl.searchParams.get("type");
+  const error = requestUrl.searchParams.get("error");
+  const error_description = requestUrl.searchParams.get("error_description");
+
+  // ── Error from Supabase ──
+  if (error) {
+    console.error("Auth callback error:", error, error_description);
+    return NextResponse.redirect(
+      new URL(
+        "/auth/error?message=" +
+          encodeURIComponent(error_description || error),
+        requestUrl.origin,
+      ),
+    );
+  }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.redirect(new URL("/auth/error", requestUrl.origin));
+    return NextResponse.redirect(
+      new URL("/auth/error?message=server_config_error", requestUrl.origin),
+    );
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  // Create Supabase server client with cookie handling
+  const cookieStore = cookies();
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
+      },
+    },
+  });
 
-  /* ── PKCE flow: exchange code for session ── */
+  // ── PKCE Flow: exchange code for session ──
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
-    if (!error) {
-      if (type === "recovery") {
+    try {
+      const { error: exchangeError } =
+        await supabase.auth.exchangeCodeForSession(code);
+      if (exchangeError) {
+        console.error("Code exchange error:", exchangeError);
         return NextResponse.redirect(
-          new URL("/auth/reset-password", requestUrl.origin)
+          new URL(
+            "/auth/error?message=" +
+              encodeURIComponent(exchangeError.message),
+            requestUrl.origin,
+          ),
         );
       }
-      return NextResponse.redirect(new URL(next, requestUrl.origin));
+      // Redirect based on flow type
+      if (type === "recovery") {
+        return NextResponse.redirect(
+          new URL("/auth/reset-password", requestUrl.origin),
+        );
+      }
+      if (type === "signup") {
+        return NextResponse.redirect(
+          new URL("/dashboard", requestUrl.origin),
+        );
+      }
+      return NextResponse.redirect(
+        new URL("/dashboard", requestUrl.origin),
+      );
+    } catch (e) {
+      console.error("Callback exception:", e);
+      return NextResponse.redirect(
+        new URL("/auth/error?message=exchange_failed", requestUrl.origin),
+      );
     }
   }
 
-  /* ── Token hash flow (older Supabase format) ── */
+  // ── Token Hash Flow (older Supabase format / magic link) ──
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash,
-      type: type as "recovery" | "email" | "signup",
-    });
-    if (!error) {
-      if (type === "recovery") {
+    try {
+      const { error: verifyError } = await supabase.auth.verifyOtp({
+        token_hash,
+        type: type as "recovery" | "email" | "signup",
+      });
+      if (verifyError) {
+        console.error("OTP verify error:", verifyError);
         return NextResponse.redirect(
-          new URL("/auth/reset-password", requestUrl.origin)
+          new URL(
+            "/auth/error?message=" +
+              encodeURIComponent(verifyError.message),
+            requestUrl.origin,
+          ),
         );
       }
-      return NextResponse.redirect(new URL("/dashboard", requestUrl.origin));
+      if (type === "recovery") {
+        return NextResponse.redirect(
+          new URL("/auth/reset-password", requestUrl.origin),
+        );
+      }
+      return NextResponse.redirect(
+        new URL("/dashboard", requestUrl.origin),
+      );
+    } catch (e) {
+      console.error("Token verification exception:", e);
+      return NextResponse.redirect(
+        new URL("/auth/error?message=verification_failed", requestUrl.origin),
+      );
     }
   }
 
-  /* ── Fallback: something went wrong ── */
-  return NextResponse.redirect(new URL("/auth/error", requestUrl.origin));
+  // ── Nothing provided ──
+  return NextResponse.redirect(
+    new URL("/auth/error?message=invalid_request", requestUrl.origin),
+  );
 }
