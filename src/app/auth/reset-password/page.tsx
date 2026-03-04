@@ -65,9 +65,12 @@ export default function ResetPasswordPage() {
         return;
       }
       setSuccess(true);
+      // User ausloggen damit er sich mit neuem Passwort anmelden muss
+      await supabase.auth.signOut();
+      // Nach 3 Sekunden zur Startseite mit Erfolgsmeldung
       setTimeout(() => {
-        window.location.href = "/dashboard";
-      }, 2000);
+        window.location.href = "/?reset=success";
+      }, 3000);
     } catch {
       setError("Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.");
       setLoading(false);
@@ -104,10 +107,10 @@ export default function ResetPasswordPage() {
               }}
             >
               <p className="text-sm font-semibold" style={{ color: C.green }}>
-                Passwort geändert!
+                Passwort erfolgreich geändert!
               </p>
               <p className="text-xs" style={{ color: C.green }}>
-                Sie werden weitergeleitet…
+                Sie werden zur Anmeldung weitergeleitet…
               </p>
             </div>
           </div>

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react"
 import { createClient } from "@supabase/supabase-js"
-import { useRouter } from "next/navigation"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +9,6 @@ const supabase = createClient(
 )
 
 export default function ResetPasswordPage() {
-  const router = useRouter()
   const [phase, setPhase] = useState<"loading"|"request"|"set-password"|"done">("loading")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -51,7 +49,12 @@ export default function ResetPasswordPage() {
     const { error } = await supabase.auth.updateUser({ password })
     if (error) return setError(error.message)
     setPhase("done")
-    setTimeout(() => router.push("/analysis"), 2000)
+    // User ausloggen damit er sich mit neuem Passwort anmelden muss
+    await supabase.auth.signOut()
+    // Nach 3 Sekunden zur Startseite mit Erfolgsmeldung
+    setTimeout(() => {
+      window.location.href = '/?reset=success'
+    }, 3000)
   }
 
   const inputStyle: React.CSSProperties = {
@@ -78,7 +81,7 @@ export default function ResetPasswordPage() {
 
   if (phase === "loading") return <div style={wrap}><p style={{color:"rgba(255,255,255,0.4)"}}>Wird geladen...</p></div>
 
-  if (phase === "done") return <div style={wrap}><p style={{color:"#34D399",fontSize:18}}>✓ Passwort gespeichert. Weiterleitung...</p></div>
+  if (phase === "done") return <div style={wrap}><div style={card}><p style={{color:"#34D399",fontSize:16,textAlign:"center"}}>✓ Passwort erfolgreich geändert!</p><p style={{color:"rgba(255,255,255,0.5)",fontSize:13,textAlign:"center",marginTop:8}}>Sie werden zur Anmeldung weitergeleitet...</p></div></div>
 
   return (
     <div style={wrap}>

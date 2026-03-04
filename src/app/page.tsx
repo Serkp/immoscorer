@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef, type ReactNode } from "react";
+import { useState, useEffect, useRef, Suspense, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
@@ -397,13 +398,24 @@ function MiniRechner({ onCta }: { onCta: () => void }) {
 export default function LandingPage() {
   return (
     <AuthProvider>
-      <LandingContent />
+      <Suspense>
+        <LandingContent />
+      </Suspense>
     </AuthProvider>
   );
 }
 
 function LandingContent() {
-  const [showAuthModal, setShowAuthModal] = useState(false);
+  const searchParams = useSearchParams();
+  const resetSuccess = searchParams.get("reset") === "success";
+  const [showAuthModal, setShowAuthModal] = useState(resetSuccess);
+
+  // Auto-open modal when ?reset=success is in URL
+  useEffect(() => {
+    if (resetSuccess) {
+      setShowAuthModal(true);
+    }
+  }, [resetSuccess]);
 
   function handleCta() {
     setShowAuthModal(true);
@@ -416,6 +428,7 @@ function LandingContent() {
         open={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         onSuccess={() => setShowAuthModal(false)}
+        resetSuccess={resetSuccess}
       />
       {/* ── Ambient Background ── */}
       <div

@@ -12,10 +12,12 @@ interface AuthModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  resetSuccess?: boolean;
 }
 
-export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
-  const [mode, setMode] = useState<Mode>("register");
+export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalProps) {
+  const [mode, setMode] = useState<Mode>(resetSuccess ? "login" : "register");
+  const [resetBanner, setResetBanner] = useState(!!resetSuccess);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -33,8 +35,19 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
       setShowForgot(false);
       setForgotStep("form");
       setForgotError(null);
+      if (resetSuccess) {
+        setMode("login");
+        setResetBanner(true);
+      }
     }
-  }, [open]);
+  }, [open, resetSuccess]);
+
+  // Auto-dismiss reset success banner after 10 seconds
+  useEffect(() => {
+    if (!resetBanner) return;
+    const t = setTimeout(() => setResetBanner(false), 10000);
+    return () => clearTimeout(t);
+  }, [resetBanner]);
 
   if (!open) return null;
 
@@ -242,6 +255,16 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
                 </button>
               ))}
             </div>
+
+            {/* Reset success banner */}
+            {resetBanner && (
+              <div
+                className="rounded-xl px-4 py-3 text-sm"
+                style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+              >
+                Passwort wurde geändert. Bitte melden Sie sich mit Ihrem neuen Passwort an.
+              </div>
+            )}
 
             {/* Error */}
             {error && (
