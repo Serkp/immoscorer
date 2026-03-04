@@ -75,6 +75,7 @@ export default function PortfolioPage() {
   const { user } = useAuth();
   const [properties, setProperties] = useState<PP[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [detail, setDetail] = useState<PP | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -90,8 +91,12 @@ export default function PortfolioPage() {
     (async () => {
       try {
         const data = await getPortfolioProperties(user.id);
+        console.log('[Portfolio] data loaded:', data?.length, 'items, user_id:', user.id);
         setProperties((data || []) as PP[]);
-      } catch { /* silent */ }
+      } catch (err) {
+        console.error('[Portfolio] load error:', err);
+        setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');
+      }
       finally { setLoading(false); }
     })();
   }, [user]);
@@ -141,6 +146,22 @@ export default function PortfolioPage() {
   }
 
   if (loading) return <div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>;
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-[1200px] space-y-6">
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Dashboard
+        </Link>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold">Mein Portfolio</h1>
+        </div>
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          Fehler beim Laden der Daten: {loadError}
+        </div>
+      </div>
+    );
+  }
 
   /* ══════════════════════════════════════
      DETAIL VIEW

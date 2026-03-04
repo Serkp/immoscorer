@@ -87,6 +87,7 @@ export default function DashboardPage() {
   const [allAnalyses, setAllAnalyses] = useState<AnalysisRow[]>([]);
   const [compareCount, setCompareCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "";
 
@@ -98,9 +99,13 @@ export default function DashboardPage() {
           getAnalyses(user!.id),
           getAnalyses(user!.id, { status: "saved", saveType: "comparison" }),
         ]);
+        console.log('[Dashboard] data loaded:', all?.length, 'analyses,', compare?.length, 'comparisons, user_id:', user!.id);
         setAllAnalyses((all || []) as AnalysisRow[]);
         setCompareCount((compare || []).length);
-      } catch { /* silent */ }
+      } catch (err) {
+        console.error('[Dashboard] load error:', err);
+        setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');
+      }
       finally { setLoading(false); }
     }
     load();
@@ -110,6 +115,25 @@ export default function DashboardPage() {
     return (
       <div className="flex items-center justify-center py-32">
         <AIOrb size={48} active />
+      </div>
+    );
+  }
+
+  // Error banner
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-[1100px] px-4 md:px-8 animate-fade-up">
+        <div className="mb-8">
+          <h1 className="text-xl font-bold" style={{ color: C.text }}>
+            {getGreeting()}, {displayName}
+          </h1>
+          <p className="text-sm mt-1" style={{ color: C.sub }}>
+            Ihr Investment-Dashboard auf einen Blick.
+          </p>
+        </div>
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          Fehler beim Laden der Daten: {loadError}
+        </div>
       </div>
     );
   }

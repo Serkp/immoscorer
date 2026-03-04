@@ -80,6 +80,7 @@ export default function ComparePage() {
   const { user } = useAuth();
   const [analyses, setAnalyses] = useState<AnalysisRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
@@ -88,8 +89,12 @@ export default function ComparePage() {
     async function load() {
       try {
         const data = await getAnalyses(user!.id, { status: "saved", saveType: "comparison" });
+        console.log('[Compare] data loaded:', data?.length, 'items, user_id:', user!.id);
         setAnalyses(((data || []) as AnalysisRow[]).slice(0, 4));
-      } catch { /* silent */ }
+      } catch (err) {
+        console.error('[Compare] load error:', err);
+        setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');
+      }
       finally { setLoading(false); }
     }
     load();
@@ -110,6 +115,23 @@ export default function ComparePage() {
 
   if (loading) {
     return <div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>;
+  }
+
+  /* ── Error State ── */
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-[1100px]">
+        <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs mb-4 transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Dashboard
+        </Link>
+        <div className="mb-8">
+          <h1 className="text-xl font-bold" style={{ color: C.text }}>Immobilien-Vergleich</h1>
+        </div>
+        <div className="rounded-xl px-4 py-3 text-sm" style={{ color: '#ef4444', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          Fehler beim Laden der Daten: {loadError}
+        </div>
+      </div>
+    );
   }
 
   /* ── Empty State ── */
