@@ -38,6 +38,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
+
+      // Ensure profile exists on sign-in (FK constraint for saves)
+      if (_event === "SIGNED_IN" && s?.user) {
+        supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", s.user.id)
+          .single()
+          .then(({ data }) => {
+            if (!data) {
+              supabase.from("profiles").upsert(
+                { id: s.user!.id, email: s.user!.email, updated_at: new Date().toISOString() },
+                { onConflict: "id" }
+              ).then(({ error }) => {
+                if (error) console.error("[AuthProvider] profile create error:", error.message);
+                else console.log("[AuthProvider] profile ensured for:", s.user!.id);
+              });
+            }
+          });
+      }
     });
 
     return () => subscription.unsubscribe();

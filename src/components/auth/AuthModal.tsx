@@ -103,6 +103,13 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
           setLoading(false);
           return;
         }
+        // Ensure profile exists (FK constraint for saves)
+        if (data?.user) {
+          await supabase.from("profiles").upsert(
+            { id: data.user.id, email: data.user.email, updated_at: new Date().toISOString() },
+            { onConflict: "id" }
+          );
+        }
       }
 
       // Auth success — hard redirect to /dashboard so auth cookie is picked up

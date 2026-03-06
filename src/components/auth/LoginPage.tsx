@@ -37,11 +37,18 @@ export function LoginPage() {
             .eq("id", data.user.id);
         }
       } else {
-        const { error: err } = await getSupabase().auth.signInWithPassword({
+        const { data: loginData, error: err } = await getSupabase().auth.signInWithPassword({
           email,
           password,
         });
         if (err) throw err;
+        // Ensure profile exists (FK constraint for saves)
+        if (loginData?.user) {
+          await getSupabase().from("profiles").upsert(
+            { id: loginData.user.id, email: loginData.user.email, updated_at: new Date().toISOString() },
+            { onConflict: "id" }
+          );
+        }
       }
     } catch (err: unknown) {
       const msg =

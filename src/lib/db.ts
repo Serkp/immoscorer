@@ -1,5 +1,31 @@
 import { getSupabase } from "./supabase";
 
+// ── Profile helper — ensures FK constraint is satisfied before inserts ──
+
+export async function ensureProfileExists(userId: string, email?: string) {
+  const supabase = getSupabase();
+  const { data } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("id", userId)
+    .single();
+  if (!data) {
+    const { error } = await supabase.from("profiles").upsert(
+      {
+        id: userId,
+        email: email || null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (error) {
+      console.error("[ensureProfileExists] upsert error:", error.message);
+    } else {
+      console.log("[ensureProfileExists] profile created for:", userId);
+    }
+  }
+}
+
 // ── Properties (legacy — used by analysis save) ──
 
 export async function savePropertyDB(userId: string, data: {
@@ -63,6 +89,9 @@ export async function saveAnalysisDB(
   result: Record<string, unknown>,
   opts?: { status?: string; saveType?: string }
 ) {
+  // Ensure profile exists (FK constraint)
+  await ensureProfileExists(userId);
+
   const { data, error } = await getSupabase()
     .from("analyses")
     .insert({
@@ -124,6 +153,9 @@ export async function saveComparisonFlat(
     inputs: inp,
     result: scores,
   };
+  // Ensure profile exists (FK constraint)
+  await ensureProfileExists(userId);
+
   console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(fullRow, null, 2));
   const { data, error } = await getSupabase()
     .from("analyses")
@@ -256,6 +288,9 @@ export async function savePortfolioProperty(userId: string, data: {
     unitCount: data.unitCount, totalRent: data.totalRent, unitsRented: data.unitsRented,
     estimatedMarketValue: data.estimatedMarketValue,
   };
+
+  // Ensure profile exists (FK constraint)
+  await ensureProfileExists(userId);
 
   // Full row with all columns
   const fullRow: Record<string, unknown> = {

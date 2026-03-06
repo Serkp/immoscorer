@@ -97,7 +97,7 @@ export default function DashboardPage() {
       try {
         const [all, compare] = await Promise.all([
           getAnalyses(user!.id),
-          getAnalyses(user!.id, { status: "saved", saveType: "comparison" }),
+          getAnalyses(user!.id, { saveType: "comparison" }),
         ]);
         console.log('[Dashboard] data loaded:', all?.length, 'analyses,', compare?.length, 'comparisons, user_id:', user!.id);
         setAllAnalyses((all || []) as AnalysisRow[]);
