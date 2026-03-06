@@ -95,13 +95,10 @@ export default function DashboardPage() {
     if (!user) { setLoading(false); return; }
     async function load() {
       try {
-        const [all, compare] = await Promise.all([
-          getAnalyses(user!.id),
-          getAnalyses(user!.id, { saveType: "comparison" }),
-        ]);
-        console.log('[Dashboard] data loaded:', all?.length, 'analyses,', compare?.length, 'comparisons, user_id:', user!.id);
+        const all = await getAnalyses(user!.id);
+        console.log('[Dashboard] data loaded:', all?.length, 'analyses, user_id:', user!.id);
         setAllAnalyses((all || []) as AnalysisRow[]);
-        setCompareCount((compare || []).length);
+        setCompareCount((all || []).length);
       } catch (err) {
         console.error('[Dashboard] load error:', err);
         setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');

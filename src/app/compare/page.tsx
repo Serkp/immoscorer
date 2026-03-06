@@ -88,7 +88,7 @@ export default function ComparePage() {
     if (!user) { setLoading(false); return; }
     async function load() {
       try {
-        const data = await getAnalyses(user!.id, { saveType: "comparison" });
+        const data = await getAnalyses(user!.id);
         console.log('[Compare] data loaded:', data?.length, 'items, user_id:', user!.id);
         setAnalyses(((data || []) as AnalysisRow[]).slice(0, 4));
       } catch (err) {

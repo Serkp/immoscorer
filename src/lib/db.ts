@@ -8,18 +8,25 @@ export async function ensureProfileExists(userId: string, email?: string) {
     .from("profiles")
     .select("id")
     .eq("id", userId)
-    .single();
+    .maybeSingle();
   if (!data) {
-    const { error } = await supabase.from("profiles").upsert(
-      {
-        id: userId,
-        email: email || null,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "id" }
-    );
+    // Try insert first, fall back to upsert
+    const row = {
+      id: userId,
+      email: email || "",
+      updated_at: new Date().toISOString(),
+    };
+    const { error } = await supabase.from("profiles").insert(row);
     if (error) {
-      console.error("[ensureProfileExists] upsert error:", error.message);
+      // Insert failed (maybe duplicate) — try upsert
+      const { error: err2 } = await supabase
+        .from("profiles")
+        .upsert(row, { onConflict: "id" });
+      if (err2) {
+        console.error("[ensureProfileExists] all attempts failed:", err2.message);
+      } else {
+        console.log("[ensureProfileExists] profile upserted for:", userId);
+      }
     } else {
       console.log("[ensureProfileExists] profile created for:", userId);
     }
