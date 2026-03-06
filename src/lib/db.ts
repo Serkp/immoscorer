@@ -95,8 +95,8 @@ export async function saveComparisonFlat(
     grossYield: number; netYield: number; priceFactor: number;
   },
 ) {
-  // ONLY safe columns that are guaranteed to exist in the analyses table
-  const row = {
+  // Full row with all flat columns
+  const fullRow = {
     user_id: userId,
     address: inp.address,
     city: inp.city,
@@ -124,24 +124,54 @@ export async function saveComparisonFlat(
     inputs: inp,
     result: scores,
   };
-  console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(row, null, 2));
+  console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(fullRow, null, 2));
   const { data, error } = await getSupabase()
     .from("analyses")
-    .insert(row)
+    .insert(fullRow)
     .select()
     .single();
-  if (error) {
-    console.error("[saveComparisonFlat] Supabase error:", {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint,
-    });
-    const dbError = new Error(`DB: ${error.message} (code: ${error.code})`);
-    (dbError as unknown as Record<string, unknown>).supabaseError = error;
-    throw dbError;
+
+  if (!error) return data;
+
+  // Full insert failed — try fallback with only essential columns
+  console.warn("[saveComparisonFlat] full insert failed:", {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+  });
+
+  // Minimal fallback: only columns guaranteed to exist + JSONB
+  const minimalRow = {
+    user_id: userId,
+    inputs: { ...inp, ...scores, savedAt: new Date().toISOString() },
+    result: scores,
+    save_type: "comparison",
+    status: "saved",
+  };
+
+  console.log("[saveComparisonFlat] trying minimal fallback...");
+  const { data: data2, error: err2 } = await getSupabase()
+    .from("analyses")
+    .insert(minimalRow)
+    .select()
+    .single();
+
+  if (!err2) {
+    console.log("[saveComparisonFlat] minimal fallback succeeded");
+    return data2;
   }
-  return data;
+
+  console.error("[saveComparisonFlat] all insert attempts failed:", {
+    message: err2.message,
+    code: err2.code,
+    details: err2.details,
+    hint: err2.hint,
+  });
+
+  const dbError = new Error(`Speichern fehlgeschlagen: ${error.message} (code: ${error.code})`);
+  (dbError as unknown as Record<string, unknown>).supabaseError = error;
+  throw dbError;
 }
 
 export async function getAnalysisById(id: string, userId: string) {
@@ -163,7 +193,12 @@ export async function getAnalyses(userId: string, filters?: { status?: string; s
   if (filters?.status) query = query.eq("status", filters.status);
   if (filters?.saveType) query = query.eq("save_type", filters.saveType);
   const { data, error } = await query.order("created_at", { ascending: false });
-  if (error) throw error;
+  if (error) {
+    console.error("[getAnalyses] error:", { message: error.message, code: error.code, details: error.details });
+    // Table doesn't exist or column errors — return empty instead of crashing
+    if (error.code === "42P01" || error.code === "42703") return [];
+    throw error;
+  }
   return data;
 }
 
@@ -347,7 +382,12 @@ export async function getPortfolioProperties(userId: string) {
     .select("*")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
-  if (error) throw error;
+  if (error) {
+    console.error("[getPortfolioProperties] error:", { message: error.message, code: error.code, details: error.details });
+    // Table doesn't exist or column errors — return empty instead of crashing
+    if (error.code === "42P01" || error.code === "42703") return [];
+    throw error;
+  }
   return data;
 }
 
