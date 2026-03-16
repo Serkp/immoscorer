@@ -19,7 +19,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useSubscription } from "@/hooks/useSubscription";
 import { C, scoreColor, scoreLabel } from "@/lib/theme";
 import { computeScore } from "@/lib/scoring";
-import { saveComparisonFlat, getAnalysisById } from "@/lib/db";
+import { getAnalysisById } from "@/lib/db";
 import type { PropertyInput, ScoringResult } from "@/lib/scoring";
 
 const ENERGY_OPTIONS = ["A+", "A", "B", "C", "D", "E", "F", "G", "H"] as const;
@@ -512,7 +512,13 @@ function AnalysisContent() {
   }
 
   async function handleSaveCompare() {
-    if (!result || !user || saving || saveChoice !== "none") return;
+    if (!result) return;
+    if (!user) {
+      setToast({ text: "Bitte melden Sie sich an, um zu speichern.", type: "neutral" });
+      setTimeout(() => setToast(null), 5000);
+      return;
+    }
+    if (saving || saveChoice !== "none") return;
     setSaving(true);
     try {
       const price = Number(form.price);
@@ -524,9 +530,33 @@ function AnalysisContent() {
 
       const getSub = (key: string) => result.subscores.find((s) => s.key === key)?.value || 0;
 
-      await saveComparisonFlat(
-        user.id,
-        {
+      const payload = {
+        address: `${form.street}, ${form.city}`,
+        city: form.city,
+        purchase_price: price,
+        monthly_rent: rent,
+        area_sqm: area,
+        building_year: Number(form.year),
+        energy_class: form.energyClass,
+        location_grade: form.locationGrade || "B",
+        management_fee: hausgeld,
+        renovation_count: form.renovations.length,
+        property_type: form.propertyType || null,
+        apartment_type: form.apartmentType || null,
+        rooms: form.rooms ? Number(form.rooms) : null,
+        estimated_utilities: form.estimatedUtilities ? Number(form.estimatedUtilities) : null,
+        unit_count: form.unitCount ? Number(form.unitCount) : null,
+        total_score: result.totalScore,
+        investment_score: getSub("investment"),
+        rentability_score: getSub("rentability"),
+        risk_score: getSub("risk"),
+        financing_score: getSub("financing"),
+        future_score: getSub("projection"),
+        energy_score: getSub("energy"),
+        gross_yield: price > 0 ? ((rent * 12) / price) * 100 : 0,
+        net_yield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
+        price_factor: rent > 0 ? price / (rent * 12) : 0,
+        inputs: {
           address: `${form.street}, ${form.city}`,
           city: form.city,
           purchasePrice: price,
@@ -537,13 +567,8 @@ function AnalysisContent() {
           locationGrade: form.locationGrade || "B",
           managementFee: hausgeld,
           renovationCount: form.renovations.length,
-          propertyType: form.propertyType || undefined,
-          apartmentType: form.apartmentType || undefined,
-          rooms: form.rooms ? Number(form.rooms) : undefined,
-          estimatedUtilities: form.estimatedUtilities ? Number(form.estimatedUtilities) : undefined,
-          unitCount: form.unitCount ? Number(form.unitCount) : undefined,
         },
-        {
+        result: {
           totalScore: result.totalScore,
           investmentScore: getSub("investment"),
           rentabilityScore: getSub("rentability"),
@@ -555,14 +580,43 @@ function AnalysisContent() {
           netYield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
           priceFactor: rent > 0 ? price / (rent * 12) : 0,
         },
-      );
+      };
+
+      // Get the session token for the API route
+      const { getSupabase } = await import("@/lib/supabase");
+      const { data: sessionData } = await getSupabase().auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      if (!token) {
+        setToast({ text: "Sitzung abgelaufen. Bitte melden Sie sich erneut an.", type: "neutral" });
+        setTimeout(() => setToast(null), 5000);
+        setSaving(false);
+        return;
+      }
+
+      const res = await fetch("/api/save-analysis", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        throw new Error(json.error || `Server error ${res.status}`);
+      }
+
+      console.log("[handleSaveCompare] saved via API:", json.data?.id, json.fallback ? "(fallback)" : "");
       setSaveChoice("compare");
       setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[handleSaveCompare] error:", err);
-      setToast({ text: `Fehler: ${msg}`, type: "neutral" });
+      setToast({ text: `Fehler beim Speichern: ${msg}`, type: "neutral" });
       setTimeout(() => setToast(null), 8000);
     } finally {
       setSaving(false);
