@@ -513,14 +513,24 @@ function AnalysisContent() {
 
   async function handleSaveCompare() {
     if (!result) return;
-    if (!user) {
-      setToast({ text: "Bitte melden Sie sich an, um zu speichern.", type: "neutral" });
-      setTimeout(() => setToast(null), 5000);
-      return;
-    }
     if (saving || saveChoice !== "none") return;
     setSaving(true);
     try {
+      // Always get fresh user from Supabase (context may be stale)
+      const { getSupabase } = await import("@/lib/supabase");
+      const supabase = getSupabase();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const { data: userData } = await supabase.auth.getUser();
+      const currentUser = userData?.user;
+      const token = sessionData?.session?.access_token;
+
+      if (!currentUser || !token) {
+        setToast({ text: "Bitte melden Sie sich an, um zu speichern.", type: "neutral" });
+        setTimeout(() => setToast(null), 5000);
+        setSaving(false);
+        return;
+      }
+
       const price = Number(form.price);
       const rent = getKaltmiete(form);
       const hausgeld = Number(form.hausgeld);
@@ -581,18 +591,6 @@ function AnalysisContent() {
           priceFactor: rent > 0 ? price / (rent * 12) : 0,
         },
       };
-
-      // Get the session token for the API route
-      const { getSupabase } = await import("@/lib/supabase");
-      const { data: sessionData } = await getSupabase().auth.getSession();
-      const token = sessionData?.session?.access_token;
-
-      if (!token) {
-        setToast({ text: "Sitzung abgelaufen. Bitte melden Sie sich erneut an.", type: "neutral" });
-        setTimeout(() => setToast(null), 5000);
-        setSaving(false);
-        return;
-      }
 
       const res = await fetch("/api/save-analysis", {
         method: "POST",
