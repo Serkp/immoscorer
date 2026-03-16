@@ -30,14 +30,27 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [waited, setWaited] = useState(false);
+
+  // Give auth a moment to resolve before showing login modal
+  useEffect(() => {
+    if (!loading && !user && !waited) {
+      const t = setTimeout(() => setWaited(true), 1500);
+      return () => clearTimeout(t);
+    }
+    if (user) {
+      setShowAuthModal(false);
+      setWaited(false);
+    }
+  }, [loading, user, waited]);
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (waited && !user) {
       setShowAuthModal(true);
     }
-  }, [loading, user]);
+  }, [waited, user]);
 
-  if (loading) {
+  if (loading || (!user && !waited)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-sm" style={{ color: C.sub }}>Laden...</div>
@@ -45,7 +58,7 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!user) {
+  if (!user && waited) {
     return (
       <AuthModal
         open={showAuthModal}

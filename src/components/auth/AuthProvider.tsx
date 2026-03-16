@@ -25,16 +25,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const supabase = getSupabase();
+    let mounted = true;
 
-    // Use getUser() — validates token server-side, reads from cookie
-    supabase.auth.getUser().then(({ data: { user: u } }) => {
-      setUser(u ?? null);
-      setLoading(false);
-    });
+    // Initialize: try getSession first (fast, from memory/cookie),
+    // then validate with getUser (server-side check)
+    async function init() {
+      try {
+        // 1. getSession — fast, reads from local storage / cookie
+        const { data: { session: s } } = await supabase.auth.getSession();
+        if (mounted && s?.user) {
+          console.log("[AuthProvider] session found:", s.user.id);
+          setSession(s);
+          setUser(s.user);
+          setLoading(false);
+        }
+
+        // 2. getUser — validates token server-side (slower but authoritative)
+        const { data: { user: u } } = await supabase.auth.getUser();
+        if (mounted) {
+          if (u) {
+            console.log("[AuthProvider] getUser confirmed:", u.id);
+            setUser(u);
+          } else if (!s?.user) {
+            // Only clear user if getSession also had no user
+            console.log("[AuthProvider] no session, no user");
+            setUser(null);
+          }
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error("[AuthProvider] init error:", err);
+        if (mounted) setLoading(false);
+      }
+    }
+    init();
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, s) => {
+      if (!mounted) return;
+      console.log("[AuthProvider] auth event:", _event, s?.user?.id);
       setSession(s);
       setUser(s?.user ?? null);
       setLoading(false);
@@ -45,7 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from("profiles")
           .select("id")
           .eq("id", s.user.id)
-          .single()
+          .maybeSingle()
           .then(({ data }) => {
             if (!data) {
               supabase.from("profiles").upsert(
@@ -60,7 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function signOut() {
