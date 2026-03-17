@@ -8,26 +8,17 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 
-type NavItem =
-  | { href: string; label: string; children?: undefined }
-  | { label: string; href?: undefined; children: { href: string; label: string }[] };
-
-const NAV: NavItem[] = [
+const NAV = [
   { href: "/dashboard", label: "Dashboard" },
-  {
-    label: "Analyse",
-    children: [
-      { href: "/analysis", label: "Immobilien-Analyse" },
-      { href: "/expose-analyse", label: "Exposé-Analyse" },
-    ],
-  },
+  { href: "/analysis", label: "Analyse" },
+  { href: "/expose-analyse", label: "Exposé-Analyse" },
   { href: "/portfolio", label: "Portfolio" },
   { href: "/compare", label: "Vergleich" },
   { href: "/financing", label: "Finanzierung" },
   { href: "/strategies", label: "Strategien" },
   { href: "/wissen", label: "Wissen" },
   { href: "/ki-berater", label: "KI-Berater" },
-];
+] as const;
 
 export function Navbar() {
   const pathname = usePathname();
@@ -35,9 +26,7 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [analyseOpen, setAnalyseOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const analyseRef = useRef<HTMLDivElement>(null);
 
   const displayName =
     user?.user_metadata?.full_name || user?.email || "";
@@ -48,14 +37,11 @@ export function Navbar() {
     .map((s: string) => s[0]?.toUpperCase())
     .join("");
 
-  // Close desktop dropdowns on outside click
+  // Close desktop dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
-      }
-      if (analyseRef.current && !analyseRef.current.contains(e.target as Node)) {
-        setAnalyseOpen(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
@@ -95,55 +81,9 @@ export function Navbar() {
           {/* Desktop nav items */}
           <div className="hidden md:flex items-center gap-1 overflow-x-auto">
             {NAV.map((n) => {
-              if (n.children) {
-                const childActive = n.children.some(
-                  (c) => pathname === c.href || pathname.startsWith(c.href),
-                );
-                return (
-                  <div key={n.label} className="relative" ref={analyseRef}>
-                    <button
-                      onClick={() => setAnalyseOpen((o) => !o)}
-                      className="relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap flex items-center gap-1"
-                      style={{
-                        background: childActive || analyseOpen ? C.surface3 : "transparent",
-                        color: childActive || analyseOpen ? C.text : C.sub,
-                      }}
-                    >
-                      {n.label}
-                      <svg width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                        style={{ transform: analyseOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
-                    {analyseOpen && (
-                      <div
-                        className="absolute left-0 top-full mt-1.5 w-52 rounded-xl py-1 shadow-xl"
-                        style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", zIndex: 60 }}
-                      >
-                        {n.children.map((child) => {
-                          const cActive = pathname === child.href || pathname.startsWith(child.href);
-                          return (
-                            <Link
-                              key={child.href}
-                              href={child.href}
-                              onClick={() => setAnalyseOpen(false)}
-                              className="flex items-center gap-2.5 px-4 py-2.5 text-[13px] font-medium transition-all rounded-lg"
-                              style={{ color: cActive ? C.text : C.sub, background: cActive ? C.surface2 : "transparent" }}
-                              onMouseEnter={(e) => { if (!cActive) { e.currentTarget.style.background = C.surface; e.currentTarget.style.color = C.text; } }}
-                              onMouseLeave={(e) => { if (!cActive) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.sub; } }}
-                            >
-                              {child.label}
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
-              const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href!));
+              const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href));
               return (
-                <Link key={n.href} href={n.href!}
+                <Link key={n.href} href={n.href}
                   className="relative rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap"
                   style={{ background: active ? C.surface3 : "transparent", color: active ? C.text : C.sub }}>
                   {n.label}
@@ -271,38 +211,11 @@ export function Navbar() {
             {/* Nav links */}
             <div className="flex-1 overflow-y-auto py-3">
               {NAV.map((n) => {
-                if (n.children) {
-                  return (
-                    <div key={n.label}>
-                      <div className="px-5 pt-3 pb-1 text-[11px] font-semibold uppercase tracking-wider" style={{ color: C.dim }}>
-                        {n.label}
-                      </div>
-                      {n.children.map((child) => {
-                        const cActive = pathname === child.href || pathname.startsWith(child.href);
-                        return (
-                          <Link
-                            key={child.href}
-                            href={child.href}
-                            className="flex items-center h-12 px-5 pl-8 text-[15px] font-medium transition-colors"
-                            style={{
-                              color: cActive ? C.text : C.sub,
-                              background: cActive ? C.surface2 : "transparent",
-                              borderLeft: cActive ? `3px solid ${C.accent}` : "3px solid transparent",
-                            }}
-                            onClick={() => setMobileOpen(false)}
-                          >
-                            {child.label}
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-                const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href!));
+                const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href));
                 return (
                   <Link
                     key={n.href}
-                    href={n.href!}
+                    href={n.href}
                     className="flex items-center h-12 px-5 text-[15px] font-medium transition-colors"
                     style={{
                       color: active ? C.text : C.sub,
