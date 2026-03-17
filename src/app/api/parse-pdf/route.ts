@@ -1,6 +1,16 @@
 import { NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
 
+// Allow up to 10 MB uploads
+export const config = {
+  api: {
+    bodyParser: false,
+    responseLimit: false,
+  },
+};
+
+export const maxDuration = 30;
+
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();

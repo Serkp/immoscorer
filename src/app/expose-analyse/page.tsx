@@ -181,10 +181,16 @@ export default function ExposeAnalysePage() {
       const formData = new FormData();
       formData.append("file", file);
 
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+
       const res = await fetch("/api/parse-pdf", {
         method: "POST",
         body: formData,
+        signal: controller.signal,
       });
+
+      clearTimeout(timeout);
 
       const data = await res.json();
 
@@ -197,8 +203,14 @@ export default function ExposeAnalysePage() {
       }
 
       setExposeText(data.text);
-    } catch {
-      setError("Verbindungsfehler beim PDF-Upload.");
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Zeitüberschreitung beim PDF-Upload. Bitte versuchen Sie es erneut.");
+      } else if (!navigator.onLine) {
+        setError("Keine Internetverbindung. Bitte prüfen Sie Ihre Verbindung.");
+      } else {
+        setError("Fehler beim PDF-Upload. Bitte versuchen Sie es erneut.");
+      }
       setPdfFile(null);
       setPdfFileName("");
     } finally {
