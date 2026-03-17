@@ -1,6 +1,47 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
+async function callOpenAI(systemPrompt: string, messages: { role: string; content: string }[]): Promise<string> {
+  const client = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+    timeout: 15000,
+  });
+  const chatMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemPrompt },
+    ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+  ];
+  const response = await client.chat.completions.create({
+    model: "gpt-4o",
+    max_tokens: 1200,
+    messages: chatMessages,
+  });
+  return response.choices[0]?.message?.content || "";
+}
+
+async function callAnthropic(systemPrompt: string, messages: { role: string; content: string }[]): Promise<string> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": process.env.ANTHROPIC_API_KEY!,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 1200,
+      system: systemPrompt,
+      messages: messages.map((m) => ({ role: m.role, content: m.content })),
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Anthropic API error: ${res.status}`);
+  }
+  const data = await res.json();
+  return data.content?.[0]?.type === "text" ? data.content[0].text : "";
+}
+
 export async function POST(request: Request) {
   try {
     const { question, context, conversationHistory } = await request.json();
@@ -9,16 +50,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Frage erforderlich." }, { status: 400 });
     }
 
-    if (!process.env.OPENAI_API_KEY) {
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
       return NextResponse.json({
         answer: getOfflineAdvice(question, context),
       });
     }
-
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-      timeout: 60000,
-    });
 
     let contextBlock = "";
 
@@ -112,25 +148,46 @@ ANTWORTREGELN:
 11. Sei professionell aber verständlich. Erkläre Fachbegriffe wenn nötig.
 12. Bei Vergleichs-Kontext: Vergleiche die Objekte direkt miteinander und gib eine klare Empfehlung.`;
 
-    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-      { role: "system", content: systemPrompt },
-    ];
+    const msgs: { role: string; content: string }[] = [];
 
     if (conversationHistory?.length > 0) {
       for (const msg of conversationHistory.slice(-8)) {
-        messages.push({ role: msg.role, content: msg.content });
+        msgs.push({ role: msg.role, content: msg.content });
       }
     }
 
-    messages.push({ role: "user", content: question });
+    msgs.push({ role: "user", content: question });
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
-      max_tokens: 1200,
-      messages: messages,
-    });
+    let answer = "";
 
-    const answer = response.choices[0]?.message?.content || "";
+    // Try OpenAI first, fall back to Anthropic, then offline
+    try {
+      if (process.env.OPENAI_API_KEY) {
+        answer = await callOpenAI(systemPrompt, msgs);
+      } else if (process.env.ANTHROPIC_API_KEY) {
+        answer = await callAnthropic(systemPrompt, msgs);
+      }
+    } catch (apiError) {
+      console.warn("[ai-advisor] Primary API failed:", (apiError as Error).message);
+      // Try the other provider
+      try {
+        if (process.env.OPENAI_API_KEY && process.env.ANTHROPIC_API_KEY) {
+          answer = process.env.OPENAI_API_KEY
+            ? await callAnthropic(systemPrompt, msgs)
+            : await callOpenAI(systemPrompt, msgs);
+        } else {
+          throw apiError;
+        }
+      } catch (fallbackError) {
+        console.warn("[ai-advisor] Fallback also failed:", (fallbackError as Error).message);
+        answer = getOfflineAdvice(question, context);
+      }
+    }
+
+    if (!answer) {
+      answer = getOfflineAdvice(question, context);
+    }
+
     return NextResponse.json({ answer });
   } catch (error: unknown) {
     console.error("[ai-advisor] error:", error);
@@ -150,10 +207,13 @@ ANTWORTREGELN:
       );
     }
 
+    const errMsg = error instanceof Error ? error.message : "Unbekannter Fehler";
+    const isCredits = errMsg.includes("credit balance");
     return NextResponse.json(
       {
-        answer:
-          "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+        answer: isCredits
+          ? "Der KI-Berater ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut."
+          : "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
         error: true,
       },
       { status: 500 },
