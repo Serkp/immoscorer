@@ -44,7 +44,9 @@ async function callAnthropic(systemPrompt: string, messages: { role: string; con
 
 export async function POST(request: Request) {
   try {
-    const { question, context, conversationHistory } = await request.json();
+    const body = await request.json();
+    const { question, conversationHistory } = body;
+    const context = body.context || (body.analysisData ? { type: "analysis", data: body.analysisData } : undefined);
 
     if (!question) {
       return NextResponse.json({ error: "Frage erforderlich." }, { status: 400 });
@@ -207,17 +209,9 @@ ANTWORTREGELN:
       );
     }
 
-    const errMsg = error instanceof Error ? error.message : "Unbekannter Fehler";
-    const isCredits = errMsg.includes("credit balance");
-    return NextResponse.json(
-      {
-        answer: isCredits
-          ? "Der KI-Berater ist vorübergehend nicht verfügbar. Bitte versuchen Sie es später erneut."
-          : "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
-        error: true,
-      },
-      { status: 500 },
-    );
+    return NextResponse.json({
+      answer: "Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.",
+    });
   }
 }
 

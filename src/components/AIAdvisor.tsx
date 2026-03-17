@@ -249,12 +249,17 @@ export function AIAdvisor({ analysisData }: { analysisData: AIAdvisorData }) {
         }
 
         const data = await res.json();
-        if (data.error) {
-          setError(data.error);
+        if (data.answer) {
+          setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: data.answer },
+          ]);
+        } else if (data.error) {
+          setError(typeof data.error === "string" ? data.error : "Ein Fehler ist aufgetreten.");
         } else {
           setMessages((prev) => [
             ...prev,
-            { role: "assistant", content: data.answer || "Keine Antwort erhalten." },
+            { role: "assistant", content: "Keine Antwort erhalten." },
           ]);
         }
       } catch (err: unknown) {
