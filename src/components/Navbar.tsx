@@ -16,6 +16,7 @@ const NAV = [
   { href: "/financing", label: "Finanzierung" },
   { href: "/strategies", label: "Strategien" },
   { href: "/wissen", label: "Wissen" },
+  { href: "/ki-berater", label: "KI-Berater" },
 ] as const;
 
 export function Navbar() {
