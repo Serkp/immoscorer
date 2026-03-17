@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -9,14 +9,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Frage erforderlich." }, { status: 400 });
     }
 
-    if (!process.env.ANTHROPIC_API_KEY) {
+    if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({
         answer: getOfflineAdvice(question, context),
       });
     }
 
-    const client = new Anthropic({
-      apiKey: process.env.ANTHROPIC_API_KEY,
+    const client = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
       timeout: 60000,
     });
 
@@ -112,7 +112,9 @@ ANTWORTREGELN:
 11. Sei professionell aber verständlich. Erkläre Fachbegriffe wenn nötig.
 12. Bei Vergleichs-Kontext: Vergleiche die Objekte direkt miteinander und gib eine klare Empfehlung.`;
 
-    const messages: { role: "user" | "assistant"; content: string }[] = [];
+    const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+    ];
 
     if (conversationHistory?.length > 0) {
       for (const msg of conversationHistory.slice(-8)) {
@@ -122,15 +124,13 @@ ANTWORTREGELN:
 
     messages.push({ role: "user", content: question });
 
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
       max_tokens: 1200,
-      system: systemPrompt,
       messages: messages,
     });
 
-    const answer =
-      response.content[0].type === "text" ? response.content[0].text : "";
+    const answer = response.choices[0]?.message?.content || "";
     return NextResponse.json({ answer });
   } catch (error: unknown) {
     console.error("[ai-advisor] error:", error);
