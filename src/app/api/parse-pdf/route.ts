@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { PDFParse } from "pdf-parse";
 
 export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
@@ -23,11 +24,22 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-    const textResult = await pdf.getText();
-    await pdf.destroy();
+    let text = "";
+    let pages = 0;
 
-    const text = textResult.text?.trim();
+    try {
+      const pdf = new PDFParse({ data: new Uint8Array(buffer) });
+      const textResult = await pdf.getText();
+      text = textResult.text?.trim() || "";
+      pages = textResult.total || 0;
+      await pdf.destroy();
+    } catch (parseError) {
+      console.error("[parse-pdf] PDF parsing failed:", parseError);
+      return NextResponse.json(
+        { error: "Die PDF konnte nicht gelesen werden. Bitte stellen Sie sicher, dass es sich um eine gültige PDF-Datei handelt." },
+        { status: 422 },
+      );
+    }
 
     if (!text || text.length < 20) {
       return NextResponse.json(
@@ -36,10 +48,7 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      text,
-      pages: textResult.total,
-    });
+    return NextResponse.json({ text, pages });
   } catch (error) {
     console.error("[parse-pdf] error:", error);
     return NextResponse.json(
