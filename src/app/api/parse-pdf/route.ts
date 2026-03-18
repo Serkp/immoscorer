@@ -1,8 +1,24 @@
 import { NextResponse } from "next/server";
-import { PDFParse } from "pdf-parse";
+import { createRequire } from "node:module";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
+
+// Use createRequire to bypass webpack bundling — pdfjs-dist doesn't work with webpack
+const nodeRequire = createRequire(import.meta.url);
+
+async function parsePdfBuffer(data: Uint8Array): Promise<{ text: string; pages: number }> {
+  const { PDFParse } = nodeRequire("pdf-parse");
+
+  const pdf = new PDFParse({ data });
+  try {
+    const result = await pdf.getText();
+    const text = (result.text || "").replace(/\n-- \d+ of \d+ --$/gm, "").trim();
+    return { text, pages: result.total || 0 };
+  } finally {
+    await pdf.destroy().catch(() => {});
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -22,17 +38,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Die Datei darf maximal 10 MB groß sein." }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const arrayBuf = await file.arrayBuffer();
 
     let text = "";
     let pages = 0;
 
     try {
-      const pdf = new PDFParse({ data: new Uint8Array(buffer) });
-      const textResult = await pdf.getText();
-      text = textResult.text?.trim() || "";
-      pages = textResult.total || 0;
-      await pdf.destroy();
+      const result = await parsePdfBuffer(new Uint8Array(arrayBuf));
+      text = result.text;
+      pages = result.pages;
     } catch (parseError) {
       console.error("[parse-pdf] PDF parsing failed:", parseError);
       return NextResponse.json(
