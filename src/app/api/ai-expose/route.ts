@@ -1,6 +1,8 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
 
+export const maxDuration = 60;
+
 async function callOpenAI(systemPrompt: string, userMessage: string): Promise<string> {
   const client = new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,

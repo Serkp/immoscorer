@@ -257,25 +257,49 @@ export default function ExposeAnalysePage() {
     }, 2500);
 
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 90000);
+
       const res = await fetch("/api/ai-expose", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ exposeText }),
+        signal: controller.signal,
       });
 
+      clearTimeout(timeout);
       clearInterval(stepInterval);
-      const data = await res.json();
 
-      if (!res.ok || data.error) {
-        setError(data.error || "Ein Fehler ist aufgetreten.");
+      // Try to parse JSON — if the server returned HTML (e.g. timeout page), this will throw
+      let data: Record<string, unknown>;
+      try {
+        data = await res.json();
+      } catch {
+        setError(
+          res.status === 504
+            ? "Die Analyse hat zu lange gedauert. Bitte versuchen Sie es erneut."
+            : `Server-Fehler (${res.status}). Bitte versuchen Sie es erneut.`,
+        );
         setLoading(false);
         return;
       }
 
-      setResult(data.analysis);
-    } catch {
+      if (!res.ok || data.error) {
+        setError((data.error as string) || "Ein Fehler ist aufgetreten.");
+        setLoading(false);
+        return;
+      }
+
+      setResult(data.analysis as AnalysisResult);
+    } catch (err) {
       clearInterval(stepInterval);
-      setError("Verbindungsfehler. Bitte versuchen Sie es erneut.");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("Zeitüberschreitung bei der Analyse. Bitte versuchen Sie es erneut.");
+      } else if (!navigator.onLine) {
+        setError("Keine Internetverbindung. Bitte prüfen Sie Ihre Verbindung.");
+      } else {
+        setError("Verbindungsfehler bei der Analyse. Bitte versuchen Sie es erneut.");
+      }
     } finally {
       setLoading(false);
     }
