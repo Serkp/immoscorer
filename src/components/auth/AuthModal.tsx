@@ -90,6 +90,13 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
               email,
               newsletter_opt_in: newsletter,
             }, { onConflict: "id" });
+
+          // Send welcome email (non-blocking)
+          fetch("/api/email/welcome", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ userId: data.user.id }),
+          }).catch((err) => console.error("[AuthModal] Welcome email request failed:", err));
         }
       } else {
         console.log("[AuthModal] Login attempt:", email);
