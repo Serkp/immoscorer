@@ -1,0 +1,24 @@
+[project]
+id = "immoscorer"
+
+[auth]
+site_url = "https://immoscorer.de"
+additional_redirect_urls = ["https://immoscorer.vercel.app", "http://localhost:3000"]
+
+[auth.email]
+enable_confirmations = true
+enable_signup = true
+double_confirm_changes = true
+max_frequency = "60s"
+
+[auth.email.template.confirmation]
+subject = "E-Mail bestätigen – ImmoScorer"
+content_path = "./templates/confirm-signup.html"
+
+[auth.email.template.recovery]
+subject = "Passwort zurücksetzen – ImmoScorer"
+content_path = "./templates/reset-password.html"
+
+[auth.email.template.magic_link]
+subject = "Ihr Login-Link – ImmoScorer"
+content_path = "./templates/confirm-signup.html"
