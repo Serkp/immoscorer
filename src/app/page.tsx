@@ -895,21 +895,23 @@ function LandingContent() {
                 className="text-2xl md:text-3xl font-extrabold mb-4"
                 style={{ color: C.text }}
               >
-                Starten Sie kostenlos. Upgraden Sie wenn&apos;s passt.
+                Kostenlos starten. Sofort loslegen.
               </h2>
               <p className="text-sm md:text-base" style={{ color: C.sub }}>
                 Keine Kreditkarte. Keine Verpflichtung. Kein Risiko.
               </p>
             </FadeIn>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="flex justify-center">
               {/* FREE */}
               <FadeIn>
                 <div
-                  className="rounded-2xl p-6 md:p-7 h-full flex flex-col"
+                  className="rounded-2xl p-6 md:p-7 flex flex-col"
                   style={{
                     background: C.surface,
                     border: `1px solid ${C.border}`,
+                    maxWidth: 360,
+                    width: "100%",
                   }}
                 >
                   <p
@@ -944,23 +946,6 @@ function LandingContent() {
                         </span>
                       </div>
                     ))}
-                    {[
-                      "Detaillierte Teilscores",
-                      "Verhandlungsguide",
-                      "Finanzierungsanfrage",
-                      "Portfolio & Vergleich",
-                      "Strategie-Finder",
-                    ].map((f) => (
-                      <div key={f} className="flex items-center gap-2.5">
-                        {Icons.x}
-                        <span
-                          className="text-sm line-through"
-                          style={{ color: C.dim }}
-                        >
-                          {f}
-                        </span>
-                      </div>
-                    ))}
                   </div>
 
                   <button
@@ -976,89 +961,6 @@ function LandingContent() {
                   >
                     Kostenlos starten
                   </button>
-                </div>
-              </FadeIn>
-
-              {/* PRO */}
-              <FadeIn delay={0.05}>
-                <div
-                  className="rounded-2xl p-6 md:p-7 h-full flex flex-col relative"
-                  style={{
-                    background: C.surface,
-                    border: `1px solid rgba(124,106,255,0.3)`,
-                    boxShadow: `0 0 40px ${C.accentDim}, 0 0 80px rgba(124,106,255,0.04)`,
-                  }}
-                >
-                  {/* Badge */}
-                  <div
-                    className="absolute -top-3.5 left-1/2 -translate-x-1/2 text-[11px] font-bold px-4 py-1 rounded-full whitespace-nowrap"
-                    style={{
-                      background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
-                      color: "#fff",
-                    }}
-                  >
-                    Beliebteste Wahl
-                  </div>
-
-                  <p
-                    className="text-xs font-bold uppercase tracking-widest mb-4"
-                    style={{ color: C.accent }}
-                  >
-                    Pro
-                  </p>
-                  <div className="flex items-baseline gap-1 mb-2">
-                    <span
-                      className="text-4xl font-extrabold"
-                      style={{ color: C.text }}
-                    >
-                      9,99 €
-                    </span>
-                    <span className="text-sm" style={{ color: C.sub }}>
-                      /Monat
-                    </span>
-                  </div>
-                  <p className="text-xs mb-6" style={{ color: C.sub }}>
-                    Monatlich kündbar. Alle Funktionen. Kein Limit.
-                  </p>
-
-                  <div className="space-y-3 mb-8 flex-1">
-                    {[
-                      "Alles aus Free",
-                      "6 Teilscores mit Begründung",
-                      "Verhandlungsguide",
-                      "Finanzierungsanfrage",
-                      "Portfolio & Favoriten",
-                      "Immobilien-Vergleich",
-                      "Strategie-Finder",
-                      "Wissensbereich",
-                      "Trends & Marktdaten (bald)",
-                      "KI-Exposé-Analyse (bald)",
-                    ].map((f) => (
-                      <div key={f} className="flex items-center gap-2.5">
-                        {Icons.check(C.accent)}
-                        <span className="text-sm" style={{ color: C.text }}>
-                          {f}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-
-                  <button
-                    onClick={handleCta}
-                    className="block w-full text-center text-sm font-bold py-3 rounded-xl transition-all"
-                    style={{
-                      background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
-                      color: "#fff",
-                    }}
-                  >
-                    Jetzt Pro freischalten
-                  </button>
-                  <p
-                    className="text-center text-[11px] mt-2.5"
-                    style={{ color: C.dim }}
-                  >
-                    Weniger als ein Kaffee pro Tag
-                  </p>
                 </div>
               </FadeIn>
             </div>
