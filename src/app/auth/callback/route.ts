@@ -2,7 +2,6 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
-import { sendWelcomeEmail } from "@/lib/email/send-welcome";
 
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
@@ -70,18 +69,6 @@ export async function GET(request: NextRequest) {
         );
       }
       if (type === "signup") {
-        // Send welcome email (non-blocking, don't fail the redirect)
-        try {
-          const { data: { user } } = await supabase.auth.getUser();
-          if (user?.email) {
-            sendWelcomeEmail({
-              email: user.email,
-              name: user.user_metadata?.full_name as string | undefined,
-            }).catch((err) => console.error("[Auth Callback] Welcome email failed:", err));
-          }
-        } catch (e) {
-          console.error("[Auth Callback] Could not send welcome email:", e);
-        }
         return NextResponse.redirect(
           new URL("/dashboard", requestUrl.origin),
         );
