@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ClientShell } from "@/components/ClientShell";
+import { ThemeProvider } from "@/lib/ThemeContext";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,8 +12,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="de">
-      <body className="bg-[#08090E] text-[#EDEEF2] antialiased">
-        <ClientShell>{children}</ClientShell>
+      <body className="antialiased">
+        <ThemeProvider>
+          <ClientShell>{children}</ClientShell>
+        </ThemeProvider>
       </body>
     </html>
   );
