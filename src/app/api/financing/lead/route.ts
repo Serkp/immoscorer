@@ -31,6 +31,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Fehler beim Speichern" }, { status: 500 });
     }
 
+    // Benachrichtigungen senden (non-blocking)
+    const origin = req.nextUrl.origin;
+    fetch(`${origin}/api/notify-lead`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        firstName: firstName || '',
+        lastName: lastName || '',
+        email: email || '',
+        phone: phone || '',
+        message: message || '',
+        propertyAddress: propertyAddress || '',
+        purchasePrice: purchasePrice || '',
+        monthlyRent: monthlyRent || '',
+        score: score || ''
+      })
+    }).catch(err => console.error('Notification failed:', err));
+
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
