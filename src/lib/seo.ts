@@ -5,8 +5,8 @@
 
 export const SITE = {
   name: "ImmoScorer",
-  /** Kanonische Domain ohne abschließenden Slash. */
-  url: "https://immoscorer.de",
+  /** Kanonische Domain ohne abschließenden Slash (Live-Host: apex leitet auf www um). */
+  url: "https://www.immoscorer.de",
   /** Standardtitel der Startseite. */
   defaultTitle:
     "ImmoScorer — Immobilien als Kapitalanlage bewerten mit KI-Score",
