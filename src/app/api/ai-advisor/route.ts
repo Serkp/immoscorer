@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 async function callOpenAI(systemPrompt: string, messages: { role: string; content: string }[]): Promise<string> {
   const client = new OpenAI({
@@ -43,13 +44,16 @@ async function callAnthropic(systemPrompt: string, messages: { role: string; con
 }
 
 export async function POST(request: Request) {
+  if (!rateLimit(`ai-advisor:${clientIp(request)}`, 20, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const body = await request.json();
     const { question, conversationHistory } = body;
     const context = body.context || (body.analysisData ? { type: "analysis", data: body.analysisData } : undefined);
 
-    if (!question) {
-      return NextResponse.json({ error: "Frage erforderlich." }, { status: 400 });
+    if (!question || typeof question !== "string" || question.length > 2000) {
+      return NextResponse.json({ error: "Ungültige Frage." }, { status: 400 });
     }
 
     if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {

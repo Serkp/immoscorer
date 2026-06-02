@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createRequire } from "node:module";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 export const maxDuration = 30;
 export const dynamic = "force-dynamic";
@@ -21,6 +22,9 @@ async function parsePdfBuffer(data: Uint8Array): Promise<{ text: string; pages: 
 }
 
 export async function POST(request: Request) {
+  if (!rateLimit(`parse-pdf:${clientIp(request)}`, 10, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const formData = await request.formData();
     const file = formData.get("file") as File | null;

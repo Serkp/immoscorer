@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 export async function GET(req: NextRequest) {
+  if (!rateLimit(`places-details:${clientIp(req)}`, 60, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   const placeId = req.nextUrl.searchParams.get("placeId");
 
   if (!placeId) {
@@ -20,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     if (data.status !== "OK") {
       console.error("Google Details error:", data.status, data.error_message);
-      return NextResponse.json({ error: data.error_message || data.status }, { status: 400 });
+      return NextResponse.json({ error: "Adresse konnte nicht geladen werden." }, { status: 400 });
     }
 
     const result = data.result;
@@ -51,8 +55,7 @@ export async function GET(req: NextRequest) {
       formattedAddress: result.formatted_address || "",
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unbekannter Fehler";
-    console.error("Places details error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Places details error:", error);
+    return NextResponse.json({ error: "Adresse konnte nicht geladen werden." }, { status: 500 });
   }
 }

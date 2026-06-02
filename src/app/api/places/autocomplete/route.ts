@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
 
 export async function GET(req: NextRequest) {
+  if (!rateLimit(`places-autocomplete:${clientIp(req)}`, 60, 60_000)) {
+    return NextResponse.json({ predictions: [], ...TOO_MANY.body }, { status: TOO_MANY.status });
+  }
   const input = req.nextUrl.searchParams.get("input");
 
   if (!input || input.length < 2) {
@@ -20,7 +24,7 @@ export async function GET(req: NextRequest) {
 
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
       console.error("Google Autocomplete error:", data.status, data.error_message);
-      return NextResponse.json({ predictions: [], error: data.error_message || data.status });
+      return NextResponse.json({ predictions: [] });
     }
 
     const predictions = (data.predictions || []).slice(0, 5).map(
@@ -33,8 +37,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ predictions });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unbekannter Fehler";
-    console.error("Places autocomplete error:", message);
-    return NextResponse.json({ predictions: [], error: message }, { status: 500 });
+    console.error("Places autocomplete error:", error);
+    return NextResponse.json({ predictions: [] }, { status: 500 });
   }
 }

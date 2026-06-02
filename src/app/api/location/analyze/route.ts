@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { findCityData } from "@/data/german-cities";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 const GOOGLE_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
 
@@ -27,6 +28,9 @@ export interface LocationAnalysisResult {
 }
 
 export async function POST(req: NextRequest) {
+  if (!rateLimit(`location-analyze:${clientIp(req)}`, 15, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const body = await req.json();
     const { lat, lng, city, price, rent, area } = body as {
