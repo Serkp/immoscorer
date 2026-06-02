@@ -1154,27 +1154,26 @@ function LandingFooter() {
               ImmoScorer
             </span>
           </div>
-          <div className="flex items-center gap-5">
-            <Link
-              href="/wissen"
-              className="text-xs transition-opacity hover:opacity-80"
-              style={{ color: C.sub }}
-            >
-              Wissen
-            </Link>
-            {["Impressum", "Datenschutz", "AGB", "Kontakt"].map((l) => (
-              <a
-                key={l}
-                href="#"
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+            {[
+              { href: "/wissen", label: "Wissen" },
+              { href: "/impressum", label: "Impressum" },
+              { href: "/datenschutz", label: "Datenschutz" },
+              { href: "/agb", label: "AGB" },
+              { href: "/widerruf", label: "Widerruf" },
+            ].map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
                 className="text-xs transition-opacity hover:opacity-80"
                 style={{ color: C.sub }}
               >
-                {l}
-              </a>
+                {l.label}
+              </Link>
             ))}
           </div>
           <p className="text-xs" style={{ color: C.dim }}>
-            © 2026 ImmoScorer. Alle Rechte vorbehalten.
+            © {new Date().getFullYear()} ImmoScorer. Alle Rechte vorbehalten.
           </p>
         </div>
       </div>

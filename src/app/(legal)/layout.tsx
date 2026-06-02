@@ -1,9 +1,8 @@
 import { PublicHeader, PublicFooter } from "@/components/PublicChrome";
 import { C } from "@/lib/theme";
 
-/* Öffentliche Hülle für den Wissens-Bereich (außerhalb des eingeloggten
-   App-Shells), damit /wissen als öffentliche, indexierbare Content-Seite läuft. */
-export default function WissenLayout({
+/* Öffentliche Hülle für die Rechtsseiten (Impressum, Datenschutz, AGB, Widerruf). */
+export default function LegalLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -12,8 +11,8 @@ export default function WissenLayout({
     <div style={{ background: C.bg, minHeight: "100vh" }}>
       <PublicHeader />
       <main
-        className="mx-auto px-4 md:px-5 py-8 md:py-12"
-        style={{ maxWidth: 1100 }}
+        className="mx-auto px-4 md:px-5 py-10 md:py-14"
+        style={{ maxWidth: 760 }}
       >
         {children}
       </main>
