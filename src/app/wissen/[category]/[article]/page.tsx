@@ -1,12 +1,67 @@
-"use client";
-
-import { useState } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Card } from "@/components/ui/Card";
 import { AIComment } from "@/components/ui/AIComment";
+import { JsonLd } from "@/components/JsonLd";
+import { TableOfContents } from "@/components/wissen/TableOfContents";
 import { C } from "@/lib/theme";
-import { getArticle } from "@/data/knowledge-base";
+import { KNOWLEDGE_BASE, getArticle } from "@/data/knowledge-base";
+import { absoluteUrl, articleJsonLd, breadcrumbJsonLd } from "@/lib/seo";
+
+/* Statisch vorgerenderte Artikel; unbekannte Slugs → 404. */
+export const dynamicParams = false;
+
+export function generateStaticParams() {
+  return KNOWLEDGE_BASE.flatMap((cat) =>
+    cat.articles.map((a) => ({ category: cat.slug, article: a.slug })),
+  );
+}
+
+export function generateMetadata({
+  params,
+}: {
+  params: { category: string; article: string };
+}): Metadata {
+  const result = getArticle(params.category, params.article);
+  if (!result) return {};
+  const { category, article } = result;
+  const path = `/wissen/${category.slug}/${article.slug}`;
+  return {
+    title: article.title,
+    description: article.summary,
+    alternates: { canonical: path },
+    openGraph: {
+      title: `${article.title} | ImmoScorer`,
+      description: article.summary,
+      url: absoluteUrl(path),
+      type: "article",
+      section: category.title,
+    },
+  };
+}
+
+/* Rendert einen Body-Absatz mit **fett**-Markierungen. */
+function renderParagraph(paragraph: string, key: number) {
+  const parts = paragraph.split(/(\*\*[^*]+\*\*)/g);
+  return (
+    <p
+      key={key}
+      className="text-sm whitespace-pre-line"
+      style={{ color: C.sub, lineHeight: 1.7 }}
+    >
+      {parts.map((part, i) =>
+        part.startsWith("**") && part.endsWith("**") ? (
+          <strong key={i} style={{ color: C.text, fontWeight: 600 }}>
+            {part.slice(2, -2)}
+          </strong>
+        ) : (
+          part
+        ),
+      )}
+    </p>
+  );
+}
 
 export default function ArticlePage({
   params,
@@ -17,26 +72,42 @@ export default function ArticlePage({
   if (!result) notFound();
 
   const { category, article } = result;
+  const path = `/wissen/${category.slug}/${article.slug}`;
 
-  /* Next / prev navigation */
   const artIdx = category.articles.findIndex((a) => a.slug === params.article);
   const prev = artIdx > 0 ? category.articles[artIdx - 1] : null;
   const next =
     artIdx < category.articles.length - 1
       ? category.articles[artIdx + 1]
       : null;
-
-  /* Similar articles (other articles in same category, max 3) */
   const similar = category.articles
     .filter((a) => a.slug !== params.article)
     .slice(0, 3);
 
+  const jsonLd = [
+    articleJsonLd({
+      title: article.title,
+      description: article.summary,
+      path,
+      section: category.title,
+    }),
+    breadcrumbJsonLd([
+      { name: "Start", path: "/" },
+      { name: "Wissen", path: "/wissen" },
+      { name: category.title, path: `/wissen/${category.slug}` },
+      { name: article.title, path },
+    ]),
+  ];
+
   return (
-    <div className="mx-auto max-w-[720px] space-y-8">
+    <article className="mx-auto max-w-[720px] space-y-8">
+      <JsonLd data={jsonLd} />
+
       {/* Breadcrumb */}
-      <div
+      <nav
         className="flex items-center gap-1.5 text-xs flex-wrap"
         style={{ color: C.dim }}
+        aria-label="Brotkrumen"
       >
         <Link href="/wissen" className="hover:opacity-80 transition-opacity">
           Wissen
@@ -52,17 +123,14 @@ export default function ArticlePage({
         <span style={{ color: C.sub }} className="truncate">
           {article.title}
         </span>
-      </div>
+      </nav>
 
       {/* Header */}
-      <div>
+      <header>
         <div className="flex items-center gap-3 mb-3">
           <span
             className="shrink-0 flex items-center justify-center w-9 h-9 rounded-lg"
-            style={{
-              background: category.color + "18",
-              color: category.color,
-            }}
+            style={{ background: category.color + "18", color: category.color }}
           >
             <svg
               width={18}
@@ -77,14 +145,15 @@ export default function ArticlePage({
               <path d={category.icon} />
             </svg>
           </span>
-          <span className="text-xs font-medium" style={{ color: C.dim }}>
+          <Link
+            href={`/wissen/${category.slug}`}
+            className="text-xs font-medium transition-opacity hover:opacity-80"
+            style={{ color: C.dim }}
+          >
             {category.title}
-          </span>
+          </Link>
         </div>
-        <h1
-          className="text-xl font-bold leading-tight"
-          style={{ color: C.text }}
-        >
+        <h1 className="text-2xl font-extrabold leading-tight" style={{ color: C.text }}>
           {article.title}
         </h1>
         <p className="text-sm mt-2" style={{ color: C.sub, lineHeight: 1.7 }}>
@@ -98,9 +167,9 @@ export default function ArticlePage({
             · {article.sections.length} Abschnitte
           </span>
         </div>
-      </div>
+      </header>
 
-      {/* Table of Contents */}
+      {/* Table of Contents (client island) */}
       <TableOfContents sections={article.sections} color={category.color} />
 
       {/* Sections */}
@@ -108,10 +177,7 @@ export default function ArticlePage({
         {article.sections.map((section, idx) => (
           <section key={idx} id={`section-${idx}`}>
             <Card className="p-6">
-              <h2
-                className="text-sm font-bold mb-3"
-                style={{ color: C.text }}
-              >
+              <h2 className="text-base font-bold mb-3" style={{ color: C.text }}>
                 <span
                   className="inline-flex items-center justify-center w-6 h-6 rounded-md text-[10px] font-bold mr-2 align-middle"
                   style={{
@@ -124,27 +190,7 @@ export default function ArticlePage({
                 {section.heading}
               </h2>
               <div className="space-y-3">
-                {section.body.split("\n\n").map((paragraph, pIdx) => {
-                  /* Render bold text between ** markers */
-                  const parts = paragraph.split(/(\*\*[^*]+\*\*)/g);
-                  return (
-                    <p
-                      key={pIdx}
-                      className="text-xs whitespace-pre-line"
-                      style={{ color: C.sub, lineHeight: 1.7 }}
-                    >
-                      {parts.map((part, i) =>
-                        part.startsWith("**") && part.endsWith("**") ? (
-                          <strong key={i} style={{ color: C.text, fontWeight: 600 }}>
-                            {part.slice(2, -2)}
-                          </strong>
-                        ) : (
-                          part
-                        )
-                      )}
-                    </p>
-                  );
-                })}
+                {section.body.split("\n\n").map((p, pIdx) => renderParagraph(p, pIdx))}
               </div>
             </Card>
           </section>
@@ -157,11 +203,13 @@ export default function ArticlePage({
           <p className="text-xs font-semibold mb-1" style={{ color: C.green }}>
             Praxis-Tipp
           </p>
-          <p className="text-xs" style={{ lineHeight: 1.7 }}>{article.tip}</p>
+          <p className="text-xs" style={{ lineHeight: 1.7 }}>
+            {article.tip}
+          </p>
         </AIComment>
       )}
 
-      {/* CTA Box */}
+      {/* CTA */}
       <Card
         className="p-6 text-center"
         style={{
@@ -173,36 +221,27 @@ export default function ArticlePage({
           Bereit für die Praxis?
         </p>
         <p className="text-xs mb-4" style={{ color: C.sub }}>
-          Analysieren Sie jetzt eine Immobilie oder lassen Sie sich zur Finanzierung beraten.
+          Bewerten Sie jetzt eine konkrete Immobilie — kostenlos, mit KI-Score
+          und Finanzierungs-Check.
         </p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link
-            href="/analysis"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{ background: C.accent, color: "#fff" }}
-          >
-            Jetzt Immobilie analysieren →
-          </Link>
-          <Link
-            href="/financing"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-opacity hover:opacity-90"
-            style={{
-              background: C.surface2,
-              color: C.text,
-              border: `1px solid ${C.border}`,
-            }}
-          >
-            Finanzierungsberatung →
-          </Link>
-        </div>
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-bold transition-opacity hover:opacity-90"
+          style={{
+            background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,
+            color: "#fff",
+          }}
+        >
+          Jetzt kostenlos analysieren →
+        </Link>
       </Card>
 
       {/* Similar articles */}
       {similar.length > 0 && (
         <div>
-          <h3 className="text-xs font-bold mb-3" style={{ color: C.text }}>
+          <h2 className="text-sm font-bold mb-3" style={{ color: C.text }}>
             Ähnliche Artikel
-          </h3>
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {similar.map((a) => (
               <Link key={a.slug} href={`/wissen/${category.slug}/${a.slug}`}>
@@ -286,66 +325,6 @@ export default function ArticlePage({
           Zurück zu {category.title}
         </Link>
       </div>
-    </div>
-  );
-}
-
-/* ── Table of Contents ── */
-function TableOfContents({
-  sections,
-  color,
-}: {
-  sections: { heading: string }[];
-  color: string;
-}) {
-  const [open, setOpen] = useState(true);
-
-  return (
-    <Card className="overflow-hidden">
-      <button
-        className="w-full flex items-center justify-between p-4 text-left"
-        style={{ background: open ? C.surface : "transparent" }}
-        onClick={() => setOpen((o) => !o)}
-      >
-        <span className="text-xs font-bold" style={{ color: C.text }}>
-          Inhaltsverzeichnis
-        </span>
-        <svg
-          width={14}
-          height={14}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={C.dim}
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="transition-transform"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-        >
-          <polyline points="6 9 12 15 18 9" />
-        </svg>
-      </button>
-      {open && (
-        <div className="px-4 pb-4 space-y-1.5">
-          <div className="h-px mb-2" style={{ background: C.border }} />
-          {sections.map((s, idx) => (
-            <a
-              key={idx}
-              href={`#section-${idx}`}
-              className="flex items-center gap-2.5 py-1 text-xs transition-colors hover:underline"
-              style={{ color: C.sub }}
-            >
-              <span
-                className="w-5 h-5 shrink-0 flex items-center justify-center rounded text-[9px] font-bold"
-                style={{ background: color + "18", color }}
-              >
-                {idx + 1}
-              </span>
-              {s.heading}
-            </a>
-          ))}
-        </div>
-      )}
-    </Card>
+    </article>
   );
 }

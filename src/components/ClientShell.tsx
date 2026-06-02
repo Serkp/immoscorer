@@ -10,8 +10,9 @@ import { C } from "@/lib/theme";
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
-  // Public pages — no shell, no auth required
-  const publicPaths = ["/auth/callback", "/auth/confirm", "/auth/reset-password", "/auth/error", "/reset-password"];
+  // Public pages — no app shell, no auth required.
+  // /wissen is the public, SEO-indexed knowledge base (own layout in app/wissen/layout.tsx).
+  const publicPaths = ["/wissen", "/auth/callback", "/auth/confirm", "/auth/reset-password", "/auth/error", "/reset-password"];
   if (pathname === "/" || publicPaths.some((p) => pathname.startsWith(p))) {
     return <>{children}</>;
   }
