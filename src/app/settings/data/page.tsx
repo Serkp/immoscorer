@@ -56,12 +56,24 @@ export default function DataExportPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      // Delete user data
       const supabase = getSupabase();
-      await supabase.from("analyses").delete().eq("user_id", user.id);
-      await supabase.from("portfolio_properties").delete().eq("user_id", user.id);
-      await supabase.from("profiles").delete().eq("id", user.id);
-      // Sign out — actual user deletion requires admin API
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) {
+        setDeleteError("Sitzung abgelaufen. Bitte melden Sie sich neu an.");
+        setDeleting(false);
+        return;
+      }
+      // Vollständige Löschung serverseitig (inkl. Auth-Account, Art. 17 DSGVO)
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        setDeleteError("Fehler beim Löschen. Bitte kontaktieren Sie den Support.");
+        setDeleting(false);
+        return;
+      }
       await supabase.auth.signOut();
       window.location.href = "/";
     } catch {
