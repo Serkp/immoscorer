@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 
-/* Favicon — dynamisch erzeugt in Markenfarben (kein Asset nötig). */
-export const size = { width: 64, height: 64 };
+/* Favicon + Organisations-Logo — dynamisch erzeugt in Markenfarben.
+   256px, damit es auch als schema.org-Logo taugt (Google verlangt ≥112px). */
+export const size = { width: 256, height: 256 };
 export const contentType = "image/png";
 
 export default function Icon() {
@@ -15,9 +16,9 @@ export default function Icon() {
           alignItems: "center",
           justifyContent: "center",
           background: "linear-gradient(135deg, #7C6AFF, #4C9AFF)",
-          borderRadius: 14,
+          borderRadius: 56,
           color: "#ffffff",
-          fontSize: 38,
+          fontSize: 150,
           fontWeight: 800,
         }}
       >

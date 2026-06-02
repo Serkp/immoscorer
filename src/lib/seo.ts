@@ -1,3 +1,5 @@
+import type { Metadata } from "next";
+
 /* ─── Zentrale SEO-Konfiguration ───
    Eine Quelle der Wahrheit für Domain, Titel, Beschreibungen und
    strukturierte Daten. Wird von layout.tsx, sitemap.ts, robots.ts,
@@ -58,12 +60,22 @@ export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
   };
 }
 
+/** @id-Referenz auf den globalen Organization-Knoten (definiert im Root-Layout). */
+export const ORG_ID = `${SITE.url}/#organization`;
+
+/** Standard-Datumsangaben (ISO) als Fallback, falls ein Artikel keine eigenen hat.
+    Per-Artikel-Daten in knowledge-base.ts überschreiben diese. */
+export const SITE_DEFAULT_PUBLISHED = "2026-05-15";
+export const SITE_DEFAULT_MODIFIED = "2026-06-02";
+
 /** Article-Markup für einen Wissens-Artikel (Basis für Google Rich Results). */
 export function articleJsonLd(opts: {
   title: string;
   description: string;
   path: string;
   section?: string;
+  datePublished?: string;
+  dateModified?: string;
 }) {
   return {
     "@context": "https://schema.org",
@@ -74,14 +86,49 @@ export function articleJsonLd(opts: {
     ...(opts.section ? { articleSection: opts.section } : {}),
     url: absoluteUrl(opts.path),
     mainEntityOfPage: { "@type": "WebPage", "@id": absoluteUrl(opts.path) },
-    image: absoluteUrl("/opengraph-image"),
+    image: {
+      "@type": "ImageObject",
+      url: absoluteUrl("/opengraph-image"),
+      width: 1200,
+      height: 630,
+    },
+    datePublished: opts.datePublished ?? SITE_DEFAULT_PUBLISHED,
+    dateModified: opts.dateModified ?? SITE_DEFAULT_MODIFIED,
     isAccessibleForFree: true,
-    author: { "@type": "Organization", name: SITE.name, url: SITE.url },
-    publisher: {
-      "@type": "Organization",
-      name: SITE.name,
-      url: SITE.url,
-      logo: { "@type": "ImageObject", url: absoluteUrl("/icon") },
+    author: { "@id": ORG_ID },
+    publisher: { "@id": ORG_ID },
+  };
+}
+
+/** Baut konsistente Seiten-Metadaten (Titel, Canonical, Open Graph & Twitter)
+    aus einer Quelle — verhindert, dass Twitter-/OG-Felder auf Standardwerte
+    der Startseite zurückfallen. */
+export function pageMeta(opts: {
+  title: string;
+  description: string;
+  path: string;
+  type?: "website" | "article";
+}): Metadata {
+  const ogTitle = `${opts.title} | ${SITE.name}`;
+  const image = absoluteUrl("/opengraph-image");
+  return {
+    title: opts.title,
+    description: opts.description,
+    alternates: { canonical: opts.path },
+    openGraph: {
+      title: ogTitle,
+      description: opts.description,
+      url: absoluteUrl(opts.path),
+      type: opts.type ?? "website",
+      siteName: SITE.name,
+      locale: SITE.locale,
+      images: [{ url: image, width: 1200, height: 630 }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: ogTitle,
+      description: opts.description,
+      images: [image],
     },
   };
 }

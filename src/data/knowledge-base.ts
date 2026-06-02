@@ -7,6 +7,11 @@ export interface KnowledgeArticle {
   readMinutes: number;
   sections: { heading: string; body: string }[];
   tip?: string;
+  /* Optionale SEO-Felder (überschreiben Defaults; werden in Paket B befüllt) */
+  seoTitle?: string;        // <title>, falls vom H1 abweichend optimiert
+  metaDescription?: string; // ~140-155 Zeichen für die Google-Snippet-Beschreibung
+  publishedAt?: string;     // ISO-Datum, z. B. "2026-05-15"
+  updatedAt?: string;       // ISO-Datum der letzten Aktualisierung
 }
 
 export interface KnowledgeCategory {
@@ -16,6 +21,7 @@ export interface KnowledgeCategory {
   icon: string; // SVG path
   color: string;
   articles: KnowledgeArticle[];
+  metaDescription?: string; // ~130-155 Zeichen für die Google-Snippet-Beschreibung
 }
 
 export const KNOWLEDGE_BASE: KnowledgeCategory[] = [

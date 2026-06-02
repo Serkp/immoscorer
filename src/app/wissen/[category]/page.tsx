@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/Card";
 import { JsonLd } from "@/components/JsonLd";
 import { C } from "@/lib/theme";
 import { KNOWLEDGE_BASE, getCategoryBySlug } from "@/data/knowledge-base";
-import { absoluteUrl, breadcrumbJsonLd } from "@/lib/seo";
+import { absoluteUrl, breadcrumbJsonLd, pageMeta } from "@/lib/seo";
 
 /* Statisch vorgerenderte Kategorie-Seiten; unbekannte Slugs → 404. */
 export const dynamicParams = false;
@@ -21,18 +21,11 @@ export function generateMetadata({
 }): Metadata {
   const cat = getCategoryBySlug(params.category);
   if (!cat) return {};
-  const title = `${cat.title} — Immobilien-Wissen`;
-  return {
-    title,
-    description: cat.description,
-    alternates: { canonical: `/wissen/${cat.slug}` },
-    openGraph: {
-      title: `${title} | ImmoScorer`,
-      description: cat.description,
-      url: absoluteUrl(`/wissen/${cat.slug}`),
-      type: "website",
-    },
-  };
+  return pageMeta({
+    title: `${cat.title} — Immobilien-Wissen`,
+    description: cat.metaDescription ?? cat.description,
+    path: `/wissen/${cat.slug}`,
+  });
 }
 
 export default function CategoryPage({

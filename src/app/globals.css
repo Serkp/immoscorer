@@ -13,7 +13,7 @@
   --c-border-hover: rgba(255,255,255,0.14);
   --c-text: #EDEEF2;
   --c-sub: rgba(255,255,255,0.52);
-  --c-dim: rgba(255,255,255,0.28);
+  --c-dim: rgba(255,255,255,0.6);
   --c-accent: #7C6AFF;
   --c-accent-mid: rgba(124,106,255,0.2);
   --c-accent-dim: rgba(124,106,255,0.1);
@@ -44,7 +44,7 @@ html.light {
   --c-border-hover: rgba(0,0,0,0.18);
   --c-text: #111218;
   --c-sub: rgba(0,0,0,0.52);
-  --c-dim: rgba(0,0,0,0.35);
+  --c-dim: rgba(0,0,0,0.55);
   --c-accent: #6B58FF;
   --c-accent-mid: rgba(107,88,255,0.15);
   --c-accent-dim: rgba(107,88,255,0.08);
@@ -154,6 +154,19 @@ body {
 
 .animate-ring {
   animation: countUp 1.2s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ── Reduced motion: laufende Animationen anhalten (Barrierefreiheit) ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin-slow,
+  .animate-pulse-dot,
+  .animate-fade-up,
+  .animate-ring {
+    animation: none !important;
+  }
+  body {
+    transition: none !important;
+  }
 }
 
 /* ── Mobile slide-in animation ── */

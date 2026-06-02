@@ -7,7 +7,7 @@ import { JsonLd } from "@/components/JsonLd";
 import { TableOfContents } from "@/components/wissen/TableOfContents";
 import { C } from "@/lib/theme";
 import { KNOWLEDGE_BASE, getArticle } from "@/data/knowledge-base";
-import { absoluteUrl, articleJsonLd, breadcrumbJsonLd } from "@/lib/seo";
+import { articleJsonLd, breadcrumbJsonLd, pageMeta } from "@/lib/seo";
 
 /* Statisch vorgerenderte Artikel; unbekannte Slugs → 404. */
 export const dynamicParams = false;
@@ -26,19 +26,12 @@ export function generateMetadata({
   const result = getArticle(params.category, params.article);
   if (!result) return {};
   const { category, article } = result;
-  const path = `/wissen/${category.slug}/${article.slug}`;
-  return {
-    title: article.title,
-    description: article.summary,
-    alternates: { canonical: path },
-    openGraph: {
-      title: `${article.title} | ImmoScorer`,
-      description: article.summary,
-      url: absoluteUrl(path),
-      type: "article",
-      section: category.title,
-    },
-  };
+  return pageMeta({
+    title: article.seoTitle ?? article.title,
+    description: article.metaDescription ?? article.summary,
+    path: `/wissen/${category.slug}/${article.slug}`,
+    type: "article",
+  });
 }
 
 /* Rendert einen Body-Absatz mit **fett**-Markierungen. */
@@ -87,9 +80,11 @@ export default function ArticlePage({
   const jsonLd = [
     articleJsonLd({
       title: article.title,
-      description: article.summary,
+      description: article.metaDescription ?? article.summary,
       path,
       section: category.title,
+      datePublished: article.publishedAt,
+      dateModified: article.updatedAt,
     }),
     breadcrumbJsonLd([
       { name: "Start", path: "/" },

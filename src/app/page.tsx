@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, Suspense, type ReactNode } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -402,6 +403,7 @@ export default function LandingPage() {
       <Suspense>
         <LandingContent />
       </Suspense>
+      <LandingFooter />
     </AuthProvider>
   );
 }
@@ -492,6 +494,13 @@ function LandingContent() {
               </span>
             </div>
             <div className="flex items-center gap-3">
+              <Link
+                href="/wissen"
+                className="hidden sm:inline-block text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ color: C.sub }}
+              >
+                Wissen
+              </Link>
               <button
                 onClick={toggle}
                 className="flex items-center justify-center w-9 h-9 rounded-xl transition-all"
@@ -1083,50 +1092,92 @@ function LandingContent() {
           </FadeIn>
         </section>
 
-        {/* ════════════════════════════════════
-            9. FOOTER
-           ════════════════════════════════════ */}
-        <footer
-          className="px-5 py-8"
-          style={{ borderTop: `1px solid ${C.border}` }}
-        >
-          <div
-            className="mx-auto flex flex-col md:flex-row items-center justify-between gap-4"
-            style={{ maxWidth: 1100 }}
-          >
-            <div className="flex items-center gap-2">
-              <AIOrb size={20} />
-              <span
-                className="text-sm font-semibold"
-                style={{ color: C.text }}
-              >
-                ImmoScorer
-              </span>
-            </div>
-            <div className="flex items-center gap-5">
-              {["Impressum", "Datenschutz", "AGB", "Kontakt"].map((l) => (
-                <a
-                  key={l}
-                  href="#"
-                  className="text-xs transition-colors"
-                  style={{ color: C.sub }}
-                  onMouseEnter={(e) =>
-                    (e.currentTarget.style.color = C.text)
-                  }
-                  onMouseLeave={(e) =>
-                    (e.currentTarget.style.color = C.sub)
-                  }
-                >
-                  {l}
-                </a>
-              ))}
-            </div>
-            <p className="text-xs" style={{ color: C.dim }}>
-              © 2026 ImmoScorer. Alle Rechte vorbehalten.
-            </p>
-          </div>
-        </footer>
+        {/* Footer wird server-gerendert in LandingPage (siehe LandingFooter),
+            damit die internen /wissen-Links im initialen HTML stehen. */}
       </div>
     </div>
+  );
+}
+
+/* Server-gerenderter Footer — bewusst AUSSERHALB des Suspense/useSearchParams-
+   Bereichs von LandingContent platziert, damit die internen /wissen-Links im
+   initialen HTML erscheinen (crawlbar, interne Link-Kraft). */
+function LandingFooter() {
+  const wissenLinks = [
+    { href: "/wissen", label: "Wissensbereich" },
+    {
+      href: "/wissen/kennzahlen/rendite-berechnen",
+      label: "Immobilienrendite berechnen",
+    },
+    {
+      href: "/wissen/grundlagen/score-verstehen",
+      label: "Immobilien-Score verstehen",
+    },
+    {
+      href: "/wissen/finanzierung/finanzierung-strukturieren",
+      label: "Immobilie finanzieren",
+    },
+    {
+      href: "/wissen/grundlagen/erste-immobilie",
+      label: "Erste Immobilie als Kapitalanlage",
+    },
+  ];
+
+  return (
+    <footer
+      className="px-5 py-8"
+      style={{ borderTop: `1px solid ${C.border}`, background: C.bg }}
+    >
+      <div className="mx-auto" style={{ maxWidth: 1100 }}>
+        {/* Wissens-Links (interne Verlinkung für SEO + Entdeckbarkeit) */}
+        <div
+          className="flex flex-wrap justify-center gap-x-5 gap-y-2 mb-6 pb-6"
+          style={{ borderBottom: `1px solid ${C.border}` }}
+        >
+          {wissenLinks.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className="text-xs transition-opacity hover:opacity-80"
+              style={{ color: C.sub }}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* Marke + Rechtliches + Copyright */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <AIOrb size={20} />
+            <span className="text-sm font-semibold" style={{ color: C.text }}>
+              ImmoScorer
+            </span>
+          </div>
+          <div className="flex items-center gap-5">
+            <Link
+              href="/wissen"
+              className="text-xs transition-opacity hover:opacity-80"
+              style={{ color: C.sub }}
+            >
+              Wissen
+            </Link>
+            {["Impressum", "Datenschutz", "AGB", "Kontakt"].map((l) => (
+              <a
+                key={l}
+                href="#"
+                className="text-xs transition-opacity hover:opacity-80"
+                style={{ color: C.sub }}
+              >
+                {l}
+              </a>
+            ))}
+          </div>
+          <p className="text-xs" style={{ color: C.dim }}>
+            © 2026 ImmoScorer. Alle Rechte vorbehalten.
+          </p>
+        </div>
+      </div>
+    </footer>
   );
 }
