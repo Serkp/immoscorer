@@ -64,7 +64,10 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
         const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name } },
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: window.location.origin + "/auth/callback?type=signup",
+          },
         });
         console.log("[AuthModal] Register result:", { user: data?.user?.id, session: !!data?.session, error: err?.message });
         if (err) {
@@ -133,7 +136,7 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
     try {
       const supabase = getSupabase();
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/reset-password",
+        redirectTo: window.location.origin + "/auth/callback?type=recovery",
       });
       if (err) { setForgotError(err.message); setForgotLoading(false); return; }
       setForgotStep("sent");
@@ -332,13 +335,18 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
               {/* Passwort vergessen — nur im Login-Modus */}
               {mode === "login" && (
                 <div className="flex justify-end">
-                  <a
-                    href="/reset-password"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgot(true);
+                      setForgotStep("form");
+                      setForgotError(null);
+                    }}
                     className="text-[11px] transition-opacity hover:opacity-80"
                     style={{ color: C.dim }}
                   >
                     Passwort vergessen?
-                  </a>
+                  </button>
                 </div>
               )}
 
