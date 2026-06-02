@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
+import { sendTelegram } from "@/lib/telegram";
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
@@ -53,6 +54,8 @@ export async function POST(req: NextRequest) {
               current_period_end: periodEnd,
             })
             .eq("user_id", userId);
+          // Kundenrelevant: neues Pro-Abo
+          await sendTelegram(`💳 Neues Pro-Abo aktiviert (User ${userId})`);
         }
         break;
       }

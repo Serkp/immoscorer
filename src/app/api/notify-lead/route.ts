@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { sendTelegram } from '@/lib/telegram'
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +29,16 @@ export async function POST(request: Request) {
 
     const adminResult = await adminEmail.json()
     if (!adminEmail.ok) console.error('Admin email error:', adminResult)
+
+    // Kundenrelevante Sofort-Benachrichtigung per Telegram
+    await sendTelegram(
+      `🏠 Neue Finanzierungsanfrage\n` +
+      `Name: ${lead.firstName || ''} ${lead.lastName || ''}\n` +
+      `Telefon: ${lead.phone || 'k.A.'}\n` +
+      `E-Mail: ${lead.email || 'k.A.'}` +
+      (lead.propertyAddress ? `\nObjekt: ${lead.propertyAddress}` : '') +
+      (lead.score ? `\nScore: ${lead.score}/100` : '')
+    )
 
     // E-MAIL 2: An den Kunden — Bestätigung
     if (lead.email) {
