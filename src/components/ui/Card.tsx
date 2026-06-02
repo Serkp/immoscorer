@@ -1,3 +1,5 @@
+"use client";
+
 import { C } from "@/lib/theme";
 import type { CSSProperties, ReactNode } from "react";
 

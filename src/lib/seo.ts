@@ -41,3 +41,47 @@ export const SITE_KEYWORDS: string[] = [
   "Immobilien Cashflow Rechner",
   "Immobilien Investment Analyse",
 ];
+
+/* ─── Strukturierte Daten (JSON-LD) Bausteine ─── */
+
+/** BreadcrumbList aus einer Liste von Schritten {name, path}. */
+export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: items.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
+  };
+}
+
+/** Article-Markup für einen Wissens-Artikel (Basis für Google Rich Results). */
+export function articleJsonLd(opts: {
+  title: string;
+  description: string;
+  path: string;
+  section?: string;
+}) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: opts.title,
+    description: opts.description,
+    inLanguage: "de-DE",
+    ...(opts.section ? { articleSection: opts.section } : {}),
+    url: absoluteUrl(opts.path),
+    mainEntityOfPage: { "@type": "WebPage", "@id": absoluteUrl(opts.path) },
+    image: absoluteUrl("/opengraph-image"),
+    isAccessibleForFree: true,
+    author: { "@type": "Organization", name: SITE.name, url: SITE.url },
+    publisher: {
+      "@type": "Organization",
+      name: SITE.name,
+      url: SITE.url,
+      logo: { "@type": "ImageObject", url: absoluteUrl("/icon") },
+    },
+  };
+}
