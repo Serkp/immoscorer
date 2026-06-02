@@ -2,8 +2,8 @@
 id = "immoscorer"
 
 [auth]
-site_url = "https://immoscorer.de"
-additional_redirect_urls = ["https://immoscorer.vercel.app", "http://localhost:3000"]
+site_url = "https://www.immoscorer.de"
+additional_redirect_urls = ["https://www.immoscorer.de/**", "https://immoscorer.de/**", "https://immoscorer.vercel.app/**", "http://localhost:3000/**"]
 
 [auth.email]
 enable_confirmations = true

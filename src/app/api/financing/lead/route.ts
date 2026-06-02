@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSupabase } from "@/lib/supabase";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
+  if (!rateLimit(`financing-lead:${clientIp(req)}`, 5, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const body = await req.json();
     const { userId, firstName, lastName, email, phone, message, propertyAddress, purchasePrice, monthlyRent, score } = body;

@@ -2,12 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
-});
+function getStripe(): Stripe | null {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  return new Stripe(key, {
+    apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const stripe = getStripe();
+    if (!stripe) {
+      return NextResponse.json(
+        { error: "Zahlungen sind aktuell nicht konfiguriert." },
+        { status: 503 },
+      );
+    }
     const { userId } = await req.json();
 
     const { data } = await getSupabaseAdmin()
@@ -27,7 +38,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unbekannter Fehler";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Stripe portal error:", error);
+    return NextResponse.json(
+      { error: "Das Kundenportal konnte nicht geöffnet werden. Bitte später erneut versuchen." },
+      { status: 500 },
+    );
   }
 }

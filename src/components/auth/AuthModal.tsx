@@ -15,13 +15,31 @@ interface AuthModalProps {
   resetSuccess?: boolean;
 }
 
+/* Übersetzt Supabase-Fehlermeldungen (Englisch) in verständliches Deutsch. */
+function authErrorToGerman(msg: string): string {
+  const m = (msg || "").toLowerCase();
+  if (m.includes("invalid login credentials"))
+    return "E-Mail-Adresse oder Passwort ist falsch.";
+  if (m.includes("email not confirmed"))
+    return "Bitte bestätigen Sie zuerst Ihre E-Mail-Adresse über den Link in unserer Bestätigungs-E-Mail.";
+  if (m.includes("already registered") || m.includes("already been registered"))
+    return "Diese E-Mail-Adresse ist bereits registriert. Bitte melden Sie sich an.";
+  if (m.includes("password should be at least"))
+    return "Das Passwort ist zu kurz (mindestens 8 Zeichen).";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Zu viele Versuche. Bitte warten Sie einen Moment und versuchen Sie es erneut.";
+  if (m.includes("invalid email") || m.includes("unable to validate email"))
+    return "Bitte geben Sie eine gültige E-Mail-Adresse ein.";
+  return "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.";
+}
+
 export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalProps) {
   const [mode, setMode] = useState<Mode>(resetSuccess ? "login" : "register");
   const [resetBanner, setResetBanner] = useState(!!resetSuccess);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [newsletter, setNewsletter] = useState(true);
+  const [newsletter, setNewsletter] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [showForgot, setShowForgot] = useState(false);
@@ -60,15 +78,16 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
       const supabase = getSupabase();
 
       if (mode === "register") {
-        console.log("[AuthModal] Register attempt:", email);
         const { data, error: err } = await supabase.auth.signUp({
           email,
           password,
-          options: { data: { full_name: name } },
+          options: {
+            data: { full_name: name },
+            emailRedirectTo: window.location.origin + "/auth/callback?type=signup",
+          },
         });
-        console.log("[AuthModal] Register result:", { user: data?.user?.id, session: !!data?.session, error: err?.message });
         if (err) {
-          setError(err.message);
+          setError(authErrorToGerman(err.message));
           setLoading(false);
           return;
         }
@@ -92,14 +111,12 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
             }, { onConflict: "id" });
         }
       } else {
-        console.log("[AuthModal] Login attempt:", email);
         const { data, error: err } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
-        console.log("[AuthModal] Login result:", { user: data?.user?.id, session: !!data?.session, error: err?.message });
         if (err) {
-          setError(err.message);
+          setError(authErrorToGerman(err.message));
           setLoading(false);
           return;
         }
@@ -113,13 +130,14 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
       }
 
       // Auth success — hard redirect to /dashboard so auth cookie is picked up
-      console.log("[AuthModal] Auth success, redirecting to /dashboard");
       setLoading(false);
       onSuccess?.();
       window.location.href = "/dashboard";
     } catch (err: unknown) {
-      console.error("[AuthModal] Unexpected error:", err);
-      const msg = err instanceof Error ? err.message : "Ein Fehler ist aufgetreten.";
+      const msg =
+        err instanceof Error
+          ? authErrorToGerman(err.message)
+          : "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.";
       setError(msg);
       setLoading(false);
     }
@@ -133,9 +151,9 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
     try {
       const supabase = getSupabase();
       const { error: err } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin + "/reset-password",
+        redirectTo: window.location.origin + "/auth/callback?type=recovery",
       });
-      if (err) { setForgotError(err.message); setForgotLoading(false); return; }
+      if (err) { setForgotError(authErrorToGerman(err.message)); setForgotLoading(false); return; }
       setForgotStep("sent");
     } catch {
       setForgotError("Ein Fehler ist aufgetreten. Bitte versuchen Sie es später erneut.");
@@ -321,8 +339,8 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={6}
-                  placeholder="Mindestens 6 Zeichen"
+                  minLength={8}
+                  placeholder="Mindestens 8 Zeichen"
                   autoComplete={mode === "register" ? "new-password" : "current-password"}
                   className="w-full rounded-xl px-4 py-3 text-sm outline-none transition-all focus:ring-2"
                   style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
@@ -332,13 +350,18 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
               {/* Passwort vergessen — nur im Login-Modus */}
               {mode === "login" && (
                 <div className="flex justify-end">
-                  <a
-                    href="/reset-password"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowForgot(true);
+                      setForgotStep("form");
+                      setForgotError(null);
+                    }}
                     className="text-[11px] transition-opacity hover:opacity-80"
                     style={{ color: C.dim }}
                   >
                     Passwort vergessen?
-                  </a>
+                  </button>
                 </div>
               )}
 

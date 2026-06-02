@@ -1,7 +1,11 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextResponse } from "next/server";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  if (!rateLimit(`ai-strategy:${clientIp(request)}`, 10, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const data = await request.json();
 

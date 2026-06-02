@@ -11,8 +11,18 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   // Public pages — no app shell, no auth required.
-  // /wissen is the public, SEO-indexed knowledge base (own layout in app/wissen/layout.tsx).
-  const publicPaths = ["/wissen", "/auth/callback", "/auth/confirm", "/auth/reset-password", "/auth/error", "/reset-password"];
+  // /wissen = public SEO knowledge base; legal pages must be publicly reachable (§5 DDG).
+  const publicPaths = [
+    "/wissen",
+    "/impressum",
+    "/datenschutz",
+    "/agb",
+    "/widerruf",
+    "/auth/callback",
+    "/auth/confirm",
+    "/auth/reset-password",
+    "/auth/error",
+  ];
   if (pathname === "/" || publicPaths.some((p) => pathname.startsWith(p))) {
     return <>{children}</>;
   }

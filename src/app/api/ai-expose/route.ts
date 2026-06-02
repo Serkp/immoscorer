@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { rateLimit, clientIp, TOO_MANY } from "@/lib/rate-limit";
 
 export const maxDuration = 60;
 
@@ -125,6 +126,9 @@ ANALYSE-REGELN:
 WICHTIG: Antworte NUR mit dem JSON-Objekt, kein Text davor oder danach.`;
 
 export async function POST(request: Request) {
+  if (!rateLimit(`ai-expose:${clientIp(request)}`, 10, 60_000)) {
+    return NextResponse.json(TOO_MANY.body, { status: TOO_MANY.status });
+  }
   try {
     const body = await request.json();
     const { exposeText } = body;
