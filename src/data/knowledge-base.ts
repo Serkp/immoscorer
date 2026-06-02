@@ -52,6 +52,84 @@ export const KNOWLEDGE_BASE: KnowledgeCategory[] = [
     color: "#7C6AFF",
     articles: [
       {
+        slug: "immobilie-als-kapitalanlage",
+        title: "Immobilie als Kapitalanlage",
+        seoTitle: "Immobilie als Kapitalanlage: Leitfaden für Einsteiger",
+        metaDescription:
+          "Immobilie als Kapitalanlage: Lohnt sich das? Voraussetzungen, Eigenkapital, Ablauf in 6 Schritten, Rendite, Finanzierung, Steuern und typische Fehler — verständlich erklärt.",
+        summary:
+          "Der komplette Einstieg: Lohnt sich eine Anlageimmobilie, welche Voraussetzungen brauchen Sie und wie läuft der Kauf ab?",
+        readMinutes: 11,
+        publishedAt: "2026-05-20",
+        updatedAt: "2026-06-02",
+        sections: [
+          {
+            heading: "Lohnt sich eine Immobilie als Kapitalanlage?",
+            body: "Eine vermietete Immobilie verbindet drei Ertragsquellen: laufende **Mieteinnahmen**, **Wertsteigerung** und **Steuervorteile** (u. a. Abschreibung und Abzug der Finanzierungszinsen). Gleichzeitig hilft der **Finanzierungshebel**: Sie investieren mit relativ wenig Eigenkapital und lassen die Mieter einen Großteil des Kredits abbezahlen.\n\nDem stehen Aufwand und Risiken gegenüber — Mietausfall, Instandhaltung, Zinsänderung und eingeschränkte Verfügbarkeit des Kapitals. Als Kapitalanlage eignet sich eine Immobilie daher vor allem, wenn Sie einen langen Anlagehorizont (10+ Jahre), solide Bonität und einen Liquiditätspuffer mitbringen.",
+          },
+          {
+            heading: "Voraussetzungen: Eigenkapital, Bonität, Zeit",
+            body: "**Eigenkapital:** Idealerweise decken Sie zumindest die Kaufnebenkosten (rund 9–15 %) aus Eigenkapital, besser zusätzlich 10–20 % des Kaufpreises. Mehr Eigenkapital senkt die Rate und den Zins.\n\n**Bonität:** Die Bank prüft Einkommen, bestehende Verpflichtungen und Schufa. Ein sicheres Einkommen verbessert Zins und Beleihung deutlich.\n\n**Zeit & Nerven:** Objektsuche, Prüfung, Verwaltung und Mieterthemen kosten Zeit. Wer das nicht selbst leisten will, plant eine Hausverwaltung ein (mindert den Cashflow).",
+          },
+          {
+            heading: "In 6 Schritten zur ersten Anlageimmobilie",
+            body: "Der Weg vom Plan zum Kauf folgt fast immer demselben Muster:",
+            table: {
+              caption: "Typischer Ablauf eines Immobilienkaufs als Kapitalanlage",
+              headers: ["Schritt", "Inhalt"],
+              rows: [
+                ["1. Budget & Finanzierung", "Eigenkapital klären, Finanzierungsrahmen von der Bank bestätigen lassen"],
+                ["2. Objektsuche", "Lage, Zustand, Mietniveau prüfen — mehrere Objekte vergleichen"],
+                ["3. Bewertung", "Rendite, Kaufpreisfaktor, Cashflow und Finanzierbarkeit berechnen"],
+                ["4. Finanzierung sichern", "Angebote vergleichen, Zinsbindung und Tilgung festlegen"],
+                ["5. Notartermin & Kauf", "Kaufvertrag, Grundbucheintrag, Kaufnebenkosten zahlen"],
+                ["6. Vermietung & Verwaltung", "Mieter, Mietvertrag, Nebenkostenabrechnung, Instandhaltung"],
+              ],
+            },
+          },
+          {
+            heading: "Die wichtigsten Kennzahlen",
+            body: "Bevor Sie kaufen, sollten Sie jedes Objekt durchrechnen: **Bruttorendite** (Jahreskaltmiete ÷ Kaufpreis), **Nettorendite** (nach allen Kosten), **Kaufpreisfaktor** und der monatliche **Cashflow**. Diese Zahlen entscheiden, ob sich die Anlage trägt — nicht das Bauchgefühl. ImmoScorer berechnet sie automatisch und ergänzt einen Finanzierbarkeits-Score.",
+          },
+          {
+            heading: "Finanzierung & Steuern in Kürze",
+            body: "**Finanzierung:** Üblich ist ein Annuitätendarlehen mit fester Zinsbindung (häufig 10–15 Jahre) und 2–3 % Anfangstilgung. Plus: Kaufnebenkosten sollten möglichst aus Eigenkapital kommen.\n\n**Steuern:** Bei Vermietung sind Finanzierungszinsen, Verwaltung, Instandhaltung und die **AfA** (Gebäudeabschreibung, meist 2–3 %/Jahr) als Werbungskosten absetzbar. Das senkt die Steuerlast und verbessert den Cashflow nach Steuern. Nach 10 Jahren Haltedauer ist ein Verkaufsgewinn in der Regel steuerfrei (Spekulationsfrist).",
+          },
+          {
+            heading: "Risiken & typische Anfängerfehler",
+            body: "Die häufigsten Fehler: **zu teuer kaufen** (zu hoher Kaufpreisfaktor), **Kaufnebenkosten unterschätzen**, **keinen Puffer** für Reparaturen/Leerstand einplanen, die **Lage** zugunsten der Rendite ignorieren und die Finanzierung **zu knapp** kalkulieren (kein Zinsänderungs-Szenario). Wer diese Punkte sauber durchrechnet, vermeidet die meisten Verlustfallen.",
+          },
+        ],
+        tip: "Rechnen Sie vor dem ersten Kauf zwei, drei Objekte komplett durch — inklusive Kaufnebenkosten und einem Szenario mit 1–2 Prozentpunkten höheren Zinsen. So sehen Sie sofort, welches Objekt auch bei der Anschlussfinanzierung trägt.",
+        faq: [
+          {
+            question: "Wie viel Eigenkapital brauche ich für eine Anlageimmobilie?",
+            answer:
+              "Als Faustregel sollten Sie mindestens die Kaufnebenkosten (rund 9–15 % des Kaufpreises) aus Eigenkapital bezahlen, besser zusätzlich 10–20 % des Kaufpreises. Eine Vollfinanzierung ist möglich, aber teurer und riskanter.",
+          },
+          {
+            question: "Lohnt sich eine Immobilie als Kapitalanlage bei hohen Zinsen?",
+            answer:
+              "Auch bei höheren Zinsen kann es sich lohnen, wenn Mietrendite und Lage stimmen und der Cashflow trägt. Wichtig ist, mit dem aktuellen Zins zu rechnen — nicht mit Wunschwerten — und einen Puffer einzuplanen.",
+          },
+          {
+            question: "Was ist eine realistische Rendite?",
+            answer:
+              "Bruttorenditen liegen je nach Lage zwischen etwa 3 % (Top-Städte) und 7 % (B-/C-Lagen). Entscheidend ist die Nettorendite nach allen Kosten und der Cashflow nach Finanzierung.",
+          },
+          {
+            question: "Selbst verwalten oder Hausverwaltung?",
+            answer:
+              "Eine Hausverwaltung kostet meist 20–35 € pro Einheit und Monat und mindert den Cashflow, spart aber Zeit und Aufwand. Bei einer einzelnen Wohnung verwalten viele Anleger zunächst selbst.",
+          },
+          {
+            question: "Wann ist der Verkaufsgewinn steuerfrei?",
+            answer:
+              "Bei vermieteten Immobilien ist der Veräußerungsgewinn in der Regel nach Ablauf der 10-jährigen Spekulationsfrist steuerfrei. Vorher fällt auf den Gewinn Einkommensteuer an.",
+          },
+        ],
+      },
+      {
         slug: "score-verstehen",
         title: "Den ImmoScorer Score verstehen",
         summary: "Wie der Gesamtscore aus sechs Teilfaktoren berechnet wird und was er aussagt.",
@@ -288,6 +366,87 @@ export const KNOWLEDGE_BASE: KnowledgeCategory[] = [
     icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
     color: "#34D399",
     articles: [
+      {
+        slug: "kaufnebenkosten",
+        title: "Kaufnebenkosten beim Immobilienkauf",
+        seoTitle: "Kaufnebenkosten beim Immobilienkauf: Übersicht & Beispiel",
+        metaDescription:
+          "Kaufnebenkosten beim Immobilienkauf: Grunderwerbsteuer nach Bundesland, Notar, Grundbuch und Makler — wie hoch sie sind, ein Rechenbeispiel und wie Sie sie senken.",
+        summary:
+          "Grunderwerbsteuer, Notar, Grundbuch, Makler: Welche Nebenkosten beim Kauf anfallen, wie hoch sie sind und wie Sie sie optimieren.",
+        readMinutes: 8,
+        publishedAt: "2026-05-20",
+        updatedAt: "2026-06-02",
+        sections: [
+          {
+            heading: "Was sind Kaufnebenkosten?",
+            body: "Kaufnebenkosten sind die Kosten, die **zusätzlich zum Kaufpreis** beim Immobilienkauf anfallen. Sie betragen je nach Bundesland und Maklereinsatz rund **9–15 % des Kaufpreises** und müssen in der Regel aus **Eigenkapital** bezahlt werden — Banken finanzieren sie meist nicht mit. Wer sie unterschätzt, hat eine Finanzierungslücke. Die vier großen Posten sind Grunderwerbsteuer, Notar, Grundbuch und ggf. Maklerprovision.",
+          },
+          {
+            heading: "Die einzelnen Posten",
+            body: "**Grunderwerbsteuer:** 3,5–6,5 % des Kaufpreises, je nach Bundesland (siehe Tabelle) — der größte Posten.\n\n**Notar:** ca. **1,0–1,5 %** für Beurkundung des Kaufvertrags und Abwicklung (gesetzlich geregelt).\n\n**Grundbuch:** ca. **0,5 %** für Eigentumsumschreibung und Eintragung der Grundschuld.\n\n**Maklerprovision:** falls ein Makler beteiligt ist, meist **3,57 % inkl. USt** für den Käufer (seit 2020 wird die Provision i. d. R. zwischen Käufer und Verkäufer geteilt).",
+          },
+          {
+            heading: "Grunderwerbsteuer nach Bundesland",
+            body: "Die Grunderwerbsteuer ist Ländersache und unterscheidet sich deutlich. Richtwerte (Satz bitte tagesaktuell prüfen, da die Länder ihn ändern können):",
+            table: {
+              caption: "Grunderwerbsteuersätze nach Bundesland (Richtwerte — bitte aktuell prüfen)",
+              headers: ["Bundesland", "Satz"],
+              rows: [
+                ["Bayern", "3,5 %"],
+                ["Sachsen", "5,5 %"],
+                ["Baden-Württemberg, Bremen, Niedersachsen, Rheinland-Pfalz, Sachsen-Anhalt, Thüringen", "5,0 %"],
+                ["Hamburg", "5,5 %"],
+                ["Berlin, Hessen, Mecklenburg-Vorpommern", "6,0 %"],
+                ["Brandenburg, NRW, Saarland, Schleswig-Holstein", "6,5 %"],
+              ],
+            },
+          },
+          {
+            heading: "Rechenbeispiel",
+            body: "So summieren sich die Nebenkosten bei einem Kaufpreis von 300.000 € (Beispiel NRW, mit Makler):",
+            table: {
+              caption: "Beispiel: Kaufpreis 300.000 € in NRW (mit Makler)",
+              headers: ["Position", "Satz", "Betrag"],
+              rows: [
+                ["Grunderwerbsteuer", "6,5 %", "19.500 €"],
+                ["Notar", "1,5 %", "4.500 €"],
+                ["Grundbuch", "0,5 %", "1.500 €"],
+                ["Maklerprovision", "3,57 %", "10.710 €"],
+                ["Kaufnebenkosten gesamt", "≈ 12,1 %", "36.210 €"],
+                ["Gesamtkosten", "—", "336.210 €"],
+              ],
+            },
+          },
+          {
+            heading: "Kaufnebenkosten senken & steuerlich nutzen",
+            body: "**Senken:** ohne Makler kaufen (Direktkauf/Bauträger), bewegliches Inventar (Einbauküche, Möbel) separat ausweisen — darauf fällt keine Grunderwerbsteuer an. **Steuerlich:** Bei vermieteten Objekten sind Notar- und Grundbuchkosten, die auf die **Finanzierung** (Grundschuld) entfallen, sofort absetzbar; die übrigen Nebenkosten erhöhen die Anschaffungskosten und werden über die **AfA** mit abgeschrieben. Die Grunderwerbsteuer selbst zählt zu den Anschaffungskosten.",
+          },
+        ],
+        tip: "Planen Sie die Kaufnebenkosten von Anfang an als Eigenkapital ein — sonst entsteht eine Finanzierungslücke. Bei einer 300.000-€-Wohnung sind das schnell über 35.000 €.",
+        faq: [
+          {
+            question: "Wie hoch sind die Kaufnebenkosten in Prozent?",
+            answer:
+              "Insgesamt etwa 9–15 % des Kaufpreises: Grunderwerbsteuer (3,5–6,5 %), Notar (ca. 1,0–1,5 %), Grundbuch (ca. 0,5 %) und — falls beteiligt — Maklerprovision (oft 3,57 % inkl. USt für den Käufer).",
+          },
+          {
+            question: "Werden die Kaufnebenkosten von der Bank mitfinanziert?",
+            answer:
+              "In der Regel nicht. Banken erwarten, dass die Kaufnebenkosten aus Eigenkapital bezahlt werden. Eine Mitfinanzierung ist möglich, aber teurer und nicht immer machbar.",
+          },
+          {
+            question: "Wo ist die Grunderwerbsteuer am niedrigsten?",
+            answer:
+              "Am niedrigsten in Bayern mit 3,5 %. Am höchsten mit 6,5 % in Brandenburg, NRW, dem Saarland und Schleswig-Holstein. Die Sätze können sich ändern — vor dem Kauf den aktuellen Satz prüfen.",
+          },
+          {
+            question: "Kann ich Kaufnebenkosten steuerlich absetzen?",
+            answer:
+              "Bei Vermietung teilweise: Kosten rund um die Grundschuld/Finanzierung sind sofort abziehbar, die übrigen Nebenkosten erhöhen die Anschaffungskosten und werden über die AfA abgeschrieben. Bei Eigennutzung sind sie nicht absetzbar.",
+          },
+        ],
+      },
       {
         slug: "finanzierung-strukturieren",
         title: "Immobilienfinanzierung richtig strukturieren",
