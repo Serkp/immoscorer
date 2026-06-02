@@ -1,12 +1,30 @@
 /* ─── ImmoScorer Wissensbereich ─── */
 
+export interface KnowledgeTable {
+  caption?: string;
+  headers: string[];
+  rows: string[][];
+}
+
+export interface KnowledgeSection {
+  heading: string;
+  body: string;
+  table?: KnowledgeTable; // optionale Tabelle (z. B. Rechenbeispiel)
+}
+
+export interface KnowledgeFaq {
+  question: string;
+  answer: string;
+}
+
 export interface KnowledgeArticle {
   slug: string;
   title: string;
   summary: string;
   readMinutes: number;
-  sections: { heading: string; body: string }[];
+  sections: KnowledgeSection[];
   tip?: string;
+  faq?: KnowledgeFaq[]; // erzeugt FAQ-Block + FAQPage-Markup
   /* Optionale SEO-Felder (überschreiben Defaults; werden in Paket B befüllt) */
   seoTitle?: string;        // <title>, falls vom H1 abweichend optimiert
   metaDescription?: string; // ~140-155 Zeichen für die Google-Snippet-Beschreibung
@@ -126,27 +144,92 @@ export const KNOWLEDGE_BASE: KnowledgeCategory[] = [
       {
         slug: "rendite-berechnen",
         title: "Rendite richtig berechnen",
-        summary: "Brutto, Netto, Eigenkapitalrendite – welche Kennzahl wann relevant ist.",
-        readMinutes: 6,
+        seoTitle: "Immobilienrendite berechnen: Brutto, Netto & Eigenkapital",
+        metaDescription:
+          "Immobilienrendite berechnen: Bruttorendite, Nettorendite und Eigenkapitalrendite mit Formeln, Rechenbeispiel und Richtwerten für A-, B- und C-Lagen.",
+        summary:
+          "Brutto, Netto, Eigenkapitalrendite – welche Kennzahl wann relevant ist, mit Formeln und durchgerechnetem Beispiel.",
+        readMinutes: 9,
+        publishedAt: "2026-05-15",
+        updatedAt: "2026-06-02",
         sections: [
           {
-            heading: "Bruttorendite",
-            body: "Die Bruttorendite ist der schnellste Indikator: (Jahreskaltmiete / Kaufpreis) × 100. Sie eignet sich zum ersten Filtern von Objekten, berücksichtigt aber weder Kaufnebenkosten noch laufende Kosten. In A-Städten (München, Hamburg, Frankfurt) liegen Bruttorenditen bei 3–4 %, in B-Städten (Leipzig, Dresden, Nürnberg) bei 4–6 %, in C-Städten bei 5–8 %. Unter 4 % sollte das Objekt außergewöhnliche Lagequalität oder Wertsteigerungspotenzial bieten.",
+            heading: "Warum die Rendite über Gewinn oder Verlust entscheidet",
+            body: "Die Rendite ist die wichtigste Kennzahl bei jeder Kapitalanlage-Immobilie – sie sagt Ihnen, wie viel Ihr eingesetztes Geld tatsächlich erwirtschaftet. Doch \"die\" Rendite gibt es nicht: Je nachdem, welche Kosten Sie einrechnen, ergeben sich sehr unterschiedliche Werte. Wer nur auf die Bruttorendite im Exposé schaut, überschätzt die Wirtschaftlichkeit fast immer deutlich.\n\nIn diesem Artikel lernen Sie die drei entscheidenden Renditekennzahlen kennen – **Bruttorendite**, **Nettorendite** und **Eigenkapitalrendite** – inklusive Formeln, Richtwerten und einer vollständig durchgerechneten Beispielimmobilie.",
           },
           {
-            heading: "Nettorendite",
-            body: "Die Nettorendite berücksichtigt alle Kosten: ((Jahreskaltmiete – Nicht-umlagefähige Bewirtschaftungskosten) / (Kaufpreis + Kaufnebenkosten)) × 100. Zu den Bewirtschaftungskosten zählen: Nicht-umlagefähiges Hausgeld, Instandhaltungsrücklage, Verwaltungskosten und Mietausfallwagnis (2–4 %). Die Nettorendite liegt typischerweise 1,5–2,5 Prozentpunkte unter der Bruttorendite.",
+            heading: "Bruttorendite: der schnelle Filter",
+            body: "Die Bruttorendite ist der schnellste Indikator, um Objekte vorzusortieren:\n\n**Bruttorendite = (Jahreskaltmiete ÷ Kaufpreis) × 100**\n\nSie eignet sich, um aus vielen Inseraten die interessanten herauszufiltern, berücksichtigt aber weder Kaufnebenkosten noch laufende Bewirtschaftungskosten – die reale Rendite liegt also immer darunter. Als grobe Orientierung gilt: Liegt die Bruttorendite unter 4 %, muss das Objekt außergewöhnliche Lagequalität oder klares Wertsteigerungspotenzial bieten, damit sich die Investition trägt.",
           },
           {
-            heading: "Eigenkapitalrendite",
-            body: "Die Eigenkapitalrendite zeigt den Hebeleffekt der Finanzierung: (Jahresreinertrag nach Kapitaldienst / eingesetztes Eigenkapital) × 100. Durch den Leverage-Effekt kann die EK-Rendite deutlich über der Objektrendite liegen. Beispiel: Bei 20 % Eigenkapital und 4 % Objektrendite kann die EK-Rendite auf 8–12 % steigen. Achtung: Der Hebel wirkt in beide Richtungen – bei sinkenden Mieten oder steigenden Zinsen dreht sich der Effekt um.",
+            heading: "Nettorendite: die ehrliche Kennzahl",
+            body: "Die Nettorendite bezieht alle Kosten ein und ist damit die belastbarere Größe:\n\n**Nettorendite = ((Jahreskaltmiete − nicht umlagefähige Bewirtschaftungskosten) ÷ (Kaufpreis + Kaufnebenkosten)) × 100**\n\nZu den nicht umlagefähigen Kosten zählen vor allem: nicht umlagefähiges Hausgeld, Instandhaltungsrücklage, Verwaltungskosten und ein Mietausfallwagnis (üblich 2–4 % der Kaltmiete). Die Kaufnebenkosten (Grunderwerbsteuer, Notar, Grundbuch, ggf. Makler) liegen je nach Bundesland bei rund 9–15 % des Kaufpreises. In der Praxis liegt die Nettorendite typischerweise **1,5 bis 2,5 Prozentpunkte** unter der Bruttorendite.",
           },
           {
-            heading: "Kaufpreisfaktor und Mietmultiplikator",
-            body: "Der Kaufpreisfaktor (= Kaufpreis / Jahreskaltmiete) zeigt, wie viele Jahreskaltmieten der Kaufpreis entspricht. Ein Faktor unter 20 gilt als günstig, 20–25 als marktüblich, über 25 als teuer. Der Mietmultiplikator ist der Kehrwert und kann mit der Bruttorendite verglichen werden. Diese Kennzahl eignet sich besonders gut für schnelle Vergleiche am Markt.",
+            heading: "Eigenkapitalrendite: der Hebeleffekt der Finanzierung",
+            body: "Die Eigenkapitalrendite zeigt, was Ihr tatsächlich eingesetztes Geld erwirtschaftet – und damit den Hebeleffekt (Leverage) der Bank-Finanzierung:\n\n**Eigenkapitalrendite = (Jahresreinertrag nach Kapitaldienst ÷ eingesetztes Eigenkapital) × 100**\n\nWeil ein großer Teil des Kaufpreises über das Darlehen finanziert wird, kann die Eigenkapitalrendite deutlich über der Objektrendite liegen – bei moderatem Eigenkapital und solider Mietrendite sind zweistellige Werte möglich. **Achtung:** Der Hebel wirkt in beide Richtungen. Steigen die Zinsen bei der Anschlussfinanzierung oder fallen die Mieten, kann die Eigenkapitalrendite schnell negativ werden. Kalkulieren Sie deshalb immer auch ein Szenario mit höheren Zinsen.",
+          },
+          {
+            heading: "Kaufpreisfaktor & Mietmultiplikator",
+            body: "Der Kaufpreisfaktor verdichtet die Bewertung auf eine einzige Zahl:\n\n**Kaufpreisfaktor = Kaufpreis ÷ Jahreskaltmiete**\n\nEr sagt, wie viele Jahreskaltmieten der Kaufpreis entspricht – und ist der Kehrwert der Bruttorendite. Je niedriger der Faktor, desto schneller hat sich der Kaufpreis über die Mieten amortisiert. Die folgenden Orientierungswerte helfen bei der Einordnung (Stand 2026):",
+            table: {
+              caption: "Orientierungswerte Kaufpreisfaktor & Bruttorendite nach Lage",
+              headers: ["Lage", "Kaufpreisfaktor", "Bruttorendite", "Einordnung"],
+              rows: [
+                ["A-Städte (München, Hamburg, Frankfurt)", "28–35", "3–4 %", "teuer, auf Wertsteigerung gesetzt"],
+                ["B-Städte (Leipzig, Dresden, Nürnberg)", "22–28", "4–5 %", "marktüblich"],
+                ["C-Städte & ländlicher Raum", "15–22", "5–8 %", "günstig, höheres Risiko"],
+              ],
+            },
+          },
+          {
+            heading: "Rechenbeispiel: Eigentumswohnung Schritt für Schritt",
+            body: "So sieht eine realistische Rechnung für eine vermietete 70-m²-Eigentumswohnung aus. Die Bewirtschaftungskosten setzen sich hier zusammen aus Verwaltung (360 €), Instandhaltungsrücklage (rund 670 €), Mietausfallwagnis (3 %, rund 310 €) und nicht umlagefähigem Hausgeld (rund 480 €).",
+            table: {
+              caption: "Beispiel: 70-m²-Wohnung, Kaufpreis 250.000 €, Kaltmiete 850 €/Monat",
+              headers: ["Position", "Wert"],
+              rows: [
+                ["Kaufpreis", "250.000 €"],
+                ["Kaufnebenkosten (ca. 12 %)", "30.000 €"],
+                ["Gesamtinvestition", "280.000 €"],
+                ["Jahreskaltmiete (850 € × 12)", "10.200 €"],
+                ["Bruttorendite (10.200 ÷ 250.000)", "4,08 %"],
+                ["− Bewirtschaftungskosten / Jahr", "1.820 €"],
+                ["Jahresreinertrag", "8.380 €"],
+                ["Nettorendite (8.380 ÷ 280.000)", "2,99 %"],
+                ["Kaufpreisfaktor (250.000 ÷ 10.200)", "24,5"],
+              ],
+            },
           },
         ],
-        tip: "Berechnen Sie für jedes Objekt immer alle drei Renditekennzahlen. Die Bruttorendite filtert, die Nettorendite bewertet und die Eigenkapitalrendite zeigt den wahren Vermögensaufbau.",
+        tip: "Berechnen Sie für jedes Objekt immer alle drei Renditekennzahlen. Die Bruttorendite filtert, die Nettorendite bewertet die echte Wirtschaftlichkeit und die Eigenkapitalrendite zeigt den wahren Vermögensaufbau. ImmoScorer übernimmt diese Rechnung automatisch – inklusive Kaufnebenkosten je Bundesland.",
+        faq: [
+          {
+            question: "Was ist eine gute Bruttorendite bei einer Immobilie?",
+            answer:
+              "Als Faustregel gilt: ab etwa 4–5 % Bruttorendite wird eine vermietete Wohnung in einer soliden Lage interessant. In gefragten A-Städten sind 3–4 % marktüblich (hier zählt vor allem die Wertsteigerung), in B- und C-Lagen sind 5–8 % möglich, allerdings mit höherem Vermietungsrisiko. Entscheidend ist immer das Verhältnis von Rendite zu Lage und Zustand.",
+          },
+          {
+            question: "Brutto- oder Nettorendite – welche zählt wirklich?",
+            answer:
+              "Die Bruttorendite eignet sich nur zum schnellen Vorfiltern. Für die echte Kaufentscheidung zählt die Nettorendite, weil sie Kaufnebenkosten und laufende Bewirtschaftungskosten einrechnet. Sie liegt meist 1,5–2,5 Prozentpunkte unter der Bruttorendite.",
+          },
+          {
+            question: "Wie berechne ich die Eigenkapitalrendite?",
+            answer:
+              "Eigenkapitalrendite = (Jahresreinertrag nach Kapitaldienst ÷ eingesetztes Eigenkapital) × 100. Sie misst die Verzinsung Ihres tatsächlich eingesetzten Geldes. Durch den Finanzierungshebel kann sie deutlich über der Objektrendite liegen – steigt aber auch das Risiko bei höheren Zinsen.",
+          },
+          {
+            question: "Welcher Kaufpreisfaktor ist noch akzeptabel?",
+            answer:
+              "Ein Kaufpreisfaktor unter 22 gilt als günstig, 22–28 als marktüblich und über 28 als teuer. In Top-Lagen werden teils Faktoren über 30 bezahlt – das rechnet sich nur mit überdurchschnittlicher Wertsteigerung.",
+          },
+          {
+            question: "Lohnt sich eine Immobilie mit negativem Cashflow?",
+            answer:
+              "Das kann sinnvoll sein, wenn eine hohe Wertsteigerung erwartet wird oder steuerliche Effekte (AfA, Zinsabzug) den Fehlbetrag ausgleichen. Ein dauerhaft negativer Cashflow ohne diese Perspektive ist jedoch ein Warnsignal – Sie zahlen dann jeden Monat aus eigener Tasche dazu.",
+          },
+        ],
       },
       {
         slug: "cashflow-analyse",
