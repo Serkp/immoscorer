@@ -2,13 +2,25 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSupabaseAdmin } from "@/lib/supabase";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
-});
+function getStripe(): Stripe | null {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) return null;
+  return new Stripe(key, {
+    apiVersion: "2024-12-18.acacia" as Stripe.LatestApiVersion,
+  });
+}
 
 export async function POST(req: NextRequest) {
+  const stripe = getStripe();
+  if (!stripe) {
+    return NextResponse.json(
+      { error: "Stripe ist nicht konfiguriert." },
+      { status: 503 },
+    );
+  }
+
   const body = await req.text();
-  const sig = req.headers.get("stripe-signature")!;
+  const sig = req.headers.get("stripe-signature");
 
   let event: Stripe.Event;
 
@@ -19,10 +31,16 @@ export async function POST(req: NextRequest) {
     ) {
       event = JSON.parse(body) as Stripe.Event;
     } else {
+      if (!sig) {
+        return NextResponse.json(
+          { error: "Missing signature" },
+          { status: 400 },
+        );
+      }
       event = stripe.webhooks.constructEvent(
         body,
         sig,
-        process.env.STRIPE_WEBHOOK_SECRET!
+        process.env.STRIPE_WEBHOOK_SECRET,
       );
     }
   } catch (err: unknown) {

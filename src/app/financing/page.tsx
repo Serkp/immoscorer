@@ -44,6 +44,7 @@ export default function FinancingPage() {
   const [finForm, setFinForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
   const [finSending, setFinSending] = useState(false);
   const [finSent, setFinSent] = useState(false);
+  const [finError, setFinError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) { setLoading(false); return; }
@@ -100,8 +101,9 @@ export default function FinancingPage() {
     if (!user || finSending) return;
     if (!finForm.firstName || !finForm.lastName || !finForm.phone || !finForm.consent) return;
     setFinSending(true);
+    setFinError(null);
     try {
-      await fetch("/api/financing/lead", {
+      const res = await fetch("/api/financing/lead", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -117,11 +119,18 @@ export default function FinancingPage() {
           score: 0,
         }),
       });
+      if (!res.ok) {
+        setFinError("Die Anfrage konnte nicht gesendet werden. Bitte versuchen Sie es später erneut.");
+        setFinSending(false);
+        return;
+      }
       setFinSent(true);
       // Reload leads
       const { data } = await getSupabase().from("financing_leads").select("id, property_address, status, created_at").eq("user_id", user.id).order("created_at", { ascending: false });
       if (data) setLeads(data as FinancingLead[]);
-    } catch { /* silent */ }
+    } catch {
+      setFinError("Verbindungsfehler. Bitte versuchen Sie es später erneut.");
+    }
     setFinSending(false);
   }
 
@@ -197,6 +206,11 @@ export default function FinancingPage() {
               <input type="checkbox" checked={finForm.consent} onChange={(e) => setFinForm((f) => ({ ...f, consent: e.target.checked }))} className="mt-0.5 rounded" />
               <span className="text-xs leading-relaxed" style={{ color: C.sub }}>Ich stimme der Kontaktaufnahme per Telefon/E-Mail zu. *</span>
             </label>
+            {finError && (
+              <div className="rounded-xl px-4 py-3 text-sm" style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}>
+                {finError}
+              </div>
+            )}
             <div className="flex gap-3">
               <button onClick={() => setShowForm(false)} className="rounded-xl px-5 py-2.5 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Abbrechen</button>
               <button onClick={handleFinSubmit} disabled={finSending || !finForm.firstName || !finForm.lastName || !finForm.phone || !finForm.consent}
