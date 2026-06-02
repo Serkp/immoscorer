@@ -1,0 +1,45 @@
+name: Telegram Task (Claude)
+
+# Wird vom Agent-Control-Bindeglied (Vercel) per repository_dispatch ausgelöst.
+# Voraussetzung: Claude-GitHub-App installiert + Repo-Secrets ANTHROPIC_API_KEY
+# und TELEGRAM_BOT_TOKEN gesetzt.
+
+on:
+  repository_dispatch:
+    types: [telegram-task]
+
+jobs:
+  task:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Claude bearbeitet die Aufgabe
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Aufgabe (per Telegram gesendet): ${{ github.event.client_payload.task }}
+
+            Arbeite auf einem neuen Branch und öffne am Ende einen Pull Request
+            (NICHT mergen). Halte dich an CLAUDE.md. Antworte auf Deutsch.
+          claude_args: "--max-turns 20"
+
+      - name: Telegram-Rückmeldung
+        if: always()
+        run: |
+          STATUS="${{ job.status }}"
+          if [ "$STATUS" = "success" ]; then
+            MSG="✅ '${{ github.event.repository.name }}': Aufgabe bearbeitet. Pull Requests: https://github.com/${{ github.repository }}/pulls"
+          else
+            MSG="⚠️ '${{ github.event.repository.name }}': Aufgabe fehlgeschlagen ($STATUS). Logs: https://github.com/${{ github.repository }}/actions"
+          fi
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            --data-urlencode "chat_id=${{ github.event.client_payload.chat_id }}" \
+            --data-urlencode "text=$MSG" > /dev/null
