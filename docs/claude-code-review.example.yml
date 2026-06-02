@@ -1,0 +1,33 @@
+name: Claude Code Review
+
+# Läuft in der GitHub-Cloud (unabhängig vom Laptop) bei jedem Pull Request.
+# Voraussetzung: Claude-GitHub-App installiert + Repo-Secret ANTHROPIC_API_KEY gesetzt.
+# Einfachste Einrichtung: im lokalen Claude Code `/install-github-app` ausführen.
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Claude Review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review diesen Pull Request für ImmoScorer (Kontext: siehe CLAUDE.md).
+            Fokus: echte Korrektheits-Bugs, Sicherheits-/DSGVO-Probleme, Auth-Fehler,
+            offene API-Routen ohne Schutz. Kommentiere knapp und nur bei echten
+            Problemen (inline, mit Datei:Zeile). Antworte auf Deutsch.
+          claude_args: "--max-turns 10"
