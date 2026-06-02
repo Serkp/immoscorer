@@ -4,22 +4,16 @@ import { JsonLd } from "@/components/JsonLd";
 import { KnowledgeIndex } from "@/components/wissen/KnowledgeIndex";
 import { KNOWLEDGE_BASE } from "@/data/knowledge-base";
 import { C } from "@/lib/theme";
-import { absoluteUrl, breadcrumbJsonLd } from "@/lib/seo";
+import { absoluteUrl, breadcrumbJsonLd, pageMeta } from "@/lib/seo";
 
 const DESCRIPTION =
-  "Fundiertes Wissen für erfolgreiche Immobilien-Investments: Rendite berechnen, Finanzierung strukturieren, Steuern sparen, Lage bewerten und Strategien entwickeln — kompakt und verständlich erklärt.";
+  "Immobilien-Wissen für Kapitalanleger: Rendite berechnen, Finanzierung & Steuern optimieren, Lage bewerten und Investment-Strategien entwickeln. Verständlich erklärt.";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMeta({
   title: "Immobilien-Wissen: Ratgeber für Kapitalanleger",
   description: DESCRIPTION,
-  alternates: { canonical: "/wissen" },
-  openGraph: {
-    title: "Immobilien-Wissen: Ratgeber für Kapitalanleger | ImmoScorer",
-    description: DESCRIPTION,
-    url: absoluteUrl("/wissen"),
-    type: "website",
-  },
-};
+  path: "/wissen",
+});
 
 /* Server-gerenderte, öffentliche Wissens-Übersicht. Der Inhalt liegt im
    initialen HTML (crawlbar); nur die Suche ist eine Client-Insel. */

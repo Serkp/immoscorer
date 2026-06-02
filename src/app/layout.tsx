@@ -69,7 +69,12 @@ const jsonLd = {
       "@id": `${SITE.url}/#organization`,
       name: SITE.name,
       url: SITE.url,
-      logo: absoluteUrl("/icon"),
+      logo: {
+        "@type": "ImageObject",
+        url: absoluteUrl("/icon"),
+        width: 256,
+        height: 256,
+      },
       description: SITE.description,
     },
     {
@@ -101,6 +106,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="de">
       <body className="antialiased">
+        {/* Theme vor dem ersten Paint setzen — verhindert Hell/Dunkel-Flackern */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('theme')==='light')document.documentElement.classList.add('light')}catch(e){}`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
