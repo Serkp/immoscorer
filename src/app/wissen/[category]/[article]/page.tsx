@@ -6,7 +6,11 @@ import { AIComment } from "@/components/ui/AIComment";
 import { JsonLd } from "@/components/JsonLd";
 import { TableOfContents } from "@/components/wissen/TableOfContents";
 import { C } from "@/lib/theme";
-import { KNOWLEDGE_BASE, getArticle } from "@/data/knowledge-base";
+import {
+  KNOWLEDGE_BASE,
+  getArticle,
+  type KnowledgeTable,
+} from "@/data/knowledge-base";
 import { articleJsonLd, breadcrumbJsonLd, pageMeta } from "@/lib/seo";
 
 /* Statisch vorgerenderte Artikel; unbekannte Slugs → 404. */
@@ -56,6 +60,57 @@ function renderParagraph(paragraph: string, key: number) {
   );
 }
 
+/* Rendert eine Tabelle (z. B. Rechenbeispiel) innerhalb eines Abschnitts. */
+function TableBlock({ table, color }: { table: KnowledgeTable; color: string }) {
+  return (
+    <figure className="mt-4 -mx-1 overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr>
+            {table.headers.map((h, i) => (
+              <th
+                key={i}
+                className="text-left text-xs font-bold px-3 py-2"
+                style={{
+                  color: C.text,
+                  background: color + "14",
+                  borderBottom: `1px solid ${color}55`,
+                }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, ri) => (
+            <tr key={ri}>
+              {row.map((cell, ci) => (
+                <td
+                  key={ci}
+                  className="px-3 py-2 text-xs"
+                  style={{
+                    color: ci === 0 ? C.text : C.sub,
+                    fontWeight: ci === 0 ? 600 : 400,
+                    borderBottom: `1px solid ${C.border}`,
+                  }}
+                >
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {table.caption && (
+        <figcaption className="text-[11px] mt-2" style={{ color: C.dim }}>
+          {table.caption}
+        </figcaption>
+      )}
+    </figure>
+  );
+}
+
 export default function ArticlePage({
   params,
 }: {
@@ -92,6 +147,19 @@ export default function ArticlePage({
       { name: category.title, path: `/wissen/${category.slug}` },
       { name: article.title, path },
     ]),
+    ...(article.faq && article.faq.length
+      ? [
+          {
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: article.faq.map((f) => ({
+              "@type": "Question",
+              name: f.question,
+              acceptedAnswer: { "@type": "Answer", text: f.answer },
+            })),
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -187,6 +255,9 @@ export default function ArticlePage({
               <div className="space-y-3">
                 {section.body.split("\n\n").map((p, pIdx) => renderParagraph(p, pIdx))}
               </div>
+              {section.table && (
+                <TableBlock table={section.table} color={category.color} />
+              )}
             </Card>
           </section>
         ))}
@@ -202,6 +273,27 @@ export default function ArticlePage({
             {article.tip}
           </p>
         </AIComment>
+      )}
+
+      {/* FAQ */}
+      {article.faq && article.faq.length > 0 && (
+        <section>
+          <h2 className="text-base font-bold mb-4" style={{ color: C.text }}>
+            Häufige Fragen
+          </h2>
+          <div className="space-y-3">
+            {article.faq.map((f, i) => (
+              <Card key={i} className="p-5">
+                <h3 className="text-sm font-bold mb-2" style={{ color: C.text }}>
+                  {f.question}
+                </h3>
+                <p className="text-sm" style={{ color: C.sub, lineHeight: 1.7 }}>
+                  {f.answer}
+                </p>
+              </Card>
+            ))}
+          </div>
+        </section>
       )}
 
       {/* CTA */}
