@@ -89,10 +89,8 @@ export default function ComparePage() {
     async function load() {
       try {
         const data = await getAnalyses(user!.id);
-        console.log('[Compare] data loaded:', data?.length, 'items, user_id:', user!.id);
         setAnalyses(((data || []) as AnalysisRow[]).slice(0, 4));
       } catch (err) {
-        console.error('[Compare] load error:', err);
         setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');
       }
       finally { setLoading(false); }
@@ -110,8 +108,10 @@ export default function ComparePage() {
     } catch { /* silent */ }
   }
 
-  const cards = useMemo(() => analyses.map(normalize), [analyses]);
-  const bestScore = cards.length > 1 ? Math.max(...cards.map((d) => d.score)) : 0;
+  const cards = useMemo(
+    () => analyses.map(normalize).sort((a, b) => b.score - a.score),
+    [analyses],
+  );
 
   if (loading) {
     return <div className="flex items-center justify-center py-32"><AIOrb size={48} active /></div>;
@@ -237,8 +237,10 @@ export default function ComparePage() {
 
       {/* Cards — responsive grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((d) => {
-          const isBestCard = cards.length > 1 && d.score === bestScore && d.score > 0;
+        {cards.map((d, i) => {
+          const rank = i + 1;
+          const showRank = cards.length > 1 && d.score > 0;
+          const isBestCard = showRank && rank === 1;
           const ptLabel = PT_LABEL[d.propertyType] || "";
           const details = [ptLabel, d.rooms > 0 ? `${d.rooms} Zi.` : "", d.area > 0 ? `${d.area} m²` : ""].filter(Boolean).join(" · ");
 
@@ -271,12 +273,14 @@ export default function ComparePage() {
                   <span className="text-xs font-bold" style={{ color: scoreColor(d.score) }}>
                     {scoreLabel(d.score)}
                   </span>
-                  {isBestCard && (
+                  {showRank && (
                     <span
                       className="text-[10px] font-bold rounded-full px-2 py-0.5"
-                      style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
+                      style={isBestCard
+                        ? { background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }
+                        : { background: C.surface3, color: C.sub, border: `1px solid ${C.border}` }}
                     >
-                      Bestes Objekt
+                      {isBestCard ? "🏆 Platz 1" : `Platz ${rank}`}
                     </span>
                   )}
                 </div>

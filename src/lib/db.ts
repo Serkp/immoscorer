@@ -24,11 +24,7 @@ export async function ensureProfileExists(userId: string, email?: string) {
         .upsert(row, { onConflict: "id" });
       if (err2) {
         console.error("[ensureProfileExists] all attempts failed:", err2.message);
-      } else {
-        console.log("[ensureProfileExists] profile upserted for:", userId);
       }
-    } else {
-      console.log("[ensureProfileExists] profile created for:", userId);
     }
   }
 }
@@ -163,7 +159,6 @@ export async function saveComparisonFlat(
   // Ensure profile exists (FK constraint)
   await ensureProfileExists(userId);
 
-  console.log("[saveComparisonFlat] inserting into analyses:", JSON.stringify(fullRow, null, 2));
   const { data, error } = await getSupabase()
     .from("analyses")
     .insert(fullRow)
@@ -172,15 +167,7 @@ export async function saveComparisonFlat(
 
   if (!error) return data;
 
-  // Full insert failed — try fallback with only essential columns
-  console.warn("[saveComparisonFlat] full insert failed:", {
-    message: error.message,
-    code: error.code,
-    details: error.details,
-    hint: error.hint,
-  });
-
-  // Minimal fallback: only columns guaranteed to exist + JSONB
+  // Full insert failed — fall back to only the columns guaranteed to exist + JSONB
   const minimalRow = {
     user_id: userId,
     inputs: { ...inp, ...scores, savedAt: new Date().toISOString() },
@@ -189,24 +176,13 @@ export async function saveComparisonFlat(
     status: "saved",
   };
 
-  console.log("[saveComparisonFlat] trying minimal fallback...");
   const { data: data2, error: err2 } = await getSupabase()
     .from("analyses")
     .insert(minimalRow)
     .select()
     .single();
 
-  if (!err2) {
-    console.log("[saveComparisonFlat] minimal fallback succeeded");
-    return data2;
-  }
-
-  console.error("[saveComparisonFlat] all insert attempts failed:", {
-    message: err2.message,
-    code: err2.code,
-    details: err2.details,
-    hint: err2.hint,
-  });
+  if (!err2) return data2;
 
   const dbError = new Error(`Speichern fehlgeschlagen: ${error.message} (code: ${error.code})`);
   (dbError as unknown as Record<string, unknown>).supabaseError = error;
@@ -337,7 +313,6 @@ export async function savePortfolioProperty(userId: string, data: {
     estimated_market_value: data.estimatedMarketValue || null,
   };
 
-  console.log("[savePortfolioProperty] trying full insert...");
   const { data: prop, error } = await getSupabase()
     .from("portfolio_properties")
     .insert(fullRow)
@@ -346,12 +321,7 @@ export async function savePortfolioProperty(userId: string, data: {
 
   if (!error) return prop;
 
-  // Full insert failed — log and try minimal fallback with JSONB inputs column
-  console.error("[savePortfolioProperty] full insert failed:", JSON.stringify({
-    message: error.message, code: error.code, details: error.details, hint: error.hint,
-  }));
-
-  console.log("[savePortfolioProperty] trying minimal fallback with inputs JSONB...");
+  // Full insert failed — try minimal fallback with JSONB inputs column
   const minimalRow: Record<string, unknown> = {
     user_id: userId,
     address: data.address,
@@ -367,17 +337,9 @@ export async function savePortfolioProperty(userId: string, data: {
     .select()
     .single();
 
-  if (!err2) {
-    console.log("[savePortfolioProperty] minimal fallback succeeded (data stored in inputs JSONB)");
-    return prop2;
-  }
+  if (!err2) return prop2;
 
   // Even minimal failed — try absolute minimum
-  console.error("[savePortfolioProperty] minimal fallback failed:", JSON.stringify({
-    message: err2.message, code: err2.code, details: err2.details, hint: err2.hint,
-  }));
-
-  console.log("[savePortfolioProperty] trying absolute minimum insert...");
   const minRow = {
     user_id: userId,
     address: data.address,
@@ -392,14 +354,7 @@ export async function savePortfolioProperty(userId: string, data: {
     .select()
     .single();
 
-  if (!err3) {
-    console.log("[savePortfolioProperty] absolute minimum insert succeeded");
-    return prop3;
-  }
-
-  console.error("[savePortfolioProperty] all insert attempts failed:", JSON.stringify({
-    message: err3.message, code: err3.code, details: err3.details, hint: err3.hint,
-  }));
+  if (!err3) return prop3;
 
   const dbError = new Error(
     `Portfolio speichern fehlgeschlagen: ${error.message} (code: ${error.code})` +

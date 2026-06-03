@@ -91,10 +91,8 @@ export default function PortfolioPage() {
     (async () => {
       try {
         const data = await getPortfolioProperties(user.id);
-        console.log('[Portfolio] data loaded:', data?.length, 'items, user_id:', user.id);
         setProperties((data || []) as PP[]);
       } catch (err) {
-        console.error('[Portfolio] load error:', err);
         setLoadError(err instanceof Error ? err.message : 'Daten konnten nicht geladen werden.');
       }
       finally { setLoading(false); }

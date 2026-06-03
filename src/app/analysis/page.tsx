@@ -608,7 +608,6 @@ function AnalysisContent() {
         throw new Error(json.error || `Server error ${res.status}`);
       }
 
-      console.log("[handleSaveCompare] saved via API:", json.data?.id, json.fallback ? "(fallback)" : "");
       setSaveChoice("compare");
       setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
       setTimeout(() => setToast(null), 3000);
