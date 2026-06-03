@@ -445,7 +445,7 @@ function AnalysisContent() {
   const mfhNeedsUnits = form.propertyType === "mfh" && !form.unitCount;
 
   const canNext0 = !!(
-    form.street && form.city && form.price && form.rent && form.propertyType &&
+    form.price && form.rent && form.propertyType &&
     priceValid && rentValid &&
     !etwNeedsApartmentType &&
     (!form.rooms || roomsValid)
@@ -537,11 +537,12 @@ function AnalysisContent() {
       const area = Number(form.area);
       const split = computeHGSplit(hausgeld, form.hgItems);
       const ownerHG = split.nichtUmlagefaehig;
+      const addressLabel = (form.street || form.city) ? `${form.street}, ${form.city}`.replace(/^, |, $/g, "") : "Objekt ohne Adresse";
 
       const getSub = (key: string) => result.subscores.find((s) => s.key === key)?.value || 0;
 
       const payload = {
-        address: `${form.street}, ${form.city}`,
+        address: addressLabel,
         city: form.city,
         purchase_price: price,
         monthly_rent: rent,
@@ -823,11 +824,14 @@ function AnalysisContent() {
               <h2 className="text-lg font-bold">Was möchten Sie analysieren?</h2>
             </div>
 
-            {/* GRUPPE 1 — Adresse */}
-            <AddressAutocomplete
-              onSelect={handleAddressSelect}
-              defaultValue={form.street ? `${form.street}, ${form.city}` : ""}
-            />
+            {/* GRUPPE 1 — Adresse (optional) */}
+            <div className="space-y-2">
+              <label className="text-xs font-medium" style={{ color: C.sub }}>Adresse <span style={{ color: C.dim }}>(optional — für automatische Lage-Analyse)</span></label>
+              <AddressAutocomplete
+                onSelect={handleAddressSelect}
+                defaultValue={form.street ? `${form.street}, ${form.city}` : ""}
+              />
+            </div>
 
             {locationLoading && (
               <div className="flex items-center gap-3 rounded-xl p-4 animate-fade-up" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
