@@ -4,7 +4,7 @@
    Jede Zahl muss stimmen.
    ═══════════════════════════════════════════════════════════ */
 
-import { findCityData } from "@/data/german-cities";
+import { findCityData, getMarketRange, type MarketRange } from "@/data/german-cities";
 
 export interface PropertyInput {
   street: string;
@@ -85,6 +85,7 @@ export interface ScoringResult {
   renovationEstimate: RenovationEstimate | null;
   valuePotential: ValuePotential | null;
   energyExplanation: string;
+  marketRange: (MarketRange & { city: string; avgPricePerSqm: number; avgRentPerSqm: number }) | null;
 }
 
 /* ─── Lookup-Tabellen ─── */
@@ -273,6 +274,7 @@ function runPlausibilityChecks(p: PropertyInput): PlausibilityCheck[] {
 
 function deriveKPIs(p: PropertyInput) {
   const cityData = findCityData(p.city);
+  const marketRange: MarketRange | null = cityData ? getMarketRange(cityData) : null;
   const annualRent = p.rent * 12;
   const renoEst = estimateRenovationCosts(p.propertyType, p.area, p.renovations, p.unitCount);
   const renovationCosts = renoEst.total;
@@ -316,7 +318,7 @@ function deriveKPIs(p: PropertyInput) {
   return {
     annualRent, grossYield, effectiveGrossYield, netCashflow, netYield,
     factor, effectiveFactor, sqmPrice, hausgeldRatio, age,
-    renovationCosts, effectivePrice, ownerHausgeld, cityData,
+    renovationCosts, effectivePrice, ownerHausgeld, cityData, marketRange,
     gesamtinvestition, kaufnebenkosten, grestPct, notarPct,
     instandhaltung, mietausfallRisiko, finanzierungsBetrag,
     geschaetzteKreditrate, cashflowNachFinanzierung,
@@ -375,6 +377,9 @@ function calcInvestment(p: PropertyInput, k: KPIs): { value: number; reasons: st
     else { marketPts = 10; reasons.push(`${Math.round(k.sqmPrice).toLocaleString("de-DE")} €/m² — deutlich überteuert.`); }
   } else {
     reasons.push(`${Math.round(k.sqmPrice).toLocaleString("de-DE")} €/m² (Stadt nicht in Datenbank — neutraler Vergleich).`);
+  }
+  if (k.marketRange) {
+    reasons.push(`Ortsübliche Spanne in ${k.cityData?.city}: ${k.marketRange.priceMin.toLocaleString("de-DE")}–${k.marketRange.priceMax.toLocaleString("de-DE")} €/m² (Kauf), ${k.marketRange.rentMin.toFixed(1).replace(".", ",")}–${k.marketRange.rentMax.toFixed(1).replace(".", ",")} €/m² (Miete). Orientierungswerte, nicht flurstückgenau.`);
   }
   s += marketPts * 0.30;
 
@@ -920,5 +925,8 @@ export function computeScore(p: PropertyInput): ScoringResult {
     renovationEstimate: renoEst,
     valuePotential,
     energyExplanation,
+    marketRange: k.marketRange && k.cityData
+      ? { ...k.marketRange, city: k.cityData.city, avgPricePerSqm: k.cityData.avgPricePerSqm, avgRentPerSqm: k.cityData.avgRentPerSqm }
+      : null,
   };
 }

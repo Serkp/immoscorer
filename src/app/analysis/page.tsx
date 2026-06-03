@@ -1434,6 +1434,39 @@ function AnalysisContent() {
               {kiEmpfehlung.text}
             </AIComment>
 
+            {/* Preiseinordnung im Markt */}
+            {result.marketRange && result.kpis.sqmPrice > 0 && (() => {
+              const mr = result.marketRange;
+              const sqm = result.kpis.sqmPrice;
+              const pos = Math.max(0, Math.min(100, ((sqm - mr.priceMin) / (mr.priceMax - mr.priceMin)) * 100));
+              const below = sqm < mr.priceMin;
+              const above = sqm > mr.priceMax;
+              const markerColor = sqm <= mr.avgPricePerSqm ? C.green : above ? C.red : C.amber;
+              return (
+                <Card className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold">Preiseinordnung — {mr.city}</span>
+                    <span className="text-xs font-semibold" style={{ color: markerColor }}>{Math.round(sqm).toLocaleString("de-DE")} €/m²</span>
+                  </div>
+                  <div className="relative h-2 rounded-full" style={{ background: `linear-gradient(90deg, ${C.green}, ${C.amber}, ${C.red})`, opacity: 0.35 }}>
+                    <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3 h-3 rounded-full" style={{ left: `${pos}%`, background: markerColor, border: "2px solid #fff", boxShadow: "0 0 0 1px rgba(0,0,0,.2)" }} />
+                  </div>
+                  <div className="flex justify-between text-[11px]" style={{ color: C.dim }}>
+                    <span>{mr.priceMin.toLocaleString("de-DE")} €</span>
+                    <span>Ø {mr.avgPricePerSqm.toLocaleString("de-DE")} €</span>
+                    <span>{mr.priceMax.toLocaleString("de-DE")} €</span>
+                  </div>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.sub }}>
+                    {below ? `Unter der ortsüblichen Spanne — mögliches Schnäppchen oder versteckter Mangel. Genau prüfen.` :
+                     above ? `Über der ortsüblichen Spanne — Preis kritisch hinterfragen oder Nachlass verhandeln.` :
+                     sqm <= mr.avgPricePerSqm ? `Im unteren Bereich der ortsüblichen Spanne — attraktiv eingepreist.` :
+                     `Im oberen Bereich der ortsüblichen Spanne — fair bis leicht ambitioniert.`}
+                    {" "}Miete ortsüblich {mr.rentMin.toFixed(1).replace(".", ",")}–{mr.rentMax.toFixed(1).replace(".", ",")} €/m². Orientierungswerte, nicht flurstückgenau.
+                  </p>
+                </Card>
+              );
+            })()}
+
             {/* Subscore Cards */}
             <div className="space-y-2">
               <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>

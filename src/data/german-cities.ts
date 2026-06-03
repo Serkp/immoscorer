@@ -217,3 +217,31 @@ export function findCityData(cityName: string): CityData | null {
 }
 
 export { CITIES };
+
+/**
+ * Ortsübliche Spanne (Orientierung) um den kuratierten Mittelwert.
+ * Innerstädtische Streuung ist in Top-Lagen größer als in einfachen Märkten,
+ * daher tier-abhängiger Spread. Keine flurstückgenauen Werte — eine
+ * realistische Bandbreite, in der sich Angebote der Stadt typischerweise bewegen.
+ */
+const TIER_SPREAD: Record<CityData["tier"], number> = { A: 0.35, B: 0.28, C: 0.22, D: 0.20 };
+
+export interface MarketRange {
+  priceMin: number;
+  priceMax: number;
+  rentMin: number;
+  rentMax: number;
+  spreadPct: number;
+}
+
+export function getMarketRange(c: CityData): MarketRange {
+  const s = TIER_SPREAD[c.tier] ?? 0.25;
+  const round = (n: number, step: number) => Math.round(n / step) * step;
+  return {
+    priceMin: round(c.avgPricePerSqm * (1 - s), 50),
+    priceMax: round(c.avgPricePerSqm * (1 + s), 50),
+    rentMin: Math.round(c.avgRentPerSqm * (1 - s) * 10) / 10,
+    rentMax: Math.round(c.avgRentPerSqm * (1 + s) * 10) / 10,
+    spreadPct: Math.round(s * 100),
+  };
+}
