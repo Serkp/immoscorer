@@ -24,15 +24,14 @@ export default function DatenschutzPage() {
       <LegalP>
         Verantwortlich für die Datenverarbeitung auf immoscorer.de ist:
         <br />
-        <PH>Parlak Invest [Rechtsform]</PH>, <PH>[Straße Hausnr., PLZ Ort]</PH>,
-        E-Mail: info@parlak-invest.de. Weitere Angaben im{" "}
+        Serkan Parlak (Einzelunternehmen, &bdquo;Parlak Invest&ldquo;),{" "}
+        <PH>[Straße Hausnr.]</PH>, <PH>[PLZ]</PH> Essen, E-Mail:
+        info@parlak-invest.de. Weitere Angaben im{" "}
         <a href="/impressum" style={{ textDecoration: "underline" }}>Impressum</a>.
       </LegalP>
       <LegalP>
-        <PH>
-          [Datenschutzbeauftragte/r: nur angeben, falls bestellt — i. d. R. erst
-          ab 20 Personen ständiger Datenverarbeitung Pflicht.]
-        </PH>
+        Ein/e Datenschutzbeauftragte/r ist nicht bestellt (gesetzlich nicht
+        erforderlich).
       </LegalP>
 
       <LegalH2>2. Ihre Rechte</LegalH2>

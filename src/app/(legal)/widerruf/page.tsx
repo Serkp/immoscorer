@@ -26,7 +26,7 @@ export default function WiderrufPage() {
       </LegalP>
       <LegalP>
         Um Ihr Widerrufsrecht auszuüben, müssen Sie uns (
-        <PH>Parlak Invest, [Anschrift]</PH>, E-Mail: info@parlak-invest.de) mittels
+        Serkan Parlak (&bdquo;Parlak Invest&ldquo;), <PH>[Straße, PLZ]</PH> Essen, E-Mail: info@parlak-invest.de) mittels
         einer eindeutigen Erklärung (z. B. ein mit der Post versandter Brief oder
         eine E-Mail) über Ihren Entschluss, diesen Vertrag zu widerrufen,
         informieren. Sie können dafür das beigefügte Muster-Widerrufsformular
@@ -56,7 +56,7 @@ export default function WiderrufPage() {
         Formular aus und senden Sie es zurück.)
       </LegalP>
       <LegalP>
-        — An <PH>Parlak Invest, [Anschrift]</PH>, info@parlak-invest.de:
+        — An Serkan Parlak (&bdquo;Parlak Invest&ldquo;), <PH>[Straße, PLZ]</PH> Essen, info@parlak-invest.de:
         <br />— Hiermit widerrufe(n) ich/wir den von mir/uns abgeschlossenen Vertrag
         über die Erbringung der folgenden Dienstleistung: ImmoScorer Pro
         <br />— Bestellt am / erhalten am: …

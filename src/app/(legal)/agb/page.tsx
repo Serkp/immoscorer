@@ -21,7 +21,7 @@ export default function AgbPage() {
       <LegalH2>§ 1 Geltungsbereich &amp; Anbieter</LegalH2>
       <LegalP>
         Diese AGB gelten für die Nutzung der Web-App ImmoScorer, betrieben von{" "}
-        <PH>Parlak Invest [Rechtsform, Anschrift]</PH> (&bdquo;Anbieter&ldquo;).
+Serkan Parlak (Einzelunternehmen, &bdquo;Parlak Invest&ldquo;), <PH>[Straße]</PH>, <PH>[PLZ]</PH> Essen (&bdquo;Anbieter&ldquo;).
         Abweichende
         Bedingungen des Nutzers gelten nur bei ausdrücklicher Zustimmung.
       </LegalP>
