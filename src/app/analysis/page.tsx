@@ -445,7 +445,7 @@ function AnalysisContent() {
   const mfhNeedsUnits = form.propertyType === "mfh" && !form.unitCount;
 
   const canNext0 = !!(
-    form.price && form.rent && form.propertyType &&
+    form.street && form.city && form.price && form.rent && form.propertyType &&
     priceValid && rentValid &&
     !etwNeedsApartmentType &&
     (!form.rooms || roomsValid)
@@ -826,7 +826,7 @@ function AnalysisContent() {
 
             {/* GRUPPE 1 — Adresse (optional) */}
             <div className="space-y-2">
-              <label className="text-xs font-medium" style={{ color: C.sub }}>Adresse <span style={{ color: C.dim }}>(optional — für automatische Lage-Analyse)</span></label>
+              <label className="text-xs font-medium" style={{ color: C.sub }}>Adresse * <span style={{ color: C.dim }}>(für Lage-Analyse & Bodenrichtwert)</span></label>
               <AddressAutocomplete
                 onSelect={handleAddressSelect}
                 defaultValue={form.street ? `${form.street}, ${form.city}` : ""}
