@@ -22,3 +22,7 @@ content_path = "./templates/reset-password.html"
 [auth.email.template.magic_link]
 subject = "Ihr Login-Link – ImmoScorer"
 content_path = "./templates/confirm-signup.html"
+
+[auth.email.template.email_change]
+subject = "Neue E-Mail-Adresse bestätigen – ImmoScorer"
+content_path = "./templates/email-change.html"
