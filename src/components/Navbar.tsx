@@ -9,16 +9,21 @@ import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 import { useTheme } from "@/lib/ThemeContext";
 
-const NAV = [
+// Kern: 2 Jobs (Objekt einschätzen + Portfolio) + Übersicht + Wissen
+const PRIMARY = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/analysis", label: "Analyse" },
-  { href: "/expose-analyse", label: "Exposé-Analyse" },
   { href: "/portfolio", label: "Portfolio" },
-  { href: "/compare", label: "Vergleich" },
-  { href: "/financing", label: "Finanzierung" },
-  { href: "/strategies", label: "Strategien" },
   { href: "/wissen", label: "Wissen" },
+] as const;
+
+// Sekundär — unter „Mehr"
+const MORE = [
+  { href: "/expose-analyse", label: "Exposé-Analyse" },
+  { href: "/compare", label: "Vergleich" },
+  { href: "/strategies", label: "Strategien" },
   { href: "/ki-berater", label: "KI-Berater" },
+  { href: "/financing", label: "Finanzierung" },
 ] as const;
 
 export function Navbar() {
@@ -27,7 +32,9 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const moreRef = useRef<HTMLDivElement>(null);
 
   const displayName =
     user?.user_metadata?.full_name || user?.email || "";
@@ -44,6 +51,9 @@ export function Navbar() {
       if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
         setMenuOpen(false);
       }
+      if (moreRef.current && !moreRef.current.contains(e.target as Node)) {
+        setMoreOpen(false);
+      }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -52,6 +62,7 @@ export function Navbar() {
   // Close mobile menu on route change
   useEffect(() => {
     setMobileOpen(false);
+    setMoreOpen(false);
   }, [pathname]);
 
   // Lock body scroll when mobile menu is open
@@ -79,9 +90,9 @@ export function Navbar() {
 
           <div className="hidden md:block h-5 w-px shrink-0" style={{ background: C.border }} />
 
-          {/* Desktop nav items */}
-          <div className="hidden md:flex items-center gap-1 overflow-x-auto">
-            {NAV.map((n) => {
+          {/* Desktop nav: 4 Kern-Punkte + „Mehr" */}
+          <div className="hidden md:flex items-center gap-1">
+            {PRIMARY.map((n) => {
               const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href));
               return (
                 <Link key={n.href} href={n.href}
@@ -91,6 +102,28 @@ export function Navbar() {
                 </Link>
               );
             })}
+            <div className="relative" ref={moreRef}>
+              <button onClick={() => setMoreOpen((o) => !o)}
+                className="rounded-lg px-3 py-1.5 text-[13px] font-medium transition-colors whitespace-nowrap flex items-center gap-1"
+                style={{ background: moreOpen || MORE.some((m) => pathname.startsWith(m.href)) ? C.surface3 : "transparent", color: MORE.some((m) => pathname.startsWith(m.href)) ? C.text : C.sub }}>
+                Mehr
+                <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform: moreOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}><polyline points="6 9 12 15 18 9" /></svg>
+              </button>
+              {moreOpen && (
+                <div className="absolute left-0 top-full mt-2 w-52 rounded-xl py-1 shadow-xl animate-fade-up"
+                  style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: "0 8px 32px rgba(0,0,0,0.4)" }}>
+                  {MORE.map((m) => (
+                    <Link key={m.href} href={m.href} onClick={() => setMoreOpen(false)}
+                      className="block px-4 py-2 text-xs transition-all"
+                      style={{ color: C.sub }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = C.surface; e.currentTarget.style.color = C.text; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.sub; }}>
+                      {m.label}
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="flex-1" />
@@ -214,8 +247,28 @@ export function Navbar() {
 
             {/* Nav links */}
             <div className="flex-1 overflow-y-auto py-3">
-              {NAV.map((n) => {
+              {PRIMARY.map((n) => {
                 const active = pathname === n.href || (n.href !== "/dashboard" && pathname.startsWith(n.href));
+                return (
+                  <Link
+                    key={n.href}
+                    href={n.href}
+                    className="flex items-center h-12 px-5 text-[15px] font-medium transition-colors"
+                    style={{
+                      color: active ? C.text : C.sub,
+                      background: active ? C.surface2 : "transparent",
+                      borderLeft: active ? `3px solid ${C.accent}` : "3px solid transparent",
+                    }}
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    {n.label}
+                  </Link>
+                );
+              })}
+
+              <p className="px-5 pt-4 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: C.dim }}>Mehr</p>
+              {MORE.map((n) => {
+                const active = pathname.startsWith(n.href);
                 return (
                   <Link
                     key={n.href}

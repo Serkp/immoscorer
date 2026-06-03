@@ -601,9 +601,9 @@ function LandingContent() {
                   className="text-base md:text-lg leading-relaxed mb-3"
                   style={{ color: C.sub, maxWidth: 520 }}
                 >
-                  Kaufpreis und Miete eingeben — ImmoScorer analysiert Rendite,
-                  Risiko, Finanzierbarkeit, Lagepotenzial und Zukunftsprognose.
-                  Alles in einem Score.
+                  Kaufpreis und Miete eingeben — und in Sekunden sehen, ob sich
+                  eine Immobilie als Kapitalanlage lohnt. Anschließend Ihr
+                  Portfolio speichern und alles im Blick behalten.
                 </p>
                 <p className="text-sm mb-8" style={{ color: C.dim }}>
                   Kein Excel. Kein Bauchgefühl. Kein Berater nötig.
