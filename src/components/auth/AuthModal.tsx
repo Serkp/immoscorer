@@ -46,6 +46,11 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
   const [forgotStep, setForgotStep] = useState<ForgotStep>("form");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotError, setForgotError] = useState<string | null>(null);
+  // 2FA challenge at login
+  const [mfaStep, setMfaStep] = useState(false);
+  const [mfaCode, setMfaCode] = useState("");
+  const [mfaError, setMfaError] = useState<string | null>(null);
+  const [mfaVerifying, setMfaVerifying] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -127,6 +132,16 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
             { onConflict: "id" }
           );
         }
+
+        // 2FA: if the account has a verified factor, login must be elevated to aal2
+        const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+        if (aal?.nextLevel === "aal2" && aal.nextLevel !== aal.currentLevel) {
+          setMfaStep(true);
+          setMfaCode("");
+          setMfaError(null);
+          setLoading(false);
+          return; // wait for the TOTP code before granting access
+        }
       }
 
       // Auth success — hard redirect to /dashboard so auth cookie is picked up
@@ -161,6 +176,36 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
     setForgotLoading(false);
   }
 
+  async function handleMfaLogin(e: React.FormEvent) {
+    e.preventDefault();
+    if (mfaCode.length !== 6) return;
+    setMfaVerifying(true);
+    setMfaError(null);
+    try {
+      const supabase = getSupabase();
+      const { data: factors } = await supabase.auth.mfa.listFactors();
+      const factor = factors?.totp?.find((f) => f.status === "verified");
+      if (!factor) { setMfaError("Kein aktiver 2FA-Faktor gefunden."); setMfaVerifying(false); return; }
+      const { data: challenge, error: chErr } = await supabase.auth.mfa.challenge({ factorId: factor.id });
+      if (chErr || !challenge) { setMfaError("Verifizierung fehlgeschlagen. Bitte erneut versuchen."); setMfaVerifying(false); return; }
+      const { error: vErr } = await supabase.auth.mfa.verify({ factorId: factor.id, challengeId: challenge.id, code: mfaCode });
+      if (vErr) { setMfaError("Code ungültig oder abgelaufen. Bitte erneut eingeben."); setMfaVerifying(false); return; }
+      setMfaVerifying(false);
+      onSuccess?.();
+      window.location.href = "/dashboard";
+    } catch {
+      setMfaError("Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.");
+      setMfaVerifying(false);
+    }
+  }
+
+  async function cancelMfa() {
+    setMfaStep(false);
+    setMfaCode("");
+    setMfaError(null);
+    try { await getSupabase().auth.signOut(); } catch { /* ignore */ }
+  }
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center px-4"
@@ -171,7 +216,42 @@ export function AuthModal({ open, onClose, onSuccess, resetSuccess }: AuthModalP
         className="w-full max-w-[420px] rounded-2xl p-6 space-y-6 animate-fade-up"
         style={{ background: C.bg2, border: `1px solid ${C.border}`, boxShadow: `0 0 60px ${C.accentDim}` }}
       >
-        {showForgot ? (
+        {mfaStep ? (
+          /* ── 2FA-Abfrage beim Login ── */
+          <form onSubmit={handleMfaLogin} className="space-y-5">
+            <div className="flex flex-col items-center gap-3 text-center">
+              <AIOrb size={40} active />
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: C.text }}>Zwei-Faktor-Bestätigung</h2>
+                <p className="text-xs mt-1" style={{ color: C.sub }}>Geben Sie den 6-stelligen Code aus Ihrer Authenticator-App ein.</p>
+              </div>
+            </div>
+            {mfaError && (
+              <div className="rounded-xl px-4 py-2.5 text-xs" style={{ background: C.redDim, color: C.red, border: "1px solid rgba(248,113,113,0.2)" }}>
+                {mfaError}
+              </div>
+            )}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={mfaCode}
+              onChange={(e) => { setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setMfaError(null); }}
+              placeholder="000000"
+              maxLength={6}
+              autoFocus
+              className="w-full rounded-xl px-4 py-3 text-lg font-mono text-center tracking-[0.5em] outline-none"
+              style={{ background: C.surface2, border: `1px solid ${C.border}`, color: C.text }}
+            />
+            <button type="submit" disabled={mfaVerifying || mfaCode.length !== 6}
+              className="w-full rounded-xl px-5 py-2.5 text-sm font-bold transition-all disabled:opacity-40"
+              style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}>
+              {mfaVerifying ? "Wird geprüft..." : "Anmelden"}
+            </button>
+            <button type="button" onClick={cancelMfa} className="w-full text-center text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+              Abbrechen
+            </button>
+          </form>
+        ) : showForgot ? (
           /* ── Passwort vergessen ── */
           <>
             <div className="flex flex-col items-center gap-3 text-center">
