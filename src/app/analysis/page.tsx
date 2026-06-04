@@ -1466,6 +1466,24 @@ function AnalysisContent() {
               );
             })()}
 
+            {/* Steuer-Basis (AfA) */}
+            {result.taxBasis && (
+              <Card className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold">Abschreibung (AfA)</span>
+                  <span className="text-xs font-semibold" style={{ color: C.green }}>
+                    ~{result.taxBasis.annualAfa.toLocaleString("de-DE")} €/Jahr
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <MiniMetric label="Gebäudeanteil" value={`${result.taxBasis.buildingValue.toLocaleString("de-DE")} €`} />
+                  <MiniMetric label="Grundstücksanteil" value={`${Math.round(result.taxBasis.landSharePct * 100)} %`} />
+                  <MiniMetric label="AfA-Satz" value={`${(result.taxBasis.afaRate * 100).toFixed(1).replace(".", ",")} %`} />
+                </div>
+                <p className="text-[11px] leading-relaxed" style={{ color: C.sub }}>{result.taxBasis.note}</p>
+              </Card>
+            )}
+
             {/* Subscore Cards */}
             <div className="space-y-2">
               <p className="text-xs" style={{ color: C.dim }}>Klicken für Begründung + Empfehlung</p>

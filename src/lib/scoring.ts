@@ -86,6 +86,16 @@ export interface ScoringResult {
   valuePotential: ValuePotential | null;
   energyExplanation: string;
   marketRange: (MarketRange & { city: string; avgPricePerSqm: number; avgRentPerSqm: number }) | null;
+  taxBasis: TaxBasis | null;
+}
+
+export interface TaxBasis {
+  landSharePct: number;   // 0..1 — geschätzter Grundstücksanteil
+  landValue: number;      // €
+  buildingValue: number;  // € — abschreibbar
+  afaRate: number;        // 0..1
+  annualAfa: number;      // €/Jahr
+  note: string;
 }
 
 /* ─── Lookup-Tabellen ─── */
@@ -212,6 +222,30 @@ export function estimateRenovationCosts(
 
   const total = Object.values(breakdown).reduce((a, b) => a + b, 0);
   return { breakdown, total, hints };
+}
+
+/* ─── Grundstücksanteil & AfA-Basis (Orientierung) ───
+   Nur der Gebäudeanteil ist abschreibbar. Der Grundstücksanteil hängt vom
+   Bodenrichtwert ab — der ist flurstückgenau (amtlich über BORIS). Hier eine
+   transparente Schätzung nach Lage-Tier und Objektart als Orientierung. */
+
+function estimateLandShare(tier: string | undefined, propertyType: string | undefined): number {
+  const base: Record<string, number> = { A: 0.28, B: 0.22, C: 0.18, D: 0.15 };
+  let s = base[tier ?? ""] ?? 0.20;
+  if (propertyType === "efh" || propertyType === "dhh") s *= 1.25; // eigenes Grundstück
+  else if (propertyType === "etw") s *= 0.9;                        // nur Miteigentumsanteil
+  return Math.max(0.10, Math.min(0.45, s));
+}
+
+function calcTaxBasis(p: PropertyInput, k: KPIs): TaxBasis | null {
+  if (!p.price || p.price <= 0) return null;
+  const landSharePct = estimateLandShare(k.cityData?.tier, p.propertyType);
+  const landValue = Math.round(p.price * landSharePct);
+  const buildingValue = p.price - landValue;
+  const afaRate = p.year >= 2023 ? 0.03 : (p.year > 0 && p.year < 1925) ? 0.025 : 0.02;
+  const annualAfa = Math.round(buildingValue * afaRate);
+  const note = `Geschätzter Grundstücksanteil ${Math.round(landSharePct * 100)} % (Orientierung nach Lage${p.propertyType ? " und Objektart" : ""}). Maßgeblich ist die Kaufpreisaufteilung im Kaufvertrag bzw. der amtliche Bodenrichtwert (BORIS/Gutachterausschuss) — nur der Gebäudeanteil ist abschreibbar. Dies ersetzt keine Steuerberatung.`;
+  return { landSharePct, landValue, buildingValue, afaRate, annualAfa, note };
 }
 
 /* ─── TEIL 1: Plausibilitäts-Checks ─── */
@@ -928,5 +962,6 @@ export function computeScore(p: PropertyInput): ScoringResult {
     marketRange: k.marketRange && k.cityData
       ? { ...k.marketRange, city: k.cityData.city, avgPricePerSqm: k.cityData.avgPricePerSqm, avgRentPerSqm: k.cityData.avgRentPerSqm }
       : null,
+    taxBasis: calcTaxBasis(p, k),
   };
 }
