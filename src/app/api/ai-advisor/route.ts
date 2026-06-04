@@ -92,7 +92,9 @@ Finanzierungs-Score: ${d.financingScore || "k.A."}/100
 Zukunfts-Score: ${d.futureScore || "k.A."}/100
 Energie-Score: ${d.energyScore || "k.A."}/100
 Sanierungsbedarf: ${d.renovations?.length > 0 ? d.renovations.join(", ") : "Keiner"}
-${d.renovationCosts ? "Geschätzte Sanierungskosten: " + d.renovationCosts.toLocaleString("de-DE") + "€" : ""}`;
+${d.renovationCosts ? "Geschätzte Sanierungskosten: " + d.renovationCosts.toLocaleString("de-DE") + "€" : ""}
+${d.marketPriceRange ? "Ortsübliche Preisspanne: " + d.marketPriceRange + " | Mietspanne: " + (d.marketRentRange || "k.A.") + " (Orientierung, nicht flurstückgenau)" : ""}
+${d.afaBuildingValue ? "AfA-Basis (gesch.): Gebäudeanteil " + Number(d.afaBuildingValue).toLocaleString("de-DE") + "€ (Grundstücksanteil ~" + d.afaLandSharePct + "%), AfA-Satz " + d.afaRate + " → ~" + Number(d.afaAnnual).toLocaleString("de-DE") + "€/Jahr. Maßgeblich ist die Kaufpreisaufteilung/Bodenrichtwert." : ""}`;
     }
 
     if (context?.type === "portfolio" && context.data) {

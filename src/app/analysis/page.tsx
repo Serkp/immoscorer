@@ -1874,6 +1874,16 @@ function AnalysisContent() {
                   priceFactor: result.kpis.factor.toFixed(1),
                   locationGrade: form.locationGrade,
                   subscores: Object.fromEntries(result.subscores.map(s => [s.key, s.value])),
+                  ...(result.marketRange ? {
+                    marketPriceRange: `${result.marketRange.priceMin}–${result.marketRange.priceMax} €/m²`,
+                    marketRentRange: `${result.marketRange.rentMin}–${result.marketRange.rentMax} €/m²`,
+                  } : {}),
+                  ...(result.taxBasis ? {
+                    afaBuildingValue: result.taxBasis.buildingValue,
+                    afaLandSharePct: Math.round(result.taxBasis.landSharePct * 100),
+                    afaAnnual: result.taxBasis.annualAfa,
+                    afaRate: `${(result.taxBasis.afaRate * 100).toFixed(1)} %`,
+                  } : {}),
                 },
               };
               const suggestions = getDynamicSuggestions(result, form);
