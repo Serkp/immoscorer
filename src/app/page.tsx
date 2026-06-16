@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useRef, Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
-import { AuthProvider } from "@/components/auth/AuthProvider";
-import { AuthModal } from "@/components/auth/AuthModal";
 import { C } from "@/lib/theme";
 import { useTheme } from "@/lib/ThemeContext";
 
@@ -399,43 +397,26 @@ function MiniRechner({ onCta }: { onCta: () => void }) {
 
 export default function LandingPage() {
   return (
-    <AuthProvider>
+    <>
       <Suspense>
         <LandingContent />
       </Suspense>
       <LandingFooter />
-    </AuthProvider>
+    </>
   );
 }
 
 function LandingContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const resetSuccess = searchParams.get("reset") === "success";
-  const [showAuthModal, setShowAuthModal] = useState(resetSuccess);
   const { theme, toggle } = useTheme();
 
-  // Auto-open modal when ?reset=success is in URL
-  useEffect(() => {
-    if (resetSuccess) {
-      setShowAuthModal(true);
-    }
-  }, [resetSuccess]);
-
   function handleCta() {
-    // Ohne Login direkt ins Tool — Account/Speichern ist optional.
+    // Alles kostenlos, kein Login — direkt ins Tool.
     router.push("/analysis");
   }
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh" }}>
-      {/* Auth Modal */}
-      <AuthModal
-        open={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        onSuccess={() => setShowAuthModal(false)}
-        resetSuccess={resetSuccess}
-      />
       {/* ── Ambient Background ── */}
       <div
         style={{
@@ -542,19 +523,6 @@ function LandingContent() {
                 )}
               </button>
               <button
-                onClick={() => setShowAuthModal(true)}
-                className="hidden sm:inline-block text-sm font-semibold px-4 py-2 rounded-xl transition-all"
-                style={{ border: `1px solid ${C.border}`, color: C.text }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.borderColor = C.borderHover)
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.borderColor = C.border)
-                }
-              >
-                Anmelden
-              </button>
-              <button
                 onClick={() => router.push("/analysis")}
                 className="text-sm font-bold px-4 py-2.5 rounded-xl transition-all"
                 style={{
@@ -562,7 +530,7 @@ function LandingContent() {
                   color: "#fff",
                 }}
               >
-                Kostenlos testen
+                Kostenlos starten
               </button>
             </div>
           </div>
@@ -1051,12 +1019,12 @@ function LandingContent() {
                     a: "Nein. Jeder Score wird klar erklärt. Für Einsteiger gebaut, von Profis genutzt.",
                   },
                   {
-                    q: "Was ist bei Free enthalten?",
-                    a: "Unbegrenzte Analysen mit Gesamtscore und KI-Empfehlung. Detaillierte Teilscores, Verhandlungsguide, Portfolio und Vergleich sind Pro-Features für 9,99 €/Monat.",
+                    q: "Was kostet ImmoScorer?",
+                    a: "Nichts. ImmoScorer ist komplett kostenlos — alle Analysen, der Score, die KI-Empfehlung, der Sprach-Check und der Besichtigungs-Begleiter sind frei nutzbar, ohne Limit.",
                   },
                   {
-                    q: "Kann ich jederzeit kündigen?",
-                    a: "Ja. Monatlich kündbar, keine Mindestlaufzeit, ein Klick im Kundenportal.",
+                    q: "Brauche ich einen Account?",
+                    a: "Nein. Du kannst alle Tools sofort nutzen — ohne Anmeldung, ohne Registrierung.",
                   },
                   {
                     q: "Welche Daten brauche ich?",

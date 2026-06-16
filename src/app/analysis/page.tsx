@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useMemo, useCallback, useEffect } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from "recharts";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { Card } from "@/components/ui/Card";
@@ -171,7 +171,6 @@ export default function AnalysisPage() {
 }
 
 function AnalysisContent() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const analysisId = searchParams.get("id");
   const { user } = useAuth();
@@ -188,15 +187,14 @@ function AnalysisContent() {
   const [loadingStep, setLoadingStep] = useState(0);
   const [loadingPct, setLoadingPct] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [saveChoice, setSaveChoice] = useState<"none" | "portfolio" | "compare">("none");
-  const [saving, setSaving] = useState(false);
+  const [, setSaveChoice] = useState<"none" | "portfolio" | "compare">("none");
   const [toast, setToast] = useState<{ text: string; type: "success" | "neutral" } | null>(null);
   const [showFinanzierung, setShowFinanzierung] = useState(false);
   const [finanzForm, setFinanzForm] = useState({ firstName: "", lastName: "", email: "", phone: "", message: "", consent: false });
   const [finanzSending, setFinanzSending] = useState(false);
   const [finanzSent, setFinanzSent] = useState(false);
   const [hgExpanded, setHgExpanded] = useState(false);
-  const [fromCompare, setFromCompare] = useState(false);
+  const [, setFromCompare] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
 
@@ -511,115 +509,7 @@ function AnalysisContent() {
     }, 600);
   }
 
-  async function handleSaveCompare() {
-    if (!result) return;
-    if (saving || saveChoice !== "none") return;
-    setSaving(true);
-    try {
-      // Always get fresh user from Supabase (context may be stale)
-      const { getSupabase } = await import("@/lib/supabase");
-      const supabase = getSupabase();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const { data: userData } = await supabase.auth.getUser();
-      const currentUser = userData?.user;
-      const token = sessionData?.session?.access_token;
-
-      if (!currentUser || !token) {
-        setToast({ text: "Bitte melden Sie sich an, um zu speichern.", type: "neutral" });
-        setTimeout(() => setToast(null), 5000);
-        setSaving(false);
-        return;
-      }
-
-      const price = Number(form.price);
-      const rent = getKaltmiete(form);
-      const hausgeld = Number(form.hausgeld);
-      const area = Number(form.area);
-      const split = computeHGSplit(hausgeld, form.hgItems);
-      const ownerHG = split.nichtUmlagefaehig;
-      const addressLabel = (form.street || form.city) ? `${form.street}, ${form.city}`.replace(/^, |, $/g, "") : "Objekt ohne Adresse";
-
-      const getSub = (key: string) => result.subscores.find((s) => s.key === key)?.value || 0;
-
-      const payload = {
-        address: addressLabel,
-        city: form.city,
-        purchase_price: price,
-        monthly_rent: rent,
-        area_sqm: area,
-        building_year: Number(form.year),
-        energy_class: form.energyClass,
-        location_grade: form.locationGrade || "B",
-        management_fee: hausgeld,
-        renovation_count: form.renovations.length,
-        property_type: form.propertyType || null,
-        apartment_type: form.apartmentType || null,
-        rooms: form.rooms ? Number(form.rooms) : null,
-        estimated_utilities: form.estimatedUtilities ? Number(form.estimatedUtilities) : null,
-        unit_count: form.unitCount ? Number(form.unitCount) : null,
-        total_score: result.totalScore,
-        investment_score: getSub("investment"),
-        rentability_score: getSub("rentability"),
-        risk_score: getSub("risk"),
-        financing_score: getSub("financing"),
-        future_score: getSub("projection"),
-        energy_score: getSub("energy"),
-        gross_yield: price > 0 ? ((rent * 12) / price) * 100 : 0,
-        net_yield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
-        price_factor: rent > 0 ? price / (rent * 12) : 0,
-        inputs: {
-          address: `${form.street}, ${form.city}`,
-          city: form.city,
-          purchasePrice: price,
-          monthlyRent: rent,
-          areaSqm: area,
-          buildingYear: Number(form.year),
-          energyClass: form.energyClass,
-          locationGrade: form.locationGrade || "B",
-          managementFee: hausgeld,
-          renovationCount: form.renovations.length,
-        },
-        result: {
-          totalScore: result.totalScore,
-          investmentScore: getSub("investment"),
-          rentabilityScore: getSub("rentability"),
-          riskScore: getSub("risk"),
-          financingScore: getSub("financing"),
-          futureScore: getSub("projection"),
-          energyScore: getSub("energy"),
-          grossYield: price > 0 ? ((rent * 12) / price) * 100 : 0,
-          netYield: price > 0 ? (((rent - ownerHG) * 12) / price) * 100 : 0,
-          priceFactor: rent > 0 ? price / (rent * 12) : 0,
-        },
-      };
-
-      const res = await fetch("/api/save-analysis", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        throw new Error(json.error || `Server error ${res.status}`);
-      }
-
-      setSaveChoice("compare");
-      setToast({ text: "Immobilie im Vergleich gespeichert", type: "success" });
-      setTimeout(() => setToast(null), 3000);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("[handleSaveCompare] error:", err);
-      setToast({ text: `Fehler beim Speichern: ${msg}`, type: "neutral" });
-      setTimeout(() => setToast(null), 8000);
-    } finally {
-      setSaving(false);
-    }
-  }
+  // Speichern/Vergleich war account-gebunden — entfernt: alles ist kostenlos & ohne Login.
 
   async function handleFinanzierung() {
     if (!result || finanzSending) return;
@@ -783,8 +673,8 @@ function AnalysisContent() {
     return (
       <div className="mx-auto max-w-[640px] py-24 text-center space-y-4">
         <p className="text-sm font-semibold" style={{ color: C.red }}>{loadError}</p>
-        <Link href="/compare" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.accent }}>
-          ← Zurück zum Vergleich
+        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.accent }}>
+          ← Zur Startseite
         </Link>
       </div>
     );
@@ -796,8 +686,8 @@ function AnalysisContent() {
   if (view === "input") {
     return (
       <div className="mx-auto max-w-[640px] space-y-6">
-        <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
-          ← Dashboard
+        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Startseite
         </Link>
         {checkoutToast}
         {/* Progress bars */}
@@ -1306,15 +1196,9 @@ function AnalysisContent() {
 
     return (
       <div className="mx-auto max-w-[1100px] space-y-6 animate-fade-up">
-        {fromCompare ? (
-          <Link href="/compare" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
-            ← Zurück zum Vergleich
-          </Link>
-        ) : (
-          <Link href="/dashboard" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
-            ← Dashboard
-          </Link>
-        )}
+        <Link href="/" className="inline-flex items-center gap-1 text-xs transition-opacity hover:opacity-80" style={{ color: C.dim }}>
+          ← Startseite
+        </Link>
         {/* Toast */}
         {toast && (
           <div
@@ -1357,27 +1241,6 @@ function AnalysisContent() {
             </div>
           </div>
           <div className="flex gap-2 shrink-0">
-            {saveChoice === "none" ? (
-              <button
-                onClick={handleSaveCompare}
-                disabled={saving}
-                className="rounded-xl px-4 py-2 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
-                style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-              >
-                {saving ? "Speichert..." : "Im Vergleich speichern"}
-              </button>
-            ) : (
-              <button
-                onClick={() => router.push("/compare")}
-                className="rounded-xl px-4 py-2 text-sm font-bold transition-all hover:opacity-90 flex items-center gap-1.5"
-                style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
-              >
-                <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                Zum Vergleich
-              </button>
-            )}
             <button onClick={reset} className="rounded-xl px-4 py-2 text-sm font-semibold" style={{ border: `1px solid ${C.border}`, color: C.sub }}>Neue Analyse</button>
           </div>
         </div>
@@ -1898,27 +1761,6 @@ function AnalysisContent() {
 
             {/* ── Action Buttons ── */}
             <div className="flex flex-col sm:flex-row gap-3 mt-6">
-              {saveChoice === "none" ? (
-                <button
-                  onClick={handleSaveCompare}
-                  disabled={saving}
-                  className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90 disabled:opacity-40"
-                  style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff" }}
-                >
-                  {saving ? "Wird gespeichert..." : "Im Vergleich speichern"}
-                </button>
-              ) : (
-                <button
-                  onClick={() => router.push("/compare")}
-                  className="rounded-xl px-6 py-3 text-sm font-bold transition-all hover:opacity-90 flex items-center gap-2"
-                  style={{ background: C.greenDim, color: C.green, border: `1px solid ${C.greenBorder}` }}
-                >
-                  <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  Zum Vergleich →
-                </button>
-              )}
               <button
                 onClick={reset}
                 className="rounded-xl px-6 py-3 text-sm font-semibold transition-all"
