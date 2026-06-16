@@ -16,6 +16,7 @@ export default function CheckPage() {
   const [msg, setMsg] = useState("");
   const [showText, setShowText] = useState(false);
   const [text, setText] = useState("");
+  const [ctx, setCtx] = useState(""); // bisher Gesagtes — wird bei Rückfragen mitgeschickt
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
 
@@ -39,13 +40,14 @@ export default function CheckPage() {
     const fd = new FormData();
     if (blob) fd.append("audio", blob, "rec.webm");
     if (txt) fd.append("text", txt);
+    if (ctx) fd.append("context", ctx);
     try {
       const r = await fetch("/api/voice-check", { method: "POST", body: fd });
       const d = await r.json();
       if (r.status === 429) { setMsg("Zu viele Anfragen — kurz warten."); setState("err"); return; }
-      if (d.needMore) { setMsg("Sag mir noch: " + (d.missing || []).join(", ")); setState("more"); return; }
+      if (d.needMore) { setCtx(d.transcript || ctx); setText(""); setMsg("Sag mir noch: " + (d.missing || []).join(", ")); setState("more"); return; }
       if (d.error) { setMsg(d.error); setState("err"); return; }
-      setResult(d); setState("done");
+      setCtx(""); setResult(d); setState("done");
     } catch { setMsg("Verbindungsfehler."); setState("err"); }
   }
 
@@ -67,11 +69,13 @@ export default function CheckPage() {
         {(state === "idle" || state === "rec" || state === "more" || state === "err") && (
           <div style={{ marginTop: 32 }}>
             <h1 style={{ fontSize: 26, lineHeight: 1.25, margin: "0 0 8px" }}>
-              {state === "rec" ? "Ich höre zu …" : "Sag mir die Immobilie."}
+              {state === "rec" ? "Ich höre zu …" : state === "more" ? "Fast geschafft …" : "Sag mir die Immobilie."}
             </h1>
-            <p style={{ color: C.sub, fontSize: 14, margin: "0 0 28px" }}>
-              Kaufpreis, Kaltmiete, Größe, Stadt — einfach frei sprechen.
-            </p>
+            {state !== "more" && (
+              <p style={{ color: C.sub, fontSize: 14, margin: "0 0 28px" }}>
+                Kaufpreis, Kaltmiete, Größe, Stadt — einfach frei sprechen.
+              </p>
+            )}
             <button
               onClick={state === "rec" ? stopRec : startRec}
               aria-label="Aufnehmen"
@@ -135,7 +139,7 @@ export default function CheckPage() {
             <a href="https://www.bauzinsmarkt.de/baufinanzierung-nach-stadt/?utm_source=immoscorer&utm_medium=voicecheck" style={{ display: "block", textAlign: "center", ...btn, marginTop: 16, textDecoration: "none" }}>
               Finanzierung dazu? → Kostenlos prüfen
             </a>
-            <button onClick={() => { setResult(null); setState("idle"); }} style={{ background: "none", border: 0, color: C.sub, marginTop: 16, width: "100%", fontSize: 14, textDecoration: "underline", cursor: "pointer" }}>
+            <button onClick={() => { setResult(null); setCtx(""); setText(""); setState("idle"); }} style={{ background: "none", border: 0, color: C.sub, marginTop: 16, width: "100%", fontSize: 14, textDecoration: "underline", cursor: "pointer" }}>
               Nächste Immobilie
             </button>
           </div>

@@ -37,14 +37,17 @@ export async function POST(req: Request) {
     const form = await req.formData();
     const audio = form.get("audio") as File | null;
     const textInput = (form.get("text") as string) || "";
+    const ctxPrev = ((form.get("context") as string) || "").trim();
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45000 });
 
-    let transcript = textInput.trim();
-    if (!transcript && audio) {
+    let said = textInput.trim();
+    if (!said && audio) {
       const tr = await client.audio.transcriptions.create({ file: audio, model: "whisper-1", language: "de" });
-      transcript = (tr.text || "").trim();
+      said = (tr.text || "").trim();
     }
-    if (!transcript) return NextResponse.json({ error: "Keine Eingabe erkannt." }, { status: 400 });
+    if (!said) return NextResponse.json({ error: "Keine Eingabe erkannt." }, { status: 400 });
+    // Kontext aus vorherigen Rückfragen voranstellen → die KI sieht alles bisher Gesagte
+    const transcript = ctxPrev ? `${ctxPrev}. ${said}` : said;
 
     // 1) Daten extrahieren
     const ex = await client.chat.completions.create({

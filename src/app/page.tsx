@@ -495,6 +495,13 @@ function LandingContent() {
             </div>
             <div className="flex items-center gap-3">
               <Link
+                href="/check"
+                className="hidden sm:inline-flex items-center gap-1 text-sm font-semibold transition-opacity hover:opacity-80"
+                style={{ color: C.accent }}
+              >
+                🎤 Sprach-Check
+              </Link>
+              <Link
                 href="/wissen"
                 className="hidden sm:inline-block text-sm font-medium transition-opacity hover:opacity-80"
                 style={{ color: C.sub }}
@@ -621,7 +628,14 @@ function LandingContent() {
                   >
                     Kostenlos starten
                   </button>
-                  <span className="text-xs" style={{ color: C.dim }}>
+                  <Link
+                    href="/check"
+                    className="inline-flex items-center gap-2 text-sm font-bold px-7 py-3 rounded-xl transition-all"
+                    style={{ border: `1px solid ${C.border}`, color: C.text }}
+                  >
+                    🎤 Per Sprache prüfen
+                  </Link>
+                  <span className="text-xs w-full sm:w-auto" style={{ color: C.dim }}>
                     Unbegrenzt &middot; kein Abo nötig
                   </span>
                 </div>
@@ -1104,6 +1118,7 @@ function LandingContent() {
    initialen HTML erscheinen (crawlbar, interne Link-Kraft). */
 function LandingFooter() {
   const wissenLinks = [
+    { href: "/check", label: "Sprach-Check (Beta)" },
     { href: "/wissen", label: "Wissensbereich" },
     {
       href: "/wissen/kennzahlen/rendite-berechnen",
