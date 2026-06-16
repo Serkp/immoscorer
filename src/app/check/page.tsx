@@ -32,6 +32,7 @@ export default function CheckPage() {
   const [text, setText] = useState("");
   const [ctx, setCtx] = useState(""); // bisher Gesagtes — wird bei Rückfragen mitgeschickt
   const [tsToken, setTsToken] = useState("");
+  const [copied, setCopied] = useState(false);
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
   const tsRef = useRef<HTMLDivElement>(null);
@@ -177,6 +178,15 @@ export default function CheckPage() {
             <a href="https://www.bauzinsmarkt.de/baufinanzierung-nach-stadt/?utm_source=immoscorer&utm_medium=voicecheck" style={{ display: "block", textAlign: "center", ...btn, marginTop: 16, textDecoration: "none" }}>
               Finanzierung dazu? → Kostenlos prüfen
             </a>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={() => { try { navigator.clipboard.writeText(`ImmoScorer · ${result.city}\nScore ${result.score}/10 — ${result.decision}\n${result.verdict}\nVerhandlung: ${result.negotiationScript}\nhttps://www.immoscorer.de/check`); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch {} }}
+                style={{ flex: 1, background: C.card, border: `1px solid ${C.border}`, color: C.ink, borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {copied ? "Kopiert ✓" : "📋 Ergebnis kopieren"}
+              </button>
+              <a href="/besichtigung" style={{ flex: 1, textAlign: "center", background: C.card, border: `1px solid ${C.border}`, color: C.accent, borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                🏠 Besichtigung
+              </a>
+            </div>
             <button onClick={() => { setResult(null); setCtx(""); setText(""); setState("idle"); }} style={{ background: "none", border: 0, color: C.sub, marginTop: 16, width: "100%", fontSize: 14, textDecoration: "underline", cursor: "pointer" }}>
               Nächste Immobilie
             </button>

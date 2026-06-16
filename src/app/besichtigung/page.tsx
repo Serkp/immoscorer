@@ -44,6 +44,7 @@ export default function BesichtigungPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [msg, setMsg] = useState("");
   const [prop, setProp] = useState({ city: "", price: "", area: "" });
+  const [copied, setCopied] = useState(false);
 
   const streamRef = useRef<MediaStream | null>(null);
   const mediaRef = useRef<MediaRecorder | null>(null);
@@ -374,6 +375,15 @@ export default function BesichtigungPage() {
             <a href={`https://www.bauzinsmarkt.de/baufinanzierung-nach-stadt/?utm_source=immoscorer&utm_medium=besichtigung`} style={{ display: "block", textAlign: "center", ...btn, marginTop: 18, textDecoration: "none" }}>
               Finanzierung dazu? → Kostenlos prüfen
             </a>
+            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+              <button onClick={() => { try { navigator.clipboard.writeText(`ImmoScorer Besichtigung: ${report.recommendation}\n${report.summary}\nRed Flags: ${(report.redFlags || []).map((f) => f.title).join(", ")}\nVerhandlung: ${(report.negotiationLevers || []).map((l) => l.lever).join("; ")}\nhttps://www.immoscorer.de/besichtigung`); setCopied(true); setTimeout(() => setCopied(false), 2500); } catch {} }}
+                style={{ flex: 1, background: C.card, border: `1px solid ${C.border}`, color: C.ink, borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+                {copied ? "Kopiert ✓" : "📋 Bericht kopieren"}
+              </button>
+              <a href="/check" style={{ flex: 1, textAlign: "center", background: C.card, border: `1px solid ${C.border}`, color: C.accent, borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                🎤 Sprach-Check
+              </a>
+            </div>
             <button onClick={restart} style={{ background: "none", border: 0, color: C.sub, marginTop: 16, width: "100%", fontSize: 14, textDecoration: "underline", cursor: "pointer" }}>
               Neue Besichtigung
             </button>
