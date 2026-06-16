@@ -1,6 +1,8 @@
 import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/seo";
 import { KNOWLEDGE_BASE } from "@/data/knowledge-base";
+import { CITIES } from "@/data/german-cities";
+import { citySlug } from "@/lib/city-pages";
 
 /* Dynamische Sitemap: öffentliche Marketing-Seiten + der komplette
    Wissens-Bereich (Kategorien und Artikel werden automatisch aus
@@ -33,7 +35,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: absoluteUrl("/kapitalanlage"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
   ];
+
+  const cityPages: MetadataRoute.Sitemap = CITIES.map((c) => ({
+    url: absoluteUrl(`/kapitalanlage/${citySlug(c.city)}`),
+    lastModified: now,
+    changeFrequency: "monthly" as const,
+    priority: 0.6,
+  }));
 
   const knowledgePages: MetadataRoute.Sitemap = KNOWLEDGE_BASE.flatMap(
     (category) => [
@@ -52,5 +67,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ],
   );
 
-  return [...staticPages, ...knowledgePages];
+  return [...staticPages, ...knowledgePages, ...cityPages];
 }

@@ -1129,6 +1129,7 @@ function LandingFooter() {
   const wissenLinks = [
     { href: "/check", label: "Sprach-Check (Beta)" },
     { href: "/besichtigung", label: "Besichtigungs-Begleiter (Beta)" },
+    { href: "/kapitalanlage", label: "Kapitalanlage nach Stadt" },
     { href: "/wissen", label: "Wissensbereich" },
     {
       href: "/wissen/kennzahlen/rendite-berechnen",
