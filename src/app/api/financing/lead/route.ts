@@ -10,29 +10,29 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { userId, firstName, lastName, email, phone, message, propertyAddress, purchasePrice, monthlyRent, score } = body;
 
-    if (!userId || !firstName || !lastName || !phone) {
+    if (!firstName || !lastName || !phone) {
       return NextResponse.json({ error: "Fehlende Pflichtfelder" }, { status: 400 });
     }
 
-    const { error } = await getSupabase()
-      .from("financing_leads")
-      .insert({
-        user_id: userId,
-        first_name: firstName,
-        last_name: lastName,
-        contact_email: email || null,
-        contact_phone: phone,
-        message: message || null,
-        property_address: propertyAddress || null,
-        property_price: purchasePrice || null,
-        monthly_rent: monthlyRent || null,
-        score: score || null,
-        status: "new",
-      });
-
-    if (error) {
-      console.error("Financing lead insert error:", error);
-      return NextResponse.json({ error: "Fehler beim Speichern" }, { status: 500 });
+    // DB-Eintrag nur für eingeloggte Nutzer (Tabelle ist an user_id gebunden).
+    // Anonyme Leads werden trotzdem zugestellt (Benachrichtigung unten) — kein Lead geht verloren.
+    if (userId) {
+      const { error } = await getSupabase()
+        .from("financing_leads")
+        .insert({
+          user_id: userId,
+          first_name: firstName,
+          last_name: lastName,
+          contact_email: email || null,
+          contact_phone: phone,
+          message: message || null,
+          property_address: propertyAddress || null,
+          property_price: purchasePrice || null,
+          monthly_rent: monthlyRent || null,
+          score: score || null,
+          status: "new",
+        });
+      if (error) console.error("Financing lead insert error:", error);
     }
 
     // Benachrichtigungen senden (non-blocking)

@@ -622,7 +622,7 @@ function AnalysisContent() {
   }
 
   async function handleFinanzierung() {
-    if (!user || !result || finanzSending) return;
+    if (!result || finanzSending) return;
     if (!finanzForm.firstName || !finanzForm.lastName || !finanzForm.phone || !finanzForm.consent) return;
     setFinanzSending(true);
     try {
@@ -630,10 +630,10 @@ function AnalysisContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user.id,
+          userId: user?.id,
           firstName: finanzForm.firstName,
           lastName: finanzForm.lastName,
-          email: finanzForm.email || user.email,
+          email: finanzForm.email || user?.email,
           phone: finanzForm.phone,
           message: finanzForm.message,
           propertyAddress: `${form.street}, ${form.city}`,
