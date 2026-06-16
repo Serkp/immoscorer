@@ -16,6 +16,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const publicPaths = [
     "/wissen",
     "/check",
+    "/besichtigung",
     "/impressum",
     "/datenschutz",
     "/agb",

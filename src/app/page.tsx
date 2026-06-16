@@ -504,6 +504,13 @@ function LandingContent() {
                 🎤 Sprach-Check
               </Link>
               <Link
+                href="/besichtigung"
+                className="hidden md:inline-flex items-center gap-1 text-sm font-semibold transition-opacity hover:opacity-80"
+                style={{ color: C.accent }}
+              >
+                🏠 Besichtigung
+              </Link>
+              <Link
                 href="/wissen"
                 className="hidden sm:inline-block text-sm font-medium transition-opacity hover:opacity-80"
                 style={{ color: C.sub }}
@@ -1121,6 +1128,7 @@ function LandingContent() {
 function LandingFooter() {
   const wissenLinks = [
     { href: "/check", label: "Sprach-Check (Beta)" },
+    { href: "/besichtigung", label: "Besichtigungs-Begleiter (Beta)" },
     { href: "/wissen", label: "Wissensbereich" },
     {
       href: "/wissen/kennzahlen/rendite-berechnen",
