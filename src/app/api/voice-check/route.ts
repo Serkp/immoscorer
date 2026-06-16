@@ -25,8 +25,9 @@ Auf Basis der berechneten Kennzahlen lieferst du JSON:
 Kein Geschwafel, keine Floskeln. Wenn die Zahlen schwach sind, sag es klar.`;
 
 function decisionFromScore(s: number): { label: string; color: string } {
-  if (s >= 7.5) return { label: "KAUFEN", color: "#10B981" };
-  if (s >= 5) return { label: "VERHANDELN", color: "#F59E0B" };
+  // s = totalScore (0-100)
+  if (s >= 72) return { label: "KAUFEN", color: "#10B981" };
+  if (s >= 50) return { label: "VERHANDELN", color: "#F59E0B" };
   return { label: "FINGER WEG", color: "#EF4444" };
 }
 
@@ -68,9 +69,16 @@ export async function POST(req: Request) {
     };
     const result = computeScore(input);
     const dec = decisionFromScore(result.totalScore);
+    const pct = (x: number) => (x > 1 ? Math.round(x * 100) / 100 : Math.round(x * 10000) / 100);
+    const netY = pct(result.kpis.netYield);
+    const grossY = pct(result.kpis.grossYield);
+    const factor = Math.round(result.kpis.factor * 10) / 10;
+    const sqm = Math.round(result.kpis.sqmPrice);
+    const cash = Math.round(result.kpis.netCashflow);
+    const score10 = Math.round(result.totalScore) / 10;
 
     // 3) Urteil + Verhandlungs-Skript (sprachlich, geerdet an den echten Zahlen)
-    const ctx = `Score: ${result.totalScore}/10 (${dec.label}). KPIs: Nettorendite ${result.kpis.netYield}%, Bruttorendite ${result.kpis.grossYield}%, Kaufpreisfaktor ${result.kpis.factor}, €/m² ${result.kpis.sqmPrice}, Cashflow ${result.kpis.netCashflow} €/Monat. Stärken: ${result.strengths.slice(0,3).join("; ")}. Risiken: ${result.risks.slice(0,3).join("; ")}. Objekt: ${input.city}, ${input.price} € Kaufpreis, ${input.rent} € Kaltmiete, ${input.area} m².`;
+    const ctx = `Score: ${result.totalScore}/100 (${dec.label}). KPIs: Nettorendite ${netY}%, Bruttorendite ${grossY}%, Kaufpreisfaktor ${factor}, €/m² ${sqm}, Cashflow ${cash} €/Monat. Stärken: ${result.strengths.slice(0,3).join("; ")}. Risiken: ${result.risks.slice(0,3).join("; ")}. Objekt: ${input.city}, ${input.price} € Kaufpreis, ${input.rent} € Kaltmiete, ${input.area} m².`;
     const vd = await client.chat.completions.create({
       model: "gpt-4o", temperature: 0.4, max_tokens: 350,
       response_format: { type: "json_object" },
@@ -80,12 +88,12 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       transcript,
-      score: result.totalScore,
+      score: score10,
       decision: dec.label, color: dec.color,
       keyPoint: v.keyPoint || "",
       verdict: v.verdict || "",
       negotiationScript: v.negotiationScript || "",
-      kpis: { netYield: result.kpis.netYield, grossYield: result.kpis.grossYield, factor: result.kpis.factor, sqmPrice: result.kpis.sqmPrice, cashflow: result.kpis.netCashflow },
+      kpis: { netYield: netY, grossYield: grossY, factor, sqmPrice: sqm, cashflow: cash },
       city: input.city, price: input.price,
     });
   } catch (e) {

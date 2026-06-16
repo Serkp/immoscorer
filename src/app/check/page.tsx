@@ -107,13 +107,13 @@ export default function CheckPage() {
         {state === "done" && result && (
           <div style={{ marginTop: 24, textAlign: "left" }}>
             <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 18, padding: 22, textAlign: "center" }}>
-              <div style={{ fontSize: 54, fontWeight: 800, lineHeight: 1 }}>{result.score}<span style={{ fontSize: 22, color: C.sub }}>/10</span></div>
+              <div style={{ fontSize: 54, fontWeight: 800, lineHeight: 1 }}>{result.score.toLocaleString("de-DE")}<span style={{ fontSize: 22, color: C.sub }}>/10</span></div>
               <div style={{ display: "inline-block", marginTop: 10, padding: "6px 16px", borderRadius: 999, fontWeight: 800, fontSize: 15, color: "#031", background: result.color }}>{result.decision}</div>
               {result.keyPoint && <div style={{ marginTop: 12, color: C.ink, fontWeight: 600 }}>{result.keyPoint}</div>}
             </div>
 
             <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-              {[["Nettorendite", result.kpis.netYield + " %"], ["Faktor", String(result.kpis.factor)], ["€/m²", Math.round(result.kpis.sqmPrice).toLocaleString("de-DE")]].map(([k, v]) => (
+              {[["Nettorendite", result.kpis.netYield.toLocaleString("de-DE") + " %"], ["Faktor", result.kpis.factor.toLocaleString("de-DE")], ["€/m²", Math.round(result.kpis.sqmPrice).toLocaleString("de-DE")]].map(([k, v]) => (
                 <div key={k} style={{ flex: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "10px 8px", textAlign: "center" }}>
                   <div style={{ fontWeight: 700 }}>{v}</div><div style={{ color: C.sub, fontSize: 11 }}>{k}</div>
                 </div>
