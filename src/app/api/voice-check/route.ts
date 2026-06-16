@@ -88,7 +88,8 @@ export async function POST(req: Request) {
       kpis: { netYield: result.kpis.netYield, grossYield: result.kpis.grossYield, factor: result.kpis.factor, sqmPrice: result.kpis.sqmPrice, cashflow: result.kpis.netCashflow },
       city: input.city, price: input.price,
     });
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Fehler bei der Analyse." }, { status: 500 });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Fehler bei der Analyse.";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

@@ -128,7 +128,7 @@ export default function CheckPage() {
             {result.negotiationScript && (
               <div style={{ background: "linear-gradient(135deg,#101a2e,#0D0F16)", border: `1px solid ${C.accent2}`, borderRadius: 14, padding: 16, marginTop: 12 }}>
                 <div style={{ color: C.accent, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Dein Verhandlungs-Satz</div>
-                <p style={{ margin: 0, fontStyle: "italic", lineHeight: 1.5 }}>„{result.negotiationScript}"</p>
+                <p style={{ margin: 0, fontStyle: "italic", lineHeight: 1.5 }}>{`„${result.negotiationScript}“`}</p>
               </div>
             )}
 
