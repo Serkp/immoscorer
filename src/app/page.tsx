@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, Suspense, type ReactNode } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { AIOrb } from "@/components/ui/AIOrb";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { AuthModal } from "@/components/auth/AuthModal";
@@ -409,6 +409,7 @@ export default function LandingPage() {
 }
 
 function LandingContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const resetSuccess = searchParams.get("reset") === "success";
   const [showAuthModal, setShowAuthModal] = useState(resetSuccess);
@@ -422,7 +423,8 @@ function LandingContent() {
   }, [resetSuccess]);
 
   function handleCta() {
-    setShowAuthModal(true);
+    // Ohne Login direkt ins Tool — Account/Speichern ist optional.
+    router.push("/analysis");
   }
 
   return (
@@ -546,7 +548,7 @@ function LandingContent() {
                 Anmelden
               </button>
               <button
-                onClick={() => setShowAuthModal(true)}
+                onClick={() => router.push("/analysis")}
                 className="text-sm font-bold px-4 py-2.5 rounded-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`,

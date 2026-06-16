@@ -12,8 +12,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   // Public pages — no app shell, no auth required.
   // /wissen = public SEO knowledge base; legal pages must be publicly reachable (§5 DDG).
+  // /check = sprachgesteuertes Gratis-Tool (eigene Vollbild-UI, ohne Login).
   const publicPaths = [
     "/wissen",
+    "/check",
     "/impressum",
     "/datenschutz",
     "/agb",
@@ -27,7 +29,19 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  // All other pages — AuthProvider + Navbar + AuthGuard
+  // Offene Tools — Navbar + OPTIONALER Login (kein Zwang). Account-Funktionen
+  // (Speichern, Portfolio, Pro) degradieren sauber, wenn kein User da ist.
+  const openToolPaths = ["/analysis"];
+  if (openToolPaths.some((p) => pathname.startsWith(p))) {
+    return (
+      <AuthProvider>
+        <Navbar />
+        <main className="mx-auto max-w-6xl px-4 md:px-5 pb-16 pt-4 md:pt-6">{children}</main>
+      </AuthProvider>
+    );
+  }
+
+  // Account-Seiten (Dashboard, Portfolio, Compare, Settings …) — Login erforderlich.
   return (
     <AuthProvider>
       <AuthGuard>
