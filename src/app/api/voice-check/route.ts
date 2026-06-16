@@ -31,6 +31,23 @@ function decisionFromScore(s: number): { label: string; color: string } {
   return { label: "FINGER WEG", color: "#EF4444" };
 }
 
+// Optionaler Bot-Schutz via Cloudflare Turnstile. Nur aktiv, wenn TURNSTILE_SECRET
+// gesetzt ist — ohne Secret ist die Prüfung ein No-op (Tool läuft unverändert).
+async function turnstileOk(token: string, ip: string): Promise<boolean> {
+  const secret = process.env.TURNSTILE_SECRET;
+  if (!secret) return true; // Schutz nicht konfiguriert → durchlassen
+  if (!token) return false;
+  try {
+    const body = new URLSearchParams({ secret, response: token });
+    if (ip) body.append("remoteip", ip);
+    const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body });
+    const j = (await r.json()) as { success?: boolean };
+    return !!j.success;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: Request) {
   if (!rateLimit("voice_" + clientIp(req), 8, 60 * 60 * 1000)) return NextResponse.json(TOO_MANY, { status: 429 });
   try {
@@ -38,6 +55,10 @@ export async function POST(req: Request) {
     const audio = form.get("audio") as File | null;
     const textInput = (form.get("text") as string) || "";
     const ctxPrev = ((form.get("context") as string) || "").trim();
+    const tsToken = (form.get("turnstile") as string) || "";
+    if (!(await turnstileOk(tsToken, clientIp(req)))) {
+      return NextResponse.json({ error: "Bot-Schutz fehlgeschlagen. Bitte Seite neu laden." }, { status: 403 });
+    }
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 45000 });
 
     let said = textInput.trim();

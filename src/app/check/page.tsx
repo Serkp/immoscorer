@@ -1,6 +1,20 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+declare global {
+  interface Window {
+    turnstile?: {
+      render: (
+        el: HTMLElement,
+        opts: { sitekey: string; callback: (t: string) => void; "error-callback"?: () => void; theme?: string },
+      ) => void;
+    };
+  }
+}
+
+// Bot-Schutz nur aktiv, wenn dieser Public-Key gesetzt ist (sonst kein Widget, kein Token).
+const SITEKEY = process.env.NEXT_PUBLIC_TURNSTILE_SITEKEY || "";
 
 type Result = {
   score: number; decision: string; color: string; keyPoint: string; verdict: string;
@@ -17,8 +31,31 @@ export default function CheckPage() {
   const [showText, setShowText] = useState(false);
   const [text, setText] = useState("");
   const [ctx, setCtx] = useState(""); // bisher Gesagtes — wird bei Rückfragen mitgeschickt
+  const [tsToken, setTsToken] = useState("");
   const mediaRef = useRef<MediaRecorder | null>(null);
   const chunks = useRef<Blob[]>([]);
+  const tsRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!SITEKEY) return;
+    const ID = "cf-turnstile-script";
+    const render = () => {
+      if (window.turnstile && tsRef.current && !tsRef.current.hasChildNodes()) {
+        window.turnstile.render(tsRef.current, {
+          sitekey: SITEKEY,
+          callback: setTsToken,
+          "error-callback": () => setTsToken(""),
+          theme: "dark",
+        });
+      }
+    };
+    if (document.getElementById(ID)) { render(); return; }
+    const s = document.createElement("script");
+    s.id = ID;
+    s.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+    s.async = true; s.defer = true; s.onload = render;
+    document.head.appendChild(s);
+  }, []);
 
   async function startRec() {
     setMsg(""); setResult(null);
@@ -41,6 +78,7 @@ export default function CheckPage() {
     if (blob) fd.append("audio", blob, "rec.webm");
     if (txt) fd.append("text", txt);
     if (ctx) fd.append("context", ctx);
+    if (tsToken) fd.append("turnstile", tsToken);
     try {
       const r = await fetch("/api/voice-check", { method: "POST", body: fd });
       const d = await r.json();
@@ -144,6 +182,8 @@ export default function CheckPage() {
             </button>
           </div>
         )}
+
+        {SITEKEY && <div ref={tsRef} style={{ marginTop: 20, display: "flex", justifyContent: "center" }} />}
 
         <p style={{ color: "#4a5266", fontSize: 11, marginTop: 36 }}>Orientierungswert, keine Anlageberatung. ImmoScorer.</p>
       </div>
