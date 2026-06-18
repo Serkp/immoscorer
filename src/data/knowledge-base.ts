@@ -523,6 +523,97 @@ export const KNOWLEDGE_BASE: KnowledgeCategory[] = [
         ],
         tip: "Kombination ist der Schlüssel: KfW-Kredit + BAFA-Zuschuss + steuerliche AfA können die effektiven Sanierungskosten um 40–60 % reduzieren.",
       },
+      {
+        slug: "afa-immobilien",
+        title: "AfA bei Immobilien richtig berechnen",
+        seoTitle: "AfA Immobilien berechnen: Gebäudeabschreibung für Vermieter",
+        metaDescription:
+          "AfA bei Immobilien: Gebäudeabschreibung korrekt berechnen, Kaufpreisaufteilung ermitteln und Sätze für Neubau, Altbau und Denkmal kennen.",
+        summary:
+          "Die Gebäudeabschreibung ist der wirkungsvollste Steuerhebel für Vermieter — Sätze, Kaufpreisaufteilung und ein vollständig durchgerechnetes Beispiel.",
+        readMinutes: 9,
+        publishedAt: "2026-06-02",
+        updatedAt: "2026-06-02",
+        sections: [
+          {
+            heading: "Warum die AfA der stärkste Steuerhebel für Vermieter ist",
+            body: "Die Absetzung für Abnutzung (AfA) ist das wirkungsvollste Steuerinstrument, das Ihnen als Vermieter zur Verfügung steht. Sie erlaubt es, den wirtschaftlichen Wertverlust eines Gebäudes jährlich als Werbungskosten geltend zu machen — ohne dass dabei Geld abfließt. Diese „fiktive Betriebsausgabe“ mindert Ihr zu versteuerndes Einkommen aus Vermietung und Verpachtung und reduziert damit unmittelbar Ihre Einkommensteuer.\n\nBei einem Grenzsteuersatz von 42 % und einer jährlichen AfA von 4.200 € sparen Sie real 1.764 € Einkommensteuer pro Jahr — ohne zusätzlichen Aufwand. Über eine typische Haltezeit von 20 Jahren summiert sich das auf über 35.000 € — allein aus der Gebäudeabschreibung.\n\nDie rechtliche Grundlage ist **§ 7 Abs. 4 EStG**. Abschreibungsfähig ist ausschließlich der **Gebäudeanteil** am Kaufpreis. Das Grundstück gilt als nicht abnutzbar und scheidet als Abschreibungsbasis aus. Deshalb ist die Kaufpreisaufteilung der erste und entscheidende Schritt.",
+          },
+          {
+            heading: "Welche AfA-Sätze gelten für Ihre Immobilie?",
+            body: "Der anzuwendende AfA-Satz richtet sich nach dem **Baujahr** des Gebäudes und ggf. der Nutzungsart. Maßgeblich ist das Baujahr des Gebäudes, nicht das eines späteren An- oder Umbaus. Seit dem Jahressteuergesetz 2022 gilt für Neubauten mit Bauantrag ab dem 1. Januar 2023 ein erhöhter Satz von 3 % (statt bisher 2 %).",
+            table: {
+              caption: "AfA-Sätze für Wohnimmobilien im Überblick (Richtwerte — bitte tagesaktuell prüfen)",
+              headers: ["Gebäudetyp", "AfA-Satz", "Nutzungsdauer"],
+              rows: [
+                ["Bestand: Baujahr ab 1925", "2 % p.a.", "50 Jahre"],
+                ["Altbau: Baujahr vor 1925", "2,5 % p.a.", "40 Jahre"],
+                ["Neubau: Bauantrag ab 01.01.2023", "3 % p.a.", "33 Jahre"],
+                ["Denkmal-Sanierungskosten (§ 7h/7i EStG)", "9 % / 7 % p.a.", "12 Jahre"],
+                ["Sonder-AfA Mietwohnungsneubau (§ 7b EStG)", "+ 5 % p.a. zusätzlich", "4 Jahre"],
+              ],
+            },
+          },
+          {
+            heading: "Die Kaufpreisaufteilung: Gebäudeanteil korrekt ermitteln",
+            body: "Je höher der Gebäudeanteil, desto größer die jährliche AfA und desto mehr Steuern sparen Sie. Es gibt drei akzeptierte Methoden zur Ermittlung:\n\n**BMF-Arbeitshilfe:** Das Bundesministerium der Finanzen stellt eine kostenlose Excel-Datei bereit, die den Gebäudeanteil nach dem vereinfachten Sachwertverfahren berechnet. Das Finanzamt erkennt diesen Ansatz in der Regel an.\n\n**Wertgutachten:** Ein zertifizierter Sachverständiger (öffentlich bestellt und vereidigt) erstellt eine belastbare Aufteilung. Kosten: 1.000–2.500 €. Lohnend ab einem Kaufpreis von ca. 400.000 €, wenn die BMF-Arbeitshilfe einen ungünstigen Gebäudeanteil ergibt.\n\n**Kaufvertragliche Aufteilung:** Wird im Kaufvertrag ein separater Grundstücks- und Gebäudepreis ausgewiesen, akzeptiert das Finanzamt dies nur, wenn er den tatsächlichen Marktwerten entspricht. Willkürliche Verschiebungen werden als Gestaltungsmissbrauch gewertet.\n\nIn zentralen Großstadtlagen liegt der Grundstücksanteil oft bei 40–60 %, in ländlichen Lagen teils unter 20 %.",
+          },
+          {
+            heading: "AfA-Berechnung Schritt für Schritt",
+            body: "Am Beispiel einer Eigentumswohnung: Kaufpreis 300.000 €, Baujahr 1975, Lage Mittelstadt, Grundstücksanteil laut BMF-Arbeitshilfe 30 %. So ermitteln Sie die jährliche AfA und die resultierende Steuerersparnis:",
+            table: {
+              caption: "Rechenbeispiel: AfA-Berechnung für eine ETW mit 300.000 € Kaufpreis (Baujahr 1975)",
+              headers: ["Schritt", "Berechnung", "Ergebnis"],
+              rows: [
+                ["Kaufpreis", "—", "300.000 €"],
+                ["Grundstücksanteil (30 %)", "300.000 € × 30 %", "90.000 €"],
+                ["Gebäudeanteil (70 %)", "300.000 € × 70 %", "210.000 €"],
+                ["Jährliche AfA (2 %, Bj. 1975)", "210.000 € × 2 %", "4.200 €"],
+                ["Monatliche AfA", "4.200 € ÷ 12", "350 €"],
+                ["Steuerersparnis/Jahr (Grenzsteuersatz 42 %)", "4.200 € × 42 %", "1.764 €"],
+                ["Steuerersparnis/Jahr (Grenzsteuersatz 35 %)", "4.200 € × 35 %", "1.470 €"],
+                ["Steuerersparnis/Jahr (Grenzsteuersatz 25 %)", "4.200 € × 25 %", "1.050 €"],
+              ],
+            },
+          },
+          {
+            heading: "Sonder-AfA und Denkmal-AfA: deutlich höhere Abschreibungen",
+            body: "Neben der linearen Standard-AfA gibt es zwei Sonderformen mit erheblich höherem Abschreibungspotenzial:\n\n**§ 7b EStG — Sonderabschreibung Mietwohnungsneubau:** Für neue Mietwohnungen mit Bauantrag zwischen 2023 und 2029, Effizienzhaus-40-Standard und Anschaffungskosten von max. 5.200 €/m² dürfen Sie in den ersten vier Jahren zusätzlich je 5 % abschreiben. In Kombination mit der regulären AfA von 3 % ergibt das 8 % p.a. in diesen Jahren. Ab dem fünften Jahr gilt ausschließlich die lineare AfA weiter.\n\n**§ 7h/7i EStG — Denkmal-AfA:** Sanierungskosten für denkmalgeschützte Gebäude können beschleunigt abgeschrieben werden: in den ersten 8 Jahren je 9 %, in den folgenden 4 Jahren je 7 % — also 100 % in 12 Jahren statt in 50. Voraussetzung ist eine Bescheinigung der Denkmalschutzbehörde, die zwingend **vor Beginn der Maßnahmen** beantragt werden muss. Nachträgliche Genehmigungen werden steuerlich nicht anerkannt.",
+          },
+          {
+            heading: "Steuerliche Verluste aus Vermietung verrechnen",
+            body: "Die AfA erhöht die steuerlichen Werbungskosten oft so stark, dass sie die Mieteinnahmen übersteigen. Der entstehende **steuerliche Verlust** aus Vermietung und Verpachtung kann mit anderen positiven Einkünften — etwa aus nichtselbständiger Arbeit — verrechnet werden (§ 2 Abs. 3 EStG). Das senkt Ihre Gesamtsteuerlast im laufenden Jahr unmittelbar.\n\nDas Finanzamt kann prüfen, ob eine sogenannte **Liebhaberei** vorliegt — also ob Sie aus der Vermietung auf Dauer einen Totalgewinn erzielen wollen. Ist das nicht plausibel, werden Verluste nicht anerkannt. Erstellen Sie für jedes Objekt eine **Totalüberschussprognose** über mindestens 30 Jahre, um diesem Vorwurf vorzubeugen.",
+          },
+        ],
+        tip: "Lassen Sie die Kaufpreisaufteilung von einem Steuerberater mit Immobilienfokus prüfen — am besten vor dem Kauf. Bei einem Kaufpreis von 400.000 € und mehr kann ein Wertgutachten, das den Gebäudeanteil um 10 Prozentpunkte erhöht, über 30 Jahre mehr als 25.000 € zusätzliche Steuerersparnis bedeuten.",
+        faq: [
+          {
+            question: "Gehören Kaufnebenkosten zur AfA-Bemessungsgrundlage?",
+            answer:
+              "Ja, anteilig. Kaufnebenkosten wie Grunderwerbsteuer, Notar und Grundbuch sind Anschaffungsnebenkosten und erhöhen die Gesamtanschaffungskosten. Von dieser Gesamtsumme wird der Gebäudeanteil ermittelt — nur dieser Teil fließt in die AfA-Basis ein.",
+          },
+          {
+            question: "Was passiert mit der aufgelaufenen AfA beim Verkauf?",
+            answer:
+              "Die kumulierte AfA mindert den steuerlichen Buchwert des Gebäudes. Beim Verkauf innerhalb der 10-Jahres-Spekulationsfrist erhöht sie den steuerpflichtigen Veräußerungsgewinn. Nach Ablauf der Spekulationsfrist ist der Gewinn in der Regel steuerfrei — die bereits gewährte AfA muss nicht zurückgezahlt werden.",
+          },
+          {
+            question: "Kann ich AfA auch bei Eigennutzung geltend machen?",
+            answer:
+              "Nein. Die lineare Gebäudeabschreibung nach § 7 Abs. 4 EStG ist ausschließlich bei Vermietung und Verpachtung als Werbungskosten absetzbar. Selbstgenutzte Immobilien begründen keine Einkunftsquelle — eine AfA ist daher nicht möglich.",
+          },
+          {
+            question: "Was tue ich, wenn das Baujahr des Gebäudes unbekannt ist?",
+            answer:
+              "Recherchieren Sie im Grundbuch, im Energieausweis oder bei der zuständigen Baubehörde. Bleibt das Baujahr unbekannt, setzt das Finanzamt in der Regel den ungünstigeren Satz von 2 % an. Ein Sachverständigengutachten kann das Baujahr datieren und gleichzeitig die Kaufpreisaufteilung dokumentieren.",
+          },
+          {
+            question: "Kann ich die AfA-Basis nachträglich durch ein Gutachten erhöhen lassen?",
+            answer:
+              "Ja, durch ein Wertgutachten, das einen höheren Gebäudeanteil belegt. Das Finanzamt kann widersprechen, ist aber beweispflichtig, wenn ein plausibles Gutachten vorliegt. Handeln Sie frühzeitig: Ist die ursprüngliche Veranlagung bereits bestandskräftig, ist eine Änderung nur noch eingeschränkt möglich.",
+          },
+        ],
+      },
     ],
   },
 
