@@ -1114,6 +1114,14 @@ function LandingFooter() {
     { href: "/kapitalanlage", label: "Kapitalanlage nach Stadt" },
     { href: "/wissen", label: "Wissensbereich" },
     {
+      href: "/rendite-rechner",
+      label: "Renditerechner",
+    },
+    {
+      href: "/kaufpreisfaktor-rechner",
+      label: "Kaufpreisfaktor berechnen",
+    },
+    {
       href: "/wissen/kennzahlen/rendite-berechnen",
       label: "Immobilienrendite berechnen",
     },

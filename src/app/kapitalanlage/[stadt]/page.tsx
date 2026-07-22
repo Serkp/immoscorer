@@ -8,6 +8,7 @@ import { getMarketRange } from "@/data/german-cities";
 import {
   getCityBySlug, allCitySlugs, citySlug, cityMetrics, tierProfile,
   yieldVerdict, demandVerdict, sameStatePeers, tierPeers, cityFaq,
+  yieldVsTier, investorProfile,
 } from "@/lib/city-pages";
 
 export const dynamicParams = false;
@@ -23,8 +24,8 @@ export function generateMetadata({ params }: { params: { stadt: string } }): Met
   if (!c) return {};
   const m = cityMetrics(c);
   return pageMeta({
-    title: `Immobilie als Kapitalanlage in ${c.city}`,
-    description: `Kaufpreise, Mieten, Rendite & Kaufpreisfaktor für ${c.city}: Ø ${c.avgPricePerSqm.toLocaleString("de-DE")} €/m², Brutto-Rendite ca. ${m.grossYield.toLocaleString("de-DE")} %. Plus kostenlose KI-Bewertung deiner Anlageimmobilie.`,
+    title: `Kapitalanlage ${c.city}: Rendite, Preise & Faktor`,
+    description: `Lohnt sich eine Kapitalanlage in ${c.city}? Ø ${c.avgPricePerSqm.toLocaleString("de-DE")} €/m², Kaltmiete ${c.avgRentPerSqm.toLocaleString("de-DE")} €/m², Brutto-Rendite ca. ${m.grossYield.toLocaleString("de-DE")} %, Kaufpreisfaktor ${m.factor.toLocaleString("de-DE")}. Marktdaten + kostenlose KI-Bewertung.`,
     path: `/kapitalanlage/${citySlug(c.city)}`,
     type: "article",
   });
@@ -108,8 +109,12 @@ export default function CityPage({ params }: { params: { stadt: string } }) {
       <div style={sec}>
         <h2 style={h2}>Rendite &amp; Kaufpreisfaktor</h2>
         <p style={para}>
-          Aus der Durchschnittsmiete von ca. {c.avgRentPerSqm.toLocaleString("de-DE")} €/m² ergibt sich eine <strong style={{ color: C.text }}>Brutto-Anfangsrendite von rund {m.grossYield.toLocaleString("de-DE")} %</strong> — das entspricht einem Kaufpreisfaktor von etwa {m.factor.toLocaleString("de-DE")}. Diese Rendite ist {yieldVerdict(m.grossYield)}. Entscheidend bleibt der Einzelfall: Lage, Zustand, Hausgeld und Finanzierung verschieben das Ergebnis deutlich.{" "}
-          <Link href="/rendite-rechner" style={{ color: C.accent, textDecoration: "none" }}>Rendite, Kaufpreisfaktor und Cashflow für ein konkretes Objekt selbst berechnen →</Link>
+          Aus der Durchschnittsmiete von ca. {c.avgRentPerSqm.toLocaleString("de-DE")} €/m² ergibt sich eine <strong style={{ color: C.text }}>Brutto-Anfangsrendite von rund {m.grossYield.toLocaleString("de-DE")} %</strong> — das entspricht einem Kaufpreisfaktor von etwa {m.factor.toLocaleString("de-DE")}. Diese Rendite ist {yieldVerdict(m.grossYield)}. {yieldVsTier(c, m)} Entscheidend bleibt der Einzelfall: Lage, Zustand, Hausgeld und Finanzierung verschieben das Ergebnis deutlich.
+        </p>
+        <p style={{ ...para, marginTop: 10 }}>
+          <Link href="/kaufpreisfaktor-rechner" style={{ color: C.accent, textDecoration: "none" }}>Kaufpreisfaktor für ein konkretes Objekt prüfen →</Link>
+          {"  ·  "}
+          <Link href="/rendite-rechner" style={{ color: C.accent, textDecoration: "none" }}>Rendite &amp; Cashflow berechnen →</Link>
         </p>
       </div>
 
@@ -117,6 +122,12 @@ export default function CityPage({ params }: { params: { stadt: string } }) {
       <div style={sec}>
         <h2 style={h2}>Nachfrage &amp; Risiko</h2>
         <p style={para}>{demandVerdict(c)}</p>
+      </div>
+
+      {/* Für wen passt die Stadt */}
+      <div style={sec}>
+        <h2 style={h2}>Für welche Anleger passt {c.city}?</h2>
+        <p style={para}>{investorProfile(c, m)}</p>
       </div>
 
       {/* Beispielrechnung */}

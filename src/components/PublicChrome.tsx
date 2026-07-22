@@ -58,6 +58,7 @@ export function PublicHeader() {
 
 const FOOTER_LINKS = [
   { href: "/rendite-rechner", label: "Renditerechner" },
+  { href: "/kaufpreisfaktor-rechner", label: "Kaufpreisfaktor" },
   { href: "/kapitalanlage", label: "Kapitalanlage" },
   { href: "/wissen", label: "Wissen" },
   { href: "/impressum", label: "Impressum" },

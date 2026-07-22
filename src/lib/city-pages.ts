@@ -77,6 +77,48 @@ export function demandVerdict(c: CityData): string {
   return `Die Bevölkerung ist rückläufig und der Leerstand liegt bei rund ${vTxt} — Lage und Vermietbarkeit solltest du hier besonders kritisch prüfen.`;
 }
 
+/** Durchschnittliche Brutto-Anfangsrendite aller Städte desselben Tiers.
+    Reine Aggregation aus dem kuratierten Datensatz (german-cities.ts) —
+    keine erfundenen Werte, dient nur der relativen Einordnung. */
+export function tierAvgYield(tier: CityData["tier"]): number {
+  const peers = CITIES.filter((x) => x.tier === tier);
+  if (peers.length === 0) return 0;
+  const sum = peers.reduce((acc, x) => acc + ((x.avgRentPerSqm * 12) / x.avgPricePerSqm) * 100, 0);
+  return Math.round((sum / peers.length) * 100) / 100;
+}
+
+/** Relative Einordnung der Stadt-Rendite gegenüber dem Tier-Schnitt —
+    macht jede Stadtseite datenbasiert einzigartig (der Vergleich fällt je
+    Stadt anders aus), ohne neue Fakten zu erfinden. */
+export function yieldVsTier(c: CityData, m: CityMetrics): string {
+  const avg = tierAvgYield(c.tier);
+  const y = m.grossYield.toLocaleString("de-DE");
+  const a = avg.toLocaleString("de-DE");
+  const diff = m.grossYield - avg;
+  if (Math.abs(diff) < 0.2)
+    return `Mit rund ${y} % liegt die Brutto-Anfangsrendite in ${c.city} etwa im Durchschnitt vergleichbarer Städte derselben Kategorie (Tier ${c.tier} ≈ ${a} %).`;
+  if (diff > 0)
+    return `Mit rund ${y} % liegt die Brutto-Anfangsrendite in ${c.city} über dem Durchschnitt vergleichbarer Städte derselben Kategorie (Tier ${c.tier} ≈ ${a} %) — rechnerisch mehr laufender Ertrag, den du gegen Lage und Risiko abwägen solltest.`;
+  return `Mit rund ${y} % liegt die Brutto-Anfangsrendite in ${c.city} unter dem Durchschnitt vergleichbarer Städte derselben Kategorie (Tier ${c.tier} ≈ ${a} %) — typisch für besonders gefragte Lagen, in denen Käufer vor allem für Wertstabilität zahlen.`;
+}
+
+/** Qualitatives Anleger-Profil aus den vorhandenen Signalen (Tier, Rendite,
+    Bevölkerungstrend, Leerstand). Interpretation der kuratierten Daten —
+    keine neuen Marktzahlen. */
+export function investorProfile(c: CityData, m: CityMetrics): string {
+  const growth = c.populationTrend === "growing";
+  const shrinking = c.populationTrend === "shrinking";
+  const lowVacancy = c.vacancyRate < 1.5;
+  const highYield = m.grossYield >= 4.5;
+  if (highYield && growth)
+    return `${c.city} verbindet eine überdurchschnittliche Anfangsrendite mit wachsender Nachfrage — eine seltene Kombination, die cashflow- wie wertorientierte Anleger anspricht. Umso wichtiger ist die genaue Objektprüfung, denn günstige Einstiege sind schnell vergriffen.`;
+  if (highYield)
+    return `${c.city} passt eher zu cashflow-orientierten Anlegern: Die vergleichsweise hohe Anfangsrendite liefert laufenden Ertrag, dafür ${shrinking ? "ist die rückläufige Nachfrage genau im Blick zu behalten" : "solltest du Vermietbarkeit und Wertentwicklung genau prüfen"}. Für Vermögensaufbau allein über Wertsteigerung ist der Markt weniger geeignet.`;
+  if (growth && lowVacancy)
+    return `${c.city} spricht eher wertorientierte Anleger an: Wachsende Bevölkerung und niedriger Leerstand sprechen für stabile Vermietung und Wertentwicklung; die niedrigere Anfangsrendite ist der Preis für diese Sicherheit. Für positiven Cashflow ab Tag eins braucht es hier viel Eigenkapital.`;
+  return `${c.city} ist ein ausgewogener Markt: weder Spitzenrendite noch Spitzenlage, dafür ein berechenbares Profil. Entscheidend ist hier der einzelne Kaufpreis — ein guter Einkauf macht den Unterschied.`;
+}
+
 /** Bis zu n weitere Städte im selben Bundesland (für interne Verlinkung). */
 export function sameStatePeers(c: CityData, n = 6): CityData[] {
   return CITIES.filter((x) => x.state === c.state && x.city !== c.city).slice(0, n);

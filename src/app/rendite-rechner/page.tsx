@@ -159,8 +159,10 @@ export default function RenditeRechnerPage() {
         <div style={formula}>Kaufpreisfaktor = Kaufpreis ÷ Jahreskaltmiete&nbsp;&nbsp;(= 100 ÷ Bruttorendite in %)</div>
         <p style={para}>
           Im Beispiel: 250.000 ÷ 9.000 = <strong style={{ color: C.text }}>27,8</strong>. Ein Faktor von 20 entspricht
-          5 % Bruttorendite, ein Faktor von 25 genau 4 %. Wie hoch der Faktor in deiner Stadt üblich ist, siehst du auf
-          den <Link href="/kapitalanlage" style={{ color: C.accent, textDecoration: "none" }}>Marktdaten-Seiten nach Stadt</Link>.
+          5 % Bruttorendite, ein Faktor von 25 genau 4 %. Nur den Faktor bestimmen und einordnen? Das geht fokussiert im{" "}
+          <Link href="/kaufpreisfaktor-rechner" style={{ color: C.accent, textDecoration: "none" }}>Kaufpreisfaktor-Rechner</Link>.
+          Wie hoch der Faktor in deiner Stadt üblich ist, siehst du auf den{" "}
+          <Link href="/kapitalanlage" style={{ color: C.accent, textDecoration: "none" }}>Marktdaten-Seiten nach Stadt</Link>.
         </p>
       </div>
 
@@ -207,6 +209,7 @@ export default function RenditeRechnerPage() {
         <ul style={{ ...para, paddingLeft: 20, margin: 0 }}>
           <li><Link href="/wissen/kennzahlen/rendite-berechnen" style={{ color: C.accent, textDecoration: "none" }}>Rendite richtig berechnen</Link> — alle Kennzahlen im Detail</li>
           <li><Link href="/wissen/kennzahlen/mietrendite-berechnen" style={{ color: C.accent, textDecoration: "none" }}>Mietrendite berechnen</Link> — Brutto vs. Netto Schritt für Schritt</li>
+          <li><Link href="/kaufpreisfaktor-rechner" style={{ color: C.accent, textDecoration: "none" }}>Kaufpreisfaktor-Rechner</Link> — Vervielfältiger berechnen &amp; einordnen</li>
           <li><Link href="/wissen/kennzahlen/kaufpreisfaktor-anlageimmobilie-zu-teuer" style={{ color: C.accent, textDecoration: "none" }}>Kaufpreisfaktor</Link> — wann eine Immobilie zu teuer ist</li>
           <li><Link href="/wissen/kennzahlen/cashflow-analyse" style={{ color: C.accent, textDecoration: "none" }}>Cashflow-Analyse im Detail</Link></li>
         </ul>

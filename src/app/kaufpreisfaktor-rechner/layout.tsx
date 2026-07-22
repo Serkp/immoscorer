@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { C } from "@/lib/theme";
 
-/* Eigene, leichte Chrome für den öffentlichen SEO-Bereich „Kapitalanlage nach Stadt"
-   (analog zum /wissen-Bereich) — server-gerendert, crawlbare interne Links. */
+/* Eigene, leichte Chrome für den öffentlichen Rechner-Bereich — server-gerendert,
+   crawlbare interne Links (analog zu /rendite-rechner und /kapitalanlage). */
 
 const NAV = [
   { href: "/analysis", label: "Tool" },
@@ -21,7 +21,7 @@ const LEGAL = [
   { href: "/widerruf", label: "Widerruf" },
 ];
 
-export default function KapitalanlageLayout({ children }: { children: ReactNode }) {
+export default function KaufpreisfaktorLayout({ children }: { children: ReactNode }) {
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text }}>
       <header

@@ -8,8 +8,8 @@ import { C } from "@/lib/theme";
 const NAV = [
   { href: "/analysis", label: "Tool" },
   { href: "/rendite-rechner", label: "Renditerechner" },
+  { href: "/kaufpreisfaktor-rechner", label: "Kaufpreisfaktor" },
   { href: "/check", label: "Sprach-Check" },
-  { href: "/besichtigung", label: "Besichtigung" },
   { href: "/kapitalanlage", label: "Kapitalanlage" },
   { href: "/wissen", label: "Wissen" },
 ];
