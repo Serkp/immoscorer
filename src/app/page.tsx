@@ -376,6 +376,13 @@ function MiniRechner({ onCta }: { onCta: () => void }) {
           <p className="text-center text-[11px] mt-2" style={{ color: C.dim }}>
             Unbegrenzt kostenlos &middot; kein Account nötig
           </p>
+          <Link
+            href="/rendite-rechner"
+            className="block text-center text-[11px] mt-1.5 font-medium transition-opacity hover:opacity-80"
+            style={{ color: C.accent }}
+          >
+            Netto­rendite, Kaufpreisfaktor &amp; Cashflow im Renditerechner →
+          </Link>
         </div>
       ) : (
         <div
@@ -490,6 +497,13 @@ function LandingContent() {
                 style={{ color: C.accent }}
               >
                 🏠 Besichtigung
+              </Link>
+              <Link
+                href="/rendite-rechner"
+                className="hidden md:inline-block text-sm font-medium transition-opacity hover:opacity-80"
+                style={{ color: C.sub }}
+              >
+                Renditerechner
               </Link>
               <Link
                 href="/wissen"

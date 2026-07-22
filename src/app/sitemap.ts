@@ -41,6 +41,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 0.8,
     },
+    {
+      url: absoluteUrl("/rendite-rechner"),
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+    },
   ];
 
   const cityPages: MetadataRoute.Sitemap = CITIES.map((c) => ({

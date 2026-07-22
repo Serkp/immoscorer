@@ -44,6 +44,9 @@ export default function KapitalanlageHub() {
         <Link href="/analysis" style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.blue})`, color: "#fff", fontWeight: 700, fontSize: 14, padding: "11px 18px", borderRadius: 12, textDecoration: "none" }}>
           Objekt jetzt bewerten →
         </Link>
+        <Link href="/rendite-rechner" style={{ border: `1px solid ${C.border}`, color: C.text, fontWeight: 700, fontSize: 14, padding: "11px 18px", borderRadius: 12, textDecoration: "none" }}>
+          Renditerechner
+        </Link>
         <Link href="/check" style={{ border: `1px solid ${C.border}`, color: C.text, fontWeight: 700, fontSize: 14, padding: "11px 18px", borderRadius: 12, textDecoration: "none" }}>
           🎤 Per Sprache prüfen
         </Link>

@@ -17,6 +17,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     "/check",
     "/besichtigung",
     "/kapitalanlage",
+    "/rendite-rechner",
     "/impressum",
     "/datenschutz",
     "/agb",

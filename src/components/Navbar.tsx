@@ -10,6 +10,7 @@ import { useTheme } from "@/lib/ThemeContext";
 // Login-frei: alle Tools sind kostenlos und ohne Account nutzbar.
 const NAV = [
   { href: "/analysis", label: "Analyse" },
+  { href: "/rendite-rechner", label: "Renditerechner" },
   { href: "/check", label: "Sprach-Check" },
   { href: "/besichtigung", label: "Besichtigung" },
   { href: "/kapitalanlage", label: "Kapitalanlage" },

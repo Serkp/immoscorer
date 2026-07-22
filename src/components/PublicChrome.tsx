@@ -27,6 +27,13 @@ export function PublicHeader() {
         </Link>
         <nav className="flex items-center gap-4">
           <Link
+            href="/rendite-rechner"
+            className="hidden sm:inline text-sm font-medium transition-opacity hover:opacity-80"
+            style={{ color: C.sub }}
+          >
+            Renditerechner
+          </Link>
+          <Link
             href="/wissen"
             className="hidden sm:inline text-sm font-medium transition-opacity hover:opacity-80"
             style={{ color: C.sub }}
@@ -50,6 +57,8 @@ export function PublicHeader() {
 }
 
 const FOOTER_LINKS = [
+  { href: "/rendite-rechner", label: "Renditerechner" },
+  { href: "/kapitalanlage", label: "Kapitalanlage" },
   { href: "/wissen", label: "Wissen" },
   { href: "/impressum", label: "Impressum" },
   { href: "/datenschutz", label: "Datenschutz" },

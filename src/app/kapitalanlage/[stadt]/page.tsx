@@ -108,7 +108,8 @@ export default function CityPage({ params }: { params: { stadt: string } }) {
       <div style={sec}>
         <h2 style={h2}>Rendite &amp; Kaufpreisfaktor</h2>
         <p style={para}>
-          Aus der Durchschnittsmiete von ca. {c.avgRentPerSqm.toLocaleString("de-DE")} €/m² ergibt sich eine <strong style={{ color: C.text }}>Brutto-Anfangsrendite von rund {m.grossYield.toLocaleString("de-DE")} %</strong> — das entspricht einem Kaufpreisfaktor von etwa {m.factor.toLocaleString("de-DE")}. Diese Rendite ist {yieldVerdict(m.grossYield)}. Entscheidend bleibt der Einzelfall: Lage, Zustand, Hausgeld und Finanzierung verschieben das Ergebnis deutlich.
+          Aus der Durchschnittsmiete von ca. {c.avgRentPerSqm.toLocaleString("de-DE")} €/m² ergibt sich eine <strong style={{ color: C.text }}>Brutto-Anfangsrendite von rund {m.grossYield.toLocaleString("de-DE")} %</strong> — das entspricht einem Kaufpreisfaktor von etwa {m.factor.toLocaleString("de-DE")}. Diese Rendite ist {yieldVerdict(m.grossYield)}. Entscheidend bleibt der Einzelfall: Lage, Zustand, Hausgeld und Finanzierung verschieben das Ergebnis deutlich.{" "}
+          <Link href="/rendite-rechner" style={{ color: C.accent, textDecoration: "none" }}>Rendite, Kaufpreisfaktor und Cashflow für ein konkretes Objekt selbst berechnen →</Link>
         </p>
       </div>
 
@@ -140,7 +141,7 @@ export default function CityPage({ params }: { params: { stadt: string } }) {
           </table>
         </div>
         <p style={{ ...para, fontSize: 12.5, marginTop: 10, color: C.dim }}>
-          Vereinfachte Brutto-Rechnung ohne Kaufnebenkosten, Hausgeld und Finanzierung. Für die echte Netto-Rendite dein konkretes Objekt im ImmoScorer durchrechnen.
+          Vereinfachte Brutto-Rechnung ohne Kaufnebenkosten, Hausgeld und Finanzierung. Für die echte Netto-Rendite dein konkretes Objekt im <Link href="/rendite-rechner" style={{ color: C.accent, textDecoration: "none" }}>Renditerechner</Link> durchrechnen.
         </p>
       </div>
 
